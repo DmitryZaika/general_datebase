@@ -10,6 +10,7 @@ import {
   redirect,
   useFetcher,
   useLoaderData,
+  useLocation,
   useNavigation,
 } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
@@ -17,13 +18,16 @@ import { Spinner } from '~/components/atoms/Spinner'
 import { Image } from '~/components/molecules/Image'
 import { ImageFolderCard } from '~/components/molecules/ImageFolderCard'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { MediaGridContentSkeleton } from '~/components/organisms/MediaGridSkeleton'
 import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
 import { useArrowToggle } from '~/hooks/useArrowToggle'
 import { useImagesFolderNavigation } from '~/hooks/useImagesFolderNavigation'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import { cn } from '~/lib/utils'
 import { csrf } from '~/utils/csrf.server'
 import { loadImagesLibrary } from '~/utils/imagesLibrary.server'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 
@@ -87,6 +91,9 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function AdminImages() {
   const { folders, rootImages } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
+  const location = useLocation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location, ['folder_id'])
+  useScrollMainToTopWhenLoading(isListLoading)
   const fetcher = useFetcher()
   const csrfToken = useAuthenticityToken()
   const [isAddingImage, setIsAddingImage] = useState(false)
@@ -154,7 +161,7 @@ export default function AdminImages() {
 
   return (
     <>
-      <div className='mb-6 flex flex-wrap items-center gap-3'>
+      <div className='mb-6 flex flex-wrap items-center gap-3 px-2'>
         {isFolderOpen && activeFolder ? (
           <Button
             type='button'
@@ -192,17 +199,25 @@ export default function AdminImages() {
           </>
         )}
       </div>
-      {isFolderOpen && activeFolder ? (
-        <h2 className='mb-4 text-xl font-semibold'>{activeFolder.name}</h2>
+      {isFolderOpen && activeFolder && !isListLoading ? (
+        <h2 className='mb-4 px-2 text-xl font-semibold'>{activeFolder.name}</h2>
       ) : null}
-      {isEmpty ? (
-        <p className='text-muted-foreground'>
+      {isListLoading ? (
+        <div className='px-2'>
+          <MediaGridContentSkeleton
+            showFolderHeader={isFolderOpen}
+            layout='admin'
+            cardCount={isFolderOpen ? 12 : 18}
+          />
+        </div>
+      ) : isEmpty ? (
+        <p className='px-2 text-muted-foreground'>
           {isFolderOpen
             ? 'This folder has no images yet.'
             : 'No images or folders yet.'}
         </p>
       ) : (
-        <div className='grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3'>
+        <div className='grid grid-cols-2 gap-3 px-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7'>
           {!isFolderOpen
             ? folders.map(folder => (
                 <ImageFolderCard

@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { motion } from 'framer-motion'
 import { useEffect } from 'react'
 import {
   type ActionFunctionArgs,
@@ -30,6 +31,7 @@ import {
   loadDealsBoardMaps,
 } from '~/utils/dealsBoardLoader.server'
 import { dealsLayoutShouldRevalidate } from '~/utils/dealsLayoutShouldRevalidate'
+import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -286,25 +288,26 @@ export default function EmployeeDeals() {
   )
 
   return (
-    <DealsBoardShell dealsBasePath='/employee/deals'>
-      <DealsView
-        deals={deals}
-        customers={customers}
-        lists={lists}
-        imagesMap={imagesMap}
-        emailsMap={emailsMap}
-        nearestActivityMap={nearestActivityMap}
-        activitiesMap={activitiesMap}
-        activitiesIconMap={activitiesIconMap}
-        notesMap={notesMap}
-        animateBoard
-        groupListSelect={
-          <div className='flex gap-2 '>
-            {groupSelect}
-            {statusSelect}
-          </div>
-        }
-      />
-    </DealsBoardShell>
+    <motion.div className='w-full' {...EMPLOYEE_VIEW_ENTER}>
+      <DealsBoardShell dealsBasePath='/employee/deals'>
+        <DealsView
+          deals={deals}
+          customers={customers}
+          lists={lists}
+          imagesMap={imagesMap}
+          emailsMap={emailsMap}
+          nearestActivityMap={nearestActivityMap}
+          activitiesMap={activitiesMap}
+          activitiesIconMap={activitiesIconMap}
+          notesMap={notesMap}
+          groupListSelect={
+            <div className='flex gap-2 '>
+              {groupSelect}
+              {statusSelect}
+            </div>
+          }
+        />
+      </DealsBoardShell>
+    </motion.div>
   )
 }

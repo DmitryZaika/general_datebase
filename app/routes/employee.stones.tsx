@@ -1,5 +1,6 @@
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
+import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   Link,
@@ -10,6 +11,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useNavigation,
   useSearchParams,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
@@ -17,12 +19,16 @@ import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { ImageCard } from '~/components/organisms/ImageCard'
+import { InventoryCatalogContentSkeleton } from '~/components/organisms/InventoryCatalogSkeleton'
 import { StoneTable } from '~/components/organisms/StoneTable'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { cleanParams } from '~/hooks/use-safe-search-params'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import { stoneFilterSchema } from '~/schemas/stones'
+import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
 import { withIconSuffix } from '~/utils/files'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getEmployeeUser } from '~/utils/session.server'
 import { stoneListShouldRevalidate } from '~/utils/stoneListShouldRevalidate'
@@ -197,6 +203,10 @@ export default function Stones() {
 
   const navigate = useNavigate()
   const location = useLocation()
+  const navigation = useNavigation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location)
+
+  useScrollMainToTopWhenLoading(isListLoading)
 
   useEffect(() => {
     const withImage = stones.filter(
@@ -356,57 +366,71 @@ export default function Stones() {
 
   return (
     <>
-      <div className='flex justify-between flex-wrap items-center items-end mb-2'>
-        <div className='flex items-center gap-4'>
-          <LoadingButton
-            variant='outline'
-            type='button'
-            loading={isViewTogglePending}
-            onClick={toggleViewMode}
-            className='ml-2'
-            title={viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Grid View'}
-          >
+      <motion.div
+        key={location.pathname}
+        className='w-full min-h-0'
+        {...EMPLOYEE_VIEW_ENTER}
+      >
+        <div className='flex justify-between flex-wrap items-center items-end mb-2'>
+          <div className='flex items-center gap-4'>
+            <LoadingButton
+              variant='outline'
+              type='button'
+              loading={isViewTogglePending}
+              onClick={toggleViewMode}
+              className='ml-2'
+              title={
+                viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Grid View'
+              }
+            >
+              {viewMode === 'grid' ? (
+                <TableIcon className='mr-1' />
+              ) : (
+                <GridIcon className='mr-1' />
+              )}
+              {viewMode === 'grid' ? 'Table View' : 'Grid View'}
+            </LoadingButton>
+
+            <Link to={`sell-slab${location.search}`}>
+              <Button variant='default'>Sell Slab</Button>
+            </Link>
+          </div>
+          <div className='flex-1 flex justify-center md:justify-end md:ml-auto'>
+            <StoneSearch userRole='employee' companyId={companyId} />
+          </div>
+        </div>
+
+        {!isListLoading ? (
+          <>
+            <div className='w-full col-span-full'>
+              <SuperCarousel
+                type='stones'
+                currentId={currentId}
+                setCurrentId={setCurrentId}
+                images={sortedStones}
+                userRole='employee'
+              />
+            </div>
+
             {viewMode === 'grid' ? (
-              <TableIcon className='mr-1' />
+              <ModuleList skipItemMountAnimation>
+                {sortedStones.map(stone => (
+                  <InteractiveCard
+                    key={stone.id}
+                    stone={stone}
+                    setCurrentId={setCurrentId}
+                    stoneType={stone.type}
+                  />
+                ))}
+              </ModuleList>
             ) : (
-              <GridIcon className='mr-1' />
+              <StoneTable stones={sortedStones} columns={columns} />
             )}
-            {viewMode === 'grid' ? 'Table View' : 'Grid View'}
-          </LoadingButton>
+          </>
+        ) : null}
+      </motion.div>
 
-          <Link to={`sell-slab${location.search}`}>
-            <Button variant='default'>Sell Slab</Button>
-          </Link>
-        </div>
-        <div className='flex-1 flex justify-center md:justify-end md:ml-auto'>
-          <StoneSearch userRole='employee' companyId={companyId} />
-        </div>
-      </div>
-
-      <div className='w-full col-span-full'>
-        <SuperCarousel
-          type='stones'
-          currentId={currentId}
-          setCurrentId={setCurrentId}
-          images={sortedStones}
-          userRole='employee'
-        />
-      </div>
-
-      {viewMode === 'grid' ? (
-        <ModuleList>
-          {sortedStones.map(stone => (
-            <InteractiveCard
-              key={stone.id}
-              stone={stone}
-              setCurrentId={setCurrentId}
-              stoneType={stone.type}
-            />
-          ))}
-        </ModuleList>
-      ) : (
-        <StoneTable stones={sortedStones} columns={columns} animateRowEntrance />
-      )}
+      {isListLoading ? <InventoryCatalogContentSkeleton fieldLineCount={4} /> : null}
 
       <Outlet />
     </>

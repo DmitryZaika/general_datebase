@@ -6,14 +6,18 @@ import {
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigation,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { InventoryCatalogContentSkeleton } from '~/components/organisms/InventoryCatalogSkeleton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { cleanParams } from '~/hooks/use-safe-search-params'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import { faucetFilterSchema } from '~/schemas/faucets'
 import { FAUCET_TYPES } from '~/utils/constants'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { type Faucet, faucetQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
 
@@ -48,6 +52,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminFaucets() {
   const { faucets } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
+  const location = useLocation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location)
+  useScrollMainToTopWhenLoading(isListLoading)
   const [isAddingFaucet, setIsAddingFaucet] = useState(false)
   const [sortedFaucets, setSortedFaucets] = useState<Faucet[]>(faucets)
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
@@ -114,8 +121,10 @@ export default function AdminFaucets() {
         </Link>
       </div>
 
-      <div>
-        <ModuleList>
+      {isListLoading ? (
+        <InventoryCatalogContentSkeleton fieldLineCount={2} />
+      ) : (
+        <ModuleList skipItemMountAnimation>
           <div className='w-full col-span-full'>
             <SuperCarousel
               type='faucets'
@@ -200,8 +209,8 @@ export default function AdminFaucets() {
             )
           })}
         </ModuleList>
-        <Outlet />
-      </div>
+      )}
+      <Outlet />
     </>
   )
 }

@@ -234,6 +234,7 @@ export default function DealsView({
   const [activeId, setActiveId] = useState<Nullable<number>>(null)
   const [highlightDealId, setHighlightDealId] = useState<Nullable<number>>(null)
   const highlightTimeoutRef = useRef<Nullable<NodeJS.Timeout>>(null)
+  const processedHighlightParamRef = useRef<Nullable<string>>(null)
   const mobileBoardScrollRef = useRef<Nullable<HTMLDivElement>>(null)
   const dragPointerClientXRef = useRef<Nullable<number>>(null)
   const lastMobileColumnSlideAtRef = useRef(0)
@@ -248,38 +249,80 @@ export default function DealsView({
     }
   }, [])
 
+  const applyDealHighlight = useCallback(
+    (dealId: number, options?: { clearUrlHighlight?: boolean }) => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current)
+      }
+
+      setHighlightDealId(dealId)
+
+      window.requestAnimationFrame(() => {
+        const el = document.getElementById(`deal-${dealId}`)
+        if (el) {
+          el.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'center',
+          })
+        }
+      })
+
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightDealId(null)
+        highlightTimeoutRef.current = null
+        if (options?.clearUrlHighlight && searchParams.get('highlight')) {
+          processedHighlightParamRef.current = null
+          const newParams = new URLSearchParams(searchParams)
+          newParams.delete('highlight')
+          navigate(
+            { pathname: location.pathname, search: newParams.toString() },
+            { replace: true },
+          )
+        }
+      }, 2010)
+    },
+    [searchParams, navigate, location.pathname],
+  )
+
+  const isHighlightNavigation = searchParams.has('highlight')
+  const showBoardSkeleton = isListLoading && !isHighlightNavigation
+
   useEffect(() => {
     const highlight = searchParams.get('highlight')
-    if (highlight) {
-      const dealId = parseInt(highlight, 10)
-      if (!Number.isNaN(dealId)) {
-        if (highlightTimeoutRef.current) {
-          clearTimeout(highlightTimeoutRef.current)
-        }
-        setTimeout(() => {
-          const el = document.getElementById(`deal-${dealId}`)
-          if (el) {
-            el.scrollIntoView({
-              behavior: 'smooth',
-              block: 'center',
-              inline: 'center',
-            })
-            setHighlightDealId(dealId)
-            highlightTimeoutRef.current = setTimeout(() => {
-              setHighlightDealId(null)
-              highlightTimeoutRef.current = null
-              const newParams = new URLSearchParams(searchParams)
-              newParams.delete('highlight')
-              navigate(
-                { pathname: location.pathname, search: newParams.toString() },
-                { replace: true },
-              )
-            }, 2010)
-          }
-        }, 100)
-      }
+    if (!highlight) {
+      processedHighlightParamRef.current = null
+      return
     }
-  }, [searchParams, board])
+
+    if (processedHighlightParamRef.current === highlight) {
+      return
+    }
+
+    const dealId = parseInt(highlight, 10)
+    if (Number.isNaN(dealId)) {
+      return
+    }
+
+    if (isListLoading) {
+      return
+    }
+
+    const isInBoard = lists.some(l => board[l.id]?.some(d => d.id === dealId))
+    if (!isInBoard) {
+      return
+    }
+
+    processedHighlightParamRef.current = highlight
+
+    const scrollTimeout = window.setTimeout(() => {
+      applyDealHighlight(dealId, { clearUrlHighlight: true })
+    }, 100)
+
+    return () => {
+      window.clearTimeout(scrollTimeout)
+    }
+  }, [searchParams, board, isListLoading, lists, applyDealHighlight])
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -560,29 +603,7 @@ export default function DealsView({
             }
           }
 
-          if (highlightTimeoutRef.current) {
-            clearTimeout(highlightTimeoutRef.current)
-          }
-
-          setHighlightDealId(null)
-
-          const el = document.getElementById(`deal-${dealId}`)
-          if (el) {
-            el.scrollIntoView({
-              behavior: 'smooth',
-              block: 'center',
-              inline: 'center',
-            })
-          }
-
-          setTimeout(() => {
-            setHighlightDealId(dealId)
-          }, 10)
-
-          highlightTimeoutRef.current = setTimeout(() => {
-            setHighlightDealId(null)
-            highlightTimeoutRef.current = null
-          }, 2010)
+          applyDealHighlight(dealId)
         }}
         resolveId={findDealIdByCustomer}
         noActionsLabel='No Deals'
@@ -609,14 +630,14 @@ export default function DealsView({
       readonly={readonly}
       highlightedDealId={highlightDealId ?? undefined}
       columnMotionVariants={
-        animateBoard && showBoardEntrance && !isListLoading
+        animateBoard && showBoardEntrance && !showBoardSkeleton
           ? DEALS_BOARD_COLUMN_VARIANTS
           : undefined
       }
     />
   ))
 
-  const listsContent = isListLoading ? (
+  const listsContent = showBoardSkeleton ? (
     <DealsBoardSkeleton />
   ) : animateBoard && showBoardEntrance ? (
     <motion.div
@@ -635,7 +656,7 @@ export default function DealsView({
   )
 
   if (readonly) {
-    if (animateBoard && showBoardEntrance && !isListLoading) {
+    if (animateBoard && showBoardEntrance && !showBoardSkeleton) {
       const boardAreaReadonly = (
         <div className='flex min-h-0 min-w-0 flex-1 flex-col'>{listsContent}</div>
       )
@@ -669,7 +690,7 @@ export default function DealsView({
   )
 
   const toolbarStickyMotion =
-    animateBoard && showBoardEntrance && !isListLoading ? (
+    animateBoard && showBoardEntrance && !showBoardSkeleton ? (
       <motion.div
         className='shrink-0 sticky top-0 z-20 bg-white'
         {...DEALS_TOOLBAR_MOTION}
@@ -705,7 +726,7 @@ export default function DealsView({
         lastMobileColumnSlideAtRef.current = 0
       }}
     >
-      {animateBoard && showBoardEntrance && !isListLoading ? (
+      {animateBoard && showBoardEntrance && !showBoardSkeleton ? (
         <motion.div
           className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col'
           {...DEALS_SHELL_MOTION}

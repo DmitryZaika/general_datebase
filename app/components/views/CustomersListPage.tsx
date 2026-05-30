@@ -18,7 +18,10 @@ import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SelectInput } from '~/components/molecules/SelectItem'
 import { CustomerActionDialogSkeletonContent } from '~/components/organisms/CustomerActionDialogSkeleton'
 import { CustomerCompactActionDialogSkeletonContent } from '~/components/organisms/CustomerCompactActionDialogSkeleton'
-import { CustomersTableSkeleton } from '~/components/organisms/CustomersTableSkeleton'
+import {
+  CustomersPaginationSkeleton,
+  CustomersTableSkeleton,
+} from '~/components/organisms/CustomersPageSkeleton'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
@@ -559,25 +562,32 @@ export function CustomersListPage() {
           </Link>
         )}
       </div>
-      <DataTablePagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        pageSize={pageSize}
-        totalRows={fullDisplayed.length}
-        onPageChange={p => {
-          const params = new URLSearchParams(searchParams)
-          params.set('page', String(p))
-          navigate({ pathname: location.pathname, search: params.toString() })
-        }}
-        onPageSizeChange={s => {
-          const params = new URLSearchParams(searchParams)
-          params.set('pageSize', String(s))
-          params.set('page', '1')
-          navigate({ pathname: location.pathname, search: params.toString() })
-        }}
-      />
       {isListLoading ? (
-        <CustomersTableSkeleton />
+        <CustomersPaginationSkeleton />
+      ) : (
+        <DataTablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalRows={fullDisplayed.length}
+          onPageChange={p => {
+            const params = new URLSearchParams(searchParams)
+            params.set('page', String(p))
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+          onPageSizeChange={s => {
+            const params = new URLSearchParams(searchParams)
+            params.set('pageSize', String(s))
+            params.set('page', '1')
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+        />
+      )}
+      {isListLoading ? (
+        <>
+          <CustomersTableSkeleton />
+          <CustomersPaginationSkeleton />
+        </>
       ) : (
         <DataTable
           key={`${tabParam}-${currentPage}-${viewParam}-${pageSize}-${salesRepParam ?? 'all'}`}
@@ -588,23 +598,25 @@ export function CustomersListPage() {
           onRowClick={customer => navigate(`info/${customer.id}${location.search}`)}
         />
       )}
-      <DataTablePagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        pageSize={pageSize}
-        totalRows={fullDisplayed.length}
-        onPageChange={p => {
-          const params = new URLSearchParams(searchParams)
-          params.set('page', String(p))
-          navigate({ pathname: location.pathname, search: params.toString() })
-        }}
-        onPageSizeChange={s => {
-          const params = new URLSearchParams(searchParams)
-          params.set('pageSize', String(s))
-          params.set('page', '1')
-          navigate({ pathname: location.pathname, search: params.toString() })
-        }}
-      />
+      {!isListLoading ? (
+        <DataTablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalRows={fullDisplayed.length}
+          onPageChange={p => {
+            const params = new URLSearchParams(searchParams)
+            params.set('page', String(p))
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+          onPageSizeChange={s => {
+            const params = new URLSearchParams(searchParams)
+            params.set('pageSize', String(s))
+            params.set('page', '1')
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+        />
+      ) : null}
       {showCustomerDialog ? (
         <Dialog open={true} onOpenChange={handleCustomerDialogClose}>
           <DialogContent

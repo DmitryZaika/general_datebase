@@ -13,6 +13,7 @@ import {
   ScrollRestoration,
   useLoaderData,
   useLocation,
+  useNavigation,
 } from 'react-router'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
@@ -20,9 +21,18 @@ import { SidebarProvider } from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
+import {
+  useScrollMainToTopOnSectionIdle,
+  useScrollMainToTopWhenLoading,
+} from '~/hooks/useScrollMainToTopWhenLoading'
 import type { ISupplier } from '~/schemas/suppliers'
 import { queryClient } from '~/utils/api'
+import { renderAppNavigationSkeleton } from '~/utils/appNavigationSkeleton'
 import { csrf } from '~/utils/csrf.server'
+import {
+  getSidebarSection,
+  isSidebarSectionChange,
+} from '~/utils/employeeSidebarNavigation'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import {
   getSuperAdminCompanies,
@@ -328,6 +338,20 @@ export default function App() {
     userIsSuperAdmin,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
+  const navigation = useNavigation()
+  const navPath = navigation.location?.pathname ?? ''
+  const showSidebarPageSkeleton =
+    (pathname.startsWith('/employee') || pathname.startsWith('/admin')) &&
+    navigation.state === 'loading' &&
+    (navPath.startsWith('/employee') || navPath.startsWith('/admin')) &&
+    navPath !== pathname &&
+    isSidebarSectionChange(pathname, navPath)
+  useScrollMainToTopWhenLoading(showSidebarPageSkeleton)
+  useScrollMainToTopOnSectionIdle(pathname, navigation.state)
+  const sidebarNavigationSkeleton = renderAppNavigationSkeleton(
+    getSidebarSection(navPath),
+    navPath,
+  )
   const { toast } = useToast()
   const _isMobile = useIsMobile()
   const isLogin = pathname === '/login'
@@ -422,10 +446,19 @@ export default function App() {
                   />
                 )}
                 <div className='relative'>
-                  <Outlet />
+                  {showSidebarPageSkeleton ? sidebarNavigationSkeleton : <Outlet />}
                 </div>
                 <Toaster />
-                <ScrollRestoration />
+                <ScrollRestoration
+                  getKey={location => {
+                    const section = getSidebarSection(location.pathname)
+                    const root = location.pathname.split('/').filter(Boolean)[0]
+                    if ((root === 'employee' || root === 'admin') && section) {
+                      return `${root}/${section}`
+                    }
+                    return location.pathname
+                  }}
+                />
                 <Scripts />
                 <Posthog />
                 {!isInstallerRoute && !isCheckIn && user && <Chat />}

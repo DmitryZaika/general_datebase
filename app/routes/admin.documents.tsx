@@ -7,13 +7,16 @@ import {
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigation,
 } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { DataTableSkeleton } from '~/components/organisms/DataTableSkeleton'
 import { DataTable } from '~/components/ui/data-table'
-
 import { db } from '~/db.server'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 
@@ -64,6 +67,9 @@ const documentColumns: ColumnDef<Document>[] = [
 export default function Documents() {
   const { documents } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
+  const location = useLocation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location)
+  useScrollMainToTopWhenLoading(isListLoading)
   const [isAddingDocument, setIsAddingDocument] = useState(false)
 
   useEffect(() => {
@@ -84,7 +90,11 @@ export default function Documents() {
           Add Document
         </LoadingButton>
       </Link>
-      <DataTable columns={documentColumns} data={documents} />
+      {isListLoading ? (
+        <DataTableSkeleton columnCount={2} rowCount={8} />
+      ) : (
+        <DataTable columns={documentColumns} data={documents} />
+      )}
       <Outlet />
     </div>
   )

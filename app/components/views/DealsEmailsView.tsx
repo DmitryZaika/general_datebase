@@ -23,6 +23,10 @@ import {
   useRevalidator,
   useSearchParams,
 } from 'react-router'
+import {
+  EmailsListSkeleton,
+  EmailsPaginationSkeleton,
+} from '~/components/organisms/EmailsPageSkeleton'
 import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
 import { parseEmailAddress } from '~/utils/stringHelpers'
@@ -37,7 +41,6 @@ import {
   SelectValue,
 } from '../ui/select'
 import { Sheet, SheetContent, SheetTrigger } from '../ui/sheet'
-import { Skeleton } from '../ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 
 export interface Email {
@@ -987,41 +990,7 @@ export default function DealsEmailsView({
         {/* Email List */}
         <div ref={listScrollRef} className='flex-1 overflow-y-auto'>
           {isLoading ? (
-            <div className='divide-y divide-gray-100'>
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div
-                  key={i}
-                  className='group relative border-b border-transparent bg-white px-3 py-1.5'
-                >
-                  <div className='relative z-[2] flex w-full min-w-0 items-stretch gap-3'>
-                    <div className='flex shrink-0 items-center self-stretch'>
-                      <Skeleton className='size-4.5 rounded' />
-                    </div>
-                    <div className='flex flex-1 min-w-0 flex-col gap-0.5 md:hidden'>
-                      <div className='flex items-center justify-between gap-2'>
-                        <Skeleton className='h-4 w-36 max-w-[65%]' />
-                        <div className='flex flex-shrink-0 items-center gap-2'>
-                          <Skeleton className='h-9 w-24' />
-                          <Skeleton className='h-3 w-10' />
-                        </div>
-                      </div>
-                      <Skeleton className='h-4 w-full max-w-[260px]' />
-                      <Skeleton className='h-4 w-full max-w-[220px]' />
-                    </div>
-                    <div className='hidden min-h-9 flex-1 items-center gap-4 md:flex'>
-                      {adminMode && <Skeleton className='h-4 w-32 flex-shrink-0' />}
-                      <Skeleton className='h-4 w-48 flex-shrink-0' />
-                      <div className='flex min-w-0 flex-1 items-center gap-2'>
-                        <Skeleton className='h-4 max-w-[200px] w-[40%] flex-shrink-0' />
-                        <Skeleton className='h-4 min-w-0 flex-1' />
-                      </div>
-                      <Skeleton className='h-9 w-24 flex-shrink-0' />
-                      <Skeleton className='h-3.5 w-16 flex-shrink-0' />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <EmailsListSkeleton adminMode={adminMode} />
           ) : sortedEmails.length === 0 ? (
             <div className='p-8 text-center text-muted-foreground'>
               {searchTerm
@@ -1300,43 +1269,47 @@ export default function DealsEmailsView({
           )}
         </div>
 
-        {isServerPagination && totalCountProp != null && pageSizeProp != null && (
-          <div className='flex items-center justify-between gap-4 px-3 py-2 border-t border-gray-200 bg-gray-50'>
-            <Button
-              variant='outline'
-              size='sm'
-              disabled={currentPageProp <= 1}
-              onClick={() => {
-                const next = new URLSearchParams(searchParams)
-                next.set('page', String(currentPageProp - 1))
-                navigate({ search: next.toString() })
-              }}
-            >
-              Previous
-            </Button>
-            <span className='text-sm text-gray-600'>
-              Page {currentPageProp} of{' '}
-              {Math.max(1, Math.ceil(totalCountProp / pageSizeProp))}
-              {totalCountProp > 0 && (
-                <span className='ml-1'>
-                  ({totalCountProp} conversation{totalCountProp !== 1 ? 's' : ''})
-                </span>
-              )}
-            </span>
-            <Button
-              variant='outline'
-              size='sm'
-              disabled={currentPageProp >= Math.ceil(totalCountProp / pageSizeProp)}
-              onClick={() => {
-                const next = new URLSearchParams(searchParams)
-                next.set('page', String(currentPageProp + 1))
-                navigate({ search: next.toString() })
-              }}
-            >
-              Next
-            </Button>
-          </div>
-        )}
+        {isServerPagination && totalCountProp != null && pageSizeProp != null ? (
+          isLoading ? (
+            <EmailsPaginationSkeleton />
+          ) : (
+            <div className='flex items-center justify-between gap-4 px-3 py-2 border-t border-gray-200 bg-gray-50'>
+              <Button
+                variant='outline'
+                size='sm'
+                disabled={currentPageProp <= 1}
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams)
+                  next.set('page', String(currentPageProp - 1))
+                  navigate({ search: next.toString() })
+                }}
+              >
+                Previous
+              </Button>
+              <span className='text-sm text-gray-600'>
+                Page {currentPageProp} of{' '}
+                {Math.max(1, Math.ceil(totalCountProp / pageSizeProp))}
+                {totalCountProp > 0 && (
+                  <span className='ml-1'>
+                    ({totalCountProp} conversation{totalCountProp !== 1 ? 's' : ''})
+                  </span>
+                )}
+              </span>
+              <Button
+                variant='outline'
+                size='sm'
+                disabled={currentPageProp >= Math.ceil(totalCountProp / pageSizeProp)}
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams)
+                  next.set('page', String(currentPageProp + 1))
+                  navigate({ search: next.toString() })
+                }}
+              >
+                Next
+              </Button>
+            </div>
+          )
+        ) : null}
       </div>
 
       {/* Mobile FAB for New Email */}

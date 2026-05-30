@@ -1,7 +1,23 @@
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { format } from 'date-fns'
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, User } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Briefcase,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  FileText,
+  Image,
+  Mail,
+  MessageSquare,
+  Phone,
+  Trash2,
+  User,
+  UserPlus,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
@@ -37,6 +53,11 @@ interface UserActivity {
   action: string
   created_at: string
   customer_name: string | null
+}
+
+interface GroupedUserActivity extends UserActivity {
+  count: number
+  groupKey: string
 }
 
 interface SmsActivityRow {
@@ -266,6 +287,561 @@ function compareActivityRows(
   return order === 'asc' ? cmp : -cmp
 }
 
+function ActivityActionIcon({
+  action,
+  iconClass = 'h-4 w-4 shrink-0 text-slate-500',
+}: {
+  action: string
+  iconClass?: string
+}) {
+  if (action === 'Made a call') return <Phone className={iconClass} />
+  if (action === 'Add Activity') return <ClipboardList className={iconClass} />
+  if (action === 'Complete Activity') return <CheckCircle2 className={iconClass} />
+  if (action === 'Delete Activity') return <Trash2 className={iconClass} />
+  if (action === 'Sent email') return <Mail className={iconClass} />
+  if (action === 'Sent a text') return <MessageSquare className={iconClass} />
+  if (action === 'Add Note') return <FileText className={iconClass} />
+  if (action === 'Delete Note') return <Trash2 className={iconClass} />
+  if (action === 'Created deal') return <Briefcase className={iconClass} />
+  if (action === 'Created customer') return <UserPlus className={iconClass} />
+  if (action === 'Created user') return <UserPlus className={iconClass} />
+  if (action === 'Added image to a deal') return <Image className={iconClass} />
+  if (action === 'Added document') return <FileText className={iconClass} />
+
+  return <ClipboardList className={iconClass} />
+}
+
+function ActivityActionCell({ action, count = 1 }: { action: string; count?: number }) {
+  let label = action
+  if (count > 1) {
+    if (action === 'Added image to a deal') {
+      label = `Added image to a deal (${count})`
+    } else {
+      label = `${action} (${count})`
+    }
+  }
+
+  return (
+    <div className='flex items-center gap-2'>
+      <ActivityActionIcon action={action} />
+      <span>{label}</span>
+    </div>
+  )
+}
+
+const ACTION_SUMMARY_ORDER = [
+  'Made a call',
+  'Sent a text',
+  'Sent email',
+  'Add Activity',
+  'Complete Activity',
+  'Add Note',
+  'Created deal',
+  'Created customer',
+  'Added image to a deal',
+  'Added document',
+  'Delete Activity',
+  'Delete Note',
+  'Created user',
+]
+
+function countActivitiesByAction(items: UserActivity[]) {
+  const counts = new Map<string, number>()
+  for (const item of items) {
+    counts.set(item.action, (counts.get(item.action) ?? 0) + 1)
+  }
+
+  const summary: { action: string; count: number }[] = []
+  for (const action of ACTION_SUMMARY_ORDER) {
+    const count = counts.get(action)
+    if (count && count > 0) {
+      summary.push({ action, count })
+    }
+    counts.delete(action)
+  }
+
+  for (const [action, count] of counts.entries()) {
+    if (count > 0) {
+      summary.push({ action, count })
+    }
+  }
+
+  return summary
+}
+
+function activityTimeGroupKey(createdAt: string) {
+  const date = new Date(createdAt)
+  if (Number.isNaN(date.getTime())) {
+    return createdAt
+  }
+  return date.toLocaleString()
+}
+
+function buildActivityGroupKey(item: UserActivity) {
+  const timeKey = activityTimeGroupKey(item.created_at)
+  const customerKey = (item.customer_name ?? '').trim().toLowerCase()
+  return `${timeKey}|${item.action}|${customerKey}`
+}
+
+function groupActivitiesByTimestamp(items: UserActivity[]): GroupedUserActivity[] {
+  const order: string[] = []
+  const groups = new Map<string, GroupedUserActivity>()
+
+  for (const item of items) {
+    const key = buildActivityGroupKey(item)
+    const existing = groups.get(key)
+    if (existing) {
+      existing.count += 1
+      continue
+    }
+    order.push(key)
+    groups.set(key, {
+      ...item,
+      count: 1,
+      groupKey: key,
+    })
+  }
+
+  return order.flatMap(key => {
+    const group = groups.get(key)
+    return group ? [group] : []
+  })
+}
+
+function ActivitySummaryRow({ items }: { items: UserActivity[] }) {
+  const summary = useMemo(() => countActivitiesByAction(items), [items])
+
+  if (summary.length === 0) {
+    return null
+  }
+
+  return (
+    <div className='mb-3 flex flex-wrap gap-2'>
+      {summary.map(({ action, count }) => (
+        <div
+          key={action}
+          className='flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700'
+        >
+          <ActivityActionIcon action={action} />
+          <span className='font-medium tabular-nums'>{count}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function timeToAngle(createdAt: string) {
+  const date = new Date(createdAt)
+  return dateToClockAngle(date.getHours() % 12, date.getMinutes(), date.getSeconds())
+}
+
+function dateToHourHandAngle(date: Date) {
+  const hours12 = date.getHours() % 12
+  return ((hours12 + date.getMinutes() / 60) / 12) * 360 - 90
+}
+
+function dateToMinuteHandAngle(date: Date) {
+  return ((date.getMinutes() + date.getSeconds() / 60) / 60) * 360 - 90
+}
+
+function dateToClockAngle(hours12: number, minutes: number, seconds: number) {
+  const clockPosition = hours12 + minutes / 60 + seconds / 3600
+  return (clockPosition / 12) * 360 - 90
+}
+
+function clockHandEnd(angleDeg: number, length: number) {
+  return angleToPoint(angleDeg, length)
+}
+
+function angleToPoint(angleDeg: number, radius: number, center = 50) {
+  const rad = (angleDeg * Math.PI) / 180
+  return {
+    x: center + radius * Math.cos(rad),
+    y: center + radius * Math.sin(rad),
+  }
+}
+
+function describeClockArc(startAngle: number, endAngle: number, radius = 43) {
+  let sweep = endAngle - startAngle
+  while (sweep <= 0) {
+    sweep += 360
+  }
+  if (sweep < 2) {
+    return ''
+  }
+  const start = angleToPoint(startAngle, radius)
+  const end = angleToPoint(startAngle + sweep, radius)
+  const largeArc = sweep > 180 ? 1 : 0
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`
+}
+
+const GAP_PADDING_DEG = 5
+const GAP_THRESHOLD_MS = 2 * 60 * 60 * 1000
+const ACTIVITY_OVERLAP_DEG = 12
+
+type ActivityClockBundle = {
+  id: string
+  angle: number
+  items: GroupedUserActivity[]
+}
+
+function angleDistance(first: number, second: number) {
+  let diff = Math.abs(first - second)
+  if (diff > 180) {
+    diff = 360 - diff
+  }
+  return diff
+}
+
+function averageAngle(angles: number[]) {
+  let x = 0
+  let y = 0
+  for (const angle of angles) {
+    const rad = (angle * Math.PI) / 180
+    x += Math.cos(rad)
+    y += Math.sin(rad)
+  }
+  return (Math.atan2(y, x) * 180) / Math.PI
+}
+
+function buildActivityBundles(
+  items: GroupedUserActivity[],
+  activityAngles: Map<string, number>,
+): ActivityClockBundle[] {
+  const bundles: ActivityClockBundle[] = items.map(item => ({
+    id: item.groupKey,
+    angle: activityAngles.get(item.groupKey) ?? timeToAngle(item.created_at),
+    items: [item],
+  }))
+
+  let merged = true
+  while (merged) {
+    merged = false
+    for (let index = 0; index < bundles.length; index += 1) {
+      for (let nextIndex = index + 1; nextIndex < bundles.length; nextIndex += 1) {
+        const current = bundles[index]
+        const next = bundles[nextIndex]
+        if (angleDistance(current.angle, next.angle) > ACTIVITY_OVERLAP_DEG) {
+          continue
+        }
+
+        const combinedItems = [...current.items, ...next.items].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        )
+        bundles[index] = {
+          id: current.id,
+          items: combinedItems,
+          angle: averageAngle(
+            combinedItems.map(
+              item => activityAngles.get(item.groupKey) ?? timeToAngle(item.created_at),
+            ),
+          ),
+        }
+        bundles.splice(nextIndex, 1)
+        merged = true
+        break
+      }
+      if (merged) {
+        break
+      }
+    }
+  }
+
+  return bundles
+}
+
+function bundleTotalCount(items: GroupedUserActivity[]) {
+  let total = 0
+  for (const item of items) {
+    total += item.count
+  }
+  return total
+}
+
+function formatActivityListTime(createdAt: string) {
+  const date = new Date(createdAt)
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+function ActivityClockBundleMarker({ bundle }: { bundle: ActivityClockBundle }) {
+  const pos = polarPosition(bundle.angle, 47)
+  const primary = bundle.items[0]
+  const totalCount = bundleTotalCount(bundle.items)
+  const isBundled = bundle.items.length > 1
+
+  return (
+    <div
+      className='group absolute z-10 -translate-x-1/2 -translate-y-1/2'
+      style={{ left: pos.left, top: pos.top }}
+    >
+      <div className='relative'>
+        {isBundled ? (
+          <>
+            <div className='absolute left-1 top-1 h-7 w-7 rounded-full border border-white bg-white shadow-sm ring-1 ring-slate-200' />
+            <div className='absolute left-0.5 top-0.5 h-7 w-7 rounded-full border border-white bg-white shadow ring-1 ring-slate-200' />
+          </>
+        ) : null}
+        <div
+          className='relative flex h-7 w-7 items-center justify-center rounded-full border border-white bg-white shadow-md ring-1 ring-slate-200'
+          title={
+            isBundled
+              ? undefined
+              : `${primary.action}${primary.customer_name ? ` · ${primary.customer_name}` : ''}`
+          }
+        >
+          <ActivityActionIcon
+            action={primary.action}
+            iconClass='h-3 w-3 shrink-0 text-slate-500'
+          />
+          {totalCount > 1 ? (
+            <span className='absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-slate-800 px-0.5 text-[9px] font-medium text-white'>
+              {totalCount}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {isBundled ? (
+        <div className='absolute bottom-full left-1/2 z-30 hidden min-w-[240px] -translate-x-1/2 pb-2 group-hover:block'>
+          <div className='rounded-md border border-slate-200 bg-white p-2 shadow-lg'>
+            <div className='max-h-48 space-y-1 overflow-y-auto'>
+              {bundle.items.map(item => (
+                <div
+                  key={item.groupKey}
+                  className='flex items-start gap-2 rounded px-1 py-1 text-xs text-slate-700 hover:bg-slate-50'
+                >
+                  <ActivityActionIcon
+                    action={item.action}
+                    iconClass='mt-0.5 h-3 w-3 shrink-0 text-slate-500'
+                  />
+                  <div className='min-w-0 flex-1'>
+                    <div className='font-medium'>
+                      {item.action}
+                      {item.count > 1 ? ` (${item.count})` : ''}
+                    </div>
+                    <div className='text-slate-500'>
+                      {formatActivityListTime(item.created_at)}
+                      {item.customer_name ? ` · ${item.customer_name}` : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function buildActivityGaps(
+  items: GroupedUserActivity[],
+  activityAngles: Map<string, number>,
+) {
+  const sorted = [...items].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  )
+
+  const slots: GroupedUserActivity[] = []
+  for (const item of sorted) {
+    const previous = slots[slots.length - 1]
+    if (
+      previous &&
+      activityTimeGroupKey(previous.created_at) ===
+        activityTimeGroupKey(item.created_at)
+    ) {
+      continue
+    }
+    slots.push(item)
+  }
+
+  const gaps: { startAngle: number; endAngle: number }[] = []
+
+  for (let index = 0; index < slots.length - 1; index += 1) {
+    const current = slots[index]
+    const next = slots[index + 1]
+    const startMs = new Date(current.created_at).getTime()
+    const endMs = new Date(next.created_at).getTime()
+    if (endMs - startMs > GAP_THRESHOLD_MS) {
+      gaps.push({
+        startAngle:
+          activityAngles.get(current.groupKey) ?? timeToAngle(current.created_at),
+        endAngle: activityAngles.get(next.groupKey) ?? timeToAngle(next.created_at),
+      })
+    }
+  }
+
+  if (gaps.length > 1) {
+    for (let index = 0; index < gaps.length; index += 1) {
+      if (index > 0) {
+        gaps[index].startAngle += GAP_PADDING_DEG
+      }
+      if (index < gaps.length - 1) {
+        gaps[index].endAngle -= GAP_PADDING_DEG
+      }
+    }
+  }
+
+  return gaps
+}
+
+function polarPosition(angleDeg: number, radiusPercent: number) {
+  const rad = (angleDeg * Math.PI) / 180
+  return {
+    left: `${50 + radiusPercent * Math.cos(rad)}%`,
+    top: `${50 + radiusPercent * Math.sin(rad)}%`,
+  }
+}
+
+function buildActivityAngles(items: GroupedUserActivity[]) {
+  const angles = new Map<string, number>()
+
+  for (const item of items) {
+    angles.set(item.groupKey, timeToAngle(item.created_at))
+  }
+
+  return angles
+}
+
+const CLOCK_HOUR_LABELS = Array.from({ length: 12 }, (_, index) => ({
+  label: String(index === 0 ? 12 : index),
+  angle: index * 30 - 90,
+}))
+
+function ActivityTimeline({ items }: { items: GroupedUserActivity[] }) {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(new Date())
+    }, 1000)
+    return () => window.clearInterval(intervalId)
+  }, [])
+
+  const activityAngles = useMemo(() => buildActivityAngles(items), [items])
+  const activityBundles = useMemo(
+    () => buildActivityBundles(items, activityAngles),
+    [items, activityAngles],
+  )
+  const activityGaps = useMemo(
+    () => buildActivityGaps(items, activityAngles),
+    [items, activityAngles],
+  )
+
+  const hourAngle = dateToHourHandAngle(now)
+  const minuteAngle = dateToMinuteHandAngle(now)
+  const hourHandEnd = clockHandEnd(hourAngle, 22)
+  const minuteHandEnd = clockHandEnd(minuteAngle, 32)
+
+  if (items.length === 0) {
+    return null
+  }
+
+  return (
+    <div className='mt-6 border-t border-slate-200 pt-6'>
+      <div className='mx-auto flex w-[90%] flex-col items-center'>
+        <div className='relative aspect-square w-full'>
+          <div className='absolute inset-[10%] rounded-full border-[6px] border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-inner'>
+            {Array.from({ length: 12 }).map((_, index) => {
+              const angle = index * 30 - 90
+              const pos = polarPosition(angle, 38)
+              return (
+                <div
+                  key={`tick-${index}`}
+                  className='absolute h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-slate-300'
+                  style={{
+                    left: pos.left,
+                    top: pos.top,
+                    transform: `translate(-50%, -50%) rotate(${angle + 90}deg)`,
+                  }}
+                />
+              )
+            })}
+
+            {CLOCK_HOUR_LABELS.map(hour => {
+              const pos = polarPosition(hour.angle, 30)
+              return (
+                <span
+                  key={hour.label}
+                  className='absolute -translate-x-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500'
+                  style={{ left: pos.left, top: pos.top }}
+                >
+                  {hour.label}
+                </span>
+              )
+            })}
+
+            <svg
+              className='pointer-events-none absolute inset-0 z-[5]'
+              viewBox='0 0 100 100'
+            >
+              <line
+                x1='50'
+                y1='50'
+                x2={hourHandEnd.x}
+                y2={hourHandEnd.y}
+                stroke='#1e293b'
+                strokeWidth='2.5'
+                strokeLinecap='round'
+              />
+              <line
+                x1='50'
+                y1='50'
+                x2={minuteHandEnd.x}
+                y2={minuteHandEnd.y}
+                stroke='#475569'
+                strokeWidth='1.5'
+                strokeLinecap='round'
+              />
+              <circle
+                cx='50'
+                cy='50'
+                r='2'
+                fill='#1e293b'
+                stroke='#ffffff'
+                strokeWidth='1'
+              />
+            </svg>
+          </div>
+
+          <svg
+            className='pointer-events-none absolute inset-0 h-full w-full'
+            viewBox='0 0 100 100'
+          >
+            {activityGaps.map((gap, index) => {
+              const path = describeClockArc(gap.startAngle, gap.endAngle)
+              if (!path) {
+                return null
+              }
+              return (
+                <path
+                  key={`gap-${index}`}
+                  d={path}
+                  fill='none'
+                  stroke='#ef4444'
+                  strokeWidth='1.75'
+                  strokeLinecap='round'
+                />
+              )
+            })}
+          </svg>
+
+          {activityBundles.map(bundle => (
+            <ActivityClockBundleMarker
+              key={bundle.items.map(item => item.groupKey).join('|')}
+              bundle={bundle}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let user: { company_id: number }
   try {
@@ -440,7 +1016,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             u_creator.name,
             NULLIF(TRIM(di.created_by), '')
           ) AS user_name,
-          'Added image' AS action,
+          'Added image to a deal' AS action,
           DATE_FORMAT(di.created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
           COALESCE(
             (
@@ -679,7 +1255,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 }
 
-const userActivityColumns: ColumnDef<UserActivity>[] = [
+const userActivityColumns: ColumnDef<GroupedUserActivity>[] = [
   {
     accessorKey: 'created_at',
     header: 'Date',
@@ -688,6 +1264,9 @@ const userActivityColumns: ColumnDef<UserActivity>[] = [
   {
     accessorKey: 'action',
     header: 'Type of activity',
+    cell: ({ row }) => (
+      <ActivityActionCell action={row.original.action} count={row.original.count} />
+    ),
   },
   {
     accessorKey: 'customer_name',
@@ -718,7 +1297,7 @@ export default function AdminUsersActivity() {
     )
   }, [])
 
-  const generalActivityColumns = useMemo((): ColumnDef<UserActivity>[] => {
+  const generalActivityColumns = useMemo((): ColumnDef<GroupedUserActivity>[] => {
     return [
       {
         accessorKey: 'created_at',
@@ -731,7 +1310,7 @@ export default function AdminUsersActivity() {
             onToggle={toggleGenSort}
           />
         ),
-        cell: ({ row }: { row: Row<UserActivity> }) =>
+        cell: ({ row }: { row: Row<GroupedUserActivity> }) =>
           new Date(row.original.created_at).toLocaleString(),
       },
       {
@@ -745,7 +1324,7 @@ export default function AdminUsersActivity() {
             onToggle={toggleGenSort}
           />
         ),
-        cell: ({ row }: { row: Row<UserActivity> }) =>
+        cell: ({ row }: { row: Row<GroupedUserActivity> }) =>
           row.original.customer_name || '-',
       },
       {
@@ -759,6 +1338,9 @@ export default function AdminUsersActivity() {
             onToggle={toggleGenSort}
           />
         ),
+        cell: ({ row }: { row: Row<GroupedUserActivity> }) => (
+          <ActivityActionCell action={row.original.action} count={row.original.count} />
+        ),
       },
       {
         accessorKey: 'user_name',
@@ -771,7 +1353,8 @@ export default function AdminUsersActivity() {
             onToggle={toggleGenSort}
           />
         ),
-        cell: ({ row }: { row: Row<UserActivity> }) => row.original.user_name || '-',
+        cell: ({ row }: { row: Row<GroupedUserActivity> }) =>
+          row.original.user_name || '-',
       },
     ]
   }, [genSort, toggleGenSort])
@@ -790,13 +1373,18 @@ export default function AdminUsersActivity() {
     return result
   }, [activities, genSort])
 
+  const groupedGeneralActivities = useMemo(
+    () => groupActivitiesByTimestamp(sortedGeneralActivities),
+    [sortedGeneralActivities],
+  )
+
   const genTotalPages = Math.max(
     1,
-    Math.ceil(sortedGeneralActivities.length / genPageSize),
+    Math.ceil(groupedGeneralActivities.length / genPageSize),
   )
   const genCurrentPage = Math.min(genPage, genTotalPages)
   const genStart = (genCurrentPage - 1) * genPageSize
-  const generalTableRows = sortedGeneralActivities.slice(
+  const generalTableRows = groupedGeneralActivities.slice(
     genStart,
     genStart + genPageSize,
   )
@@ -835,6 +1423,11 @@ export default function AdminUsersActivity() {
       })
   }, [activities, selectedUser, dateFrom, dateTo])
 
+  const groupedSelectedUserActivities = useMemo(
+    () => groupActivitiesByTimestamp(selectedUserActivities),
+    [selectedUserActivities],
+  )
+
   return (
     <PageLayout title='Sales Reps Activity'>
       <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'>
@@ -861,7 +1454,7 @@ export default function AdminUsersActivity() {
               currentPage={genCurrentPage}
               totalPages={genTotalPages}
               pageSize={genPageSize}
-              totalRows={sortedGeneralActivities.length}
+              totalRows={groupedGeneralActivities.length}
               onPageChange={setGenPage}
               onPageSizeChange={size => {
                 setGenPageSize(size)
@@ -872,13 +1465,13 @@ export default function AdminUsersActivity() {
               key={`${genCurrentPage}-${genPageSize}-${genSort.key}-${genSort.order}`}
               columns={generalActivityColumns}
               data={generalTableRows}
-              getRowId={row => `${row.source}-${row.id}`}
+              getRowId={row => row.groupKey}
             />
             <DataTablePagination
               currentPage={genCurrentPage}
               totalPages={genTotalPages}
               pageSize={genPageSize}
-              totalRows={sortedGeneralActivities.length}
+              totalRows={groupedGeneralActivities.length}
               onPageChange={setGenPage}
               onPageSizeChange={size => {
                 setGenPageSize(size)
@@ -894,7 +1487,7 @@ export default function AdminUsersActivity() {
           if (!open) setSelectedUser(null)
         }}
       >
-        <DialogContent className='sm:max-w-[760px] max-h-[85vh] overflow-hidden'>
+        <DialogContent className='sm:max-w-[860px] max-h-[90vh] overflow-hidden'>
           <DialogHeader>
             <DialogTitle>
               {selectedUser ? `${selectedUser.name} activity` : 'User activity'}
@@ -918,12 +1511,14 @@ export default function AdminUsersActivity() {
             <div className='text-sm text-slate-500'>No activity yet</div>
           ) : (
             <div className='h-[80vh] overflow-y-auto'>
+              <ActivitySummaryRow items={selectedUserActivities} />
               <DataTable
                 key={`${selectedUser?.id || 'none'}-${dateFrom?.toISOString() || 'all'}-${dateTo?.toISOString() || 'all'}`}
                 columns={userActivityColumns}
-                data={selectedUserActivities}
-                getRowId={row => `${row.source}-${row.id}`}
+                data={groupedSelectedUserActivities}
+                getRowId={row => row.groupKey}
               />
+              <ActivityTimeline items={groupedSelectedUserActivities} />
             </div>
           )}
         </DialogContent>
