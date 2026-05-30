@@ -17,8 +17,12 @@ interface Event {
   endDate: Date
   description?: string
   variant?: (typeof variants)[number]
+  color?: string
   notes?: string
+  allDay?: boolean
 }
+
+const MAX_VISIBLE_EVENTS = 4
 
 const pageTransitionVariants: Variants = {
   enter: () => ({
@@ -44,13 +48,12 @@ function formatDateStr(date: Date): string {
 }
 
 export default function MonthView() {
-  const { getters, weekStartsOn } = useScheduler()
+  const { getters, weekStartsOn, setSelectedEventId } = useScheduler()
   const [open, setOpen] = useState<{ startDate: Date; endDate: Date } | null>(null)
   const [dayEventsModal, setDayEventsModal] = useState<{
     date: Date
     events: Event[]
   } | null>(null)
-  const [editEvent, setEditEvent] = useState<Event | null>(null)
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [direction, setDirection] = useState<number>(0)
@@ -96,32 +99,22 @@ export default function MonthView() {
     })
   }, [currentDate, navigate])
 
-  function handleAddEvent(selectedDay: number) {
-    // Don't open add modal if there's already a modal open (like edit modal)
+  function handleAddEventForDate(date: Date) {
     if (document.querySelector('[role="dialog"]')) {
       return
     }
 
-    // Create start date at 12:00 AM on the selected day
-    const startDate = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      selectedDay,
-      0,
-      0,
-      0,
-    )
-
-    // Create end date at 11:59 PM on the same day
-    const endDate = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      selectedDay,
-      23,
-      59,
-      59,
-    )
+    const startDate = new Date(date)
+    startDate.setHours(0, 0, 0, 0)
+    const endDate = new Date(date)
+    endDate.setHours(23, 59, 59, 999)
     setOpen({ startDate, endDate })
+  }
+
+  function handleAddEvent(selectedDay: number) {
+    handleAddEventForDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay),
+    )
   }
 
   function handleShowMoreEvents(dayEvents: Event[], dayNumber: number) {
@@ -134,8 +127,8 @@ export default function MonthView() {
   }
 
   function handleEditEventFromModal(event: Event) {
-    setEditEvent(event)
-    setDayEventsModal(null) // Close the day events modal
+    setSelectedEventId(event.id)
+    setDayEventsModal(null)
   }
 
   function handleAddEventFromModal(date: Date) {
@@ -171,6 +164,36 @@ export default function MonthView() {
     prevMonth.getMonth() + 1,
     0,
   ).getDate()
+
+  const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
+  const totalCells = startOffset + daysInMonth.length
+  const nextMonthPadding = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7)
+
+  function renderAdjacentDayCell(date: Date, dayLabel: number, key: string) {
+    return (
+      <div
+        key={key}
+        className='min-h-24 sm:min-h-28 md:min-h-32 border-r border-b border-border last:border-r-0 bg-muted/10 group cursor-pointer hover:bg-muted/20 transition-colors touch-target relative'
+        onClick={e => {
+          const target = e.target
+          if (target instanceof HTMLElement && target.closest('[data-event-element]')) {
+            return
+          }
+          handleAddEventForDate(date)
+        }}
+      >
+        <div className='p-1 h-full flex flex-col relative'>
+          <div className='text-xs text-muted-foreground pl-1 pt-0.5'>{dayLabel}</div>
+          <div className='absolute inset-0 bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded'>
+            <span className='text-xs sm:text-sm font-medium text-primary'>
+              <span className='hidden sm:inline'>Add Event</span>
+              <span className='sm:hidden'>+</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className='w-full'>
@@ -228,7 +251,7 @@ export default function MonthView() {
               {daysOfWeek.map((day, idx) => (
                 <div
                   key={idx}
-                  className='p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-muted-foreground border-r border-border last:border-r-0'
+                  className='py-2 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground border-r border-border last:border-r-0'
                 >
                   <span className='hidden sm:inline'>{day}</span>
                   <span className='sm:hidden'>{day.slice(0, 1)}</span>
@@ -239,16 +262,15 @@ export default function MonthView() {
             {/* Calendar body */}
             <div className='grid grid-cols-7'>
               {/* Previous month's trailing days */}
-              {Array.from({ length: startOffset }).map((_, idx) => (
-                <div
-                  key={`offset-${idx}`}
-                  className='h-20 sm:h-24 md:h-32 lg:h-36 border-r border-b border-border last:border-r-0 p-1 sm:p-2 bg-muted/10'
-                >
-                  <div className='text-xs sm:text-sm text-muted-foreground'>
-                    {lastDateOfPrevMonth - startOffset + idx + 1}
-                  </div>
-                </div>
-              ))}
+              {Array.from({ length: startOffset }).map((_, idx) => {
+                const day = lastDateOfPrevMonth - startOffset + idx + 1
+                const cellDate = new Date(
+                  prevMonth.getFullYear(),
+                  prevMonth.getMonth(),
+                  day,
+                )
+                return renderAdjacentDayCell(cellDate, day, `offset-${idx}`)
+              })}
 
               {/* Current month's days */}
               {daysInMonth.map((dayObj: { day: number }) => {
@@ -263,40 +285,37 @@ export default function MonthView() {
 
                 return (
                   <motion.div
-                    className='h-20 sm:h-24 md:h-32 lg:h-36 border-r border-b border-border last:border-r-0 group cursor-pointer hover:bg-muted/20 transition-colors touch-target relative'
+                    className='min-h-24 sm:min-h-28 md:min-h-32 border-r border-b border-border last:border-r-0 group cursor-pointer hover:bg-muted/20 transition-colors touch-target relative'
                     key={dayObj.day}
                     variants={itemVariants}
                     initial='enter'
                     animate='center'
                     exit='exit'
                     onClick={e => {
-                      // Don't open add modal if clicking on an event element
-                      const target = e.target as HTMLElement
-                      if (target.closest('[data-event-element]')) {
+                      const target = e.target
+                      if (
+                        target instanceof HTMLElement &&
+                        target.closest('[data-event-element]')
+                      ) {
                         return
                       }
                       handleAddEvent(dayObj.day)
                     }}
                   >
-                    <div className='p-1 sm:p-2 h-full flex flex-col relative'>
-                      {/* Day number */}
-                      <div className='flex justify-between items-start mb-1'>
+                    <div className='p-1 h-full flex flex-col relative'>
+                      <div className='flex justify-start items-start mb-0.5 pl-1 pt-0.5'>
                         <span
                           className={clsx(
-                            'text-xs sm:text-sm font-medium leading-none',
+                            'text-xs font-normal leading-none',
                             isToday &&
-                              'bg-primary text-primary-foreground rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs',
-                            dayEvents.length > 0 &&
-                              !isToday &&
-                              'text-primary font-semibold',
-                            dayEvents.length === 0 && !isToday && 'text-foreground',
+                              'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center',
+                            !isToday && 'text-foreground',
                           )}
                         >
                           {dayObj.day}
                         </span>
                       </div>
 
-                      {/* Events - mobile optimized */}
                       <div className='flex-1 overflow-hidden'>
                         <AnimatePresence mode='wait'>
                           {dayEvents?.length > 0 && (
@@ -306,68 +325,32 @@ export default function MonthView() {
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -10 }}
                               transition={{ duration: 0.3 }}
-                              className='h-full'
+                              className='flex flex-col gap-0.5 px-0.5'
                             >
-                              {/* Mobile: Show dots and count with click to open modal */}
-                              <div
-                                className='sm:hidden cursor-pointer p-1 rounded hover:bg-muted/50 transition-colors border border-transparent hover:border-border'
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  handleShowMoreEvents(dayEvents, dayObj.day)
-                                }}
-                                title={`View all ${dayEvents.length} event${dayEvents.length > 1 ? 's' : ''}`}
-                              >
-                                <div className='flex gap-1 flex-wrap mb-1'>
-                                  {dayEvents.slice(0, 4).map((event: Event) => (
-                                    <div
-                                      key={event.id}
-                                      className={clsx(
-                                        'w-2 h-2 rounded-full',
-                                        event.variant === 'primary' && 'bg-blue-500',
-                                        event.variant === 'danger' && 'bg-red-500',
-                                        event.variant === 'success' && 'bg-green-500',
-                                        event.variant === 'warning' && 'bg-yellow-500',
-                                        !event.variant && 'bg-gray-500',
-                                      )}
-                                    />
-                                  ))}
-                                  {dayEvents.length > 4 && (
-                                    <div className='w-2 h-2 rounded-full bg-gray-400 flex items-center justify-center'>
-                                      <span className='text-xs text-white'>+</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className='text-xs text-primary font-medium'>
-                                  {dayEvents.length} event
-                                  {dayEvents.length > 1 ? 's' : ''} →
-                                </div>
-                              </div>
-
-                              {/* Desktop: Show first event and +X more button */}
-                              <div className='hidden sm:block space-y-1'>
-                                {dayEvents.slice(0, 1).map((event: Event) => (
+                              {dayEvents
+                                .slice(0, MAX_VISIBLE_EVENTS)
+                                .map((event: Event) => (
                                   <EventStyled
                                     key={event.id}
                                     event={{
                                       ...event,
-                                      minmized: true,
+                                      monthView: true,
                                     }}
                                   />
                                 ))}
 
-                                {dayEvents.length > 1 && (
-                                  <div
-                                    className='text-xs bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors p-1 rounded border border-primary/20 hover:border-primary/40 font-medium text-center'
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      handleShowMoreEvents(dayEvents, dayObj.day)
-                                    }}
-                                    title={`View all ${dayEvents.length} events`}
-                                  >
-                                    +{dayEvents.length - 1} more →
-                                  </div>
-                                )}
-                              </div>
+                              {dayEvents.length > MAX_VISIBLE_EVENTS && (
+                                <button
+                                  type='button'
+                                  className='text-[11px] leading-4 text-left px-1 py-px text-muted-foreground hover:text-foreground truncate w-full'
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    handleShowMoreEvents(dayEvents, dayObj.day)
+                                  }}
+                                >
+                                  {dayEvents.length - MAX_VISIBLE_EVENTS} more
+                                </button>
+                              )}
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -386,6 +369,16 @@ export default function MonthView() {
                   </motion.div>
                 )
               })}
+
+              {Array.from({ length: nextMonthPadding }).map((_, idx) => {
+                const day = idx + 1
+                const cellDate = new Date(
+                  nextMonth.getFullYear(),
+                  nextMonth.getMonth(),
+                  day,
+                )
+                return renderAdjacentDayCell(cellDate, day, `next-${idx}`)
+              })}
             </div>
           </div>
         </motion.div>
@@ -403,24 +396,6 @@ export default function MonthView() {
         />
       )}
 
-      {/* Edit Event Modal */}
-      {editEvent && (
-        <AddEventModal
-          open={true}
-          onOpenChange={isOpen => !isOpen && setEditEvent(null)}
-          defaultValues={{
-            id: editEvent.id,
-            title: editEvent.title,
-            description: editEvent.description,
-            startDate: editEvent.startDate,
-            endDate: editEvent.endDate,
-            variant: editEvent.variant,
-            notes: editEvent.notes,
-          }}
-        />
-      )}
-
-      {/* Day Events Modal */}
       {dayEventsModal && (
         <DayEventsModal
           open={true}

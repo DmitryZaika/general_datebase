@@ -155,7 +155,7 @@ export interface Handlers {
   }
   handleAddEvent: (event: Event) => void
   handleUpdateEvent: (event: Event, id: number) => void
-  handleDeleteEvent: (id: number) => void
+  handleDeleteEvent: (id: number) => void | Promise<void>
 }
 
 // Define getters interface
@@ -174,6 +174,8 @@ export interface SchedulerContextType {
   getters: Getters
   handlers: Handlers
   weekStartsOn: startOfWeek
+  selectedEventId: number | null
+  setSelectedEventId: (id: number | null) => void
 }
 
 // Define the variant options

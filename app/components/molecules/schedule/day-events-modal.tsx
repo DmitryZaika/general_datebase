@@ -1,6 +1,17 @@
 import { Calendar, Clock, Edit, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -71,11 +82,23 @@ export default function DayEventsModal({
   onEditEvent,
   onAddEvent,
 }: DayEventsModalProps) {
-  const { handlers } = useScheduler()
+  const { handlers, setSelectedEventId } = useScheduler()
+  const [eventToDelete, setEventToDelete] = useState<Event | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const handleDeleteEvent = async (eventId: number) => {
-    if (confirm('Are you sure you want to delete this event?')) {
-      handlers.handleDeleteEvent(eventId)
+  function handleSelectEvent(event: Event) {
+    setSelectedEventId(event.id)
+    onOpenChange(false)
+  }
+
+  const confirmDelete = async () => {
+    if (!eventToDelete) return
+    setIsDeleting(true)
+    try {
+      await handlers.handleDeleteEvent(eventToDelete.id)
+      setEventToDelete(null)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -108,7 +131,8 @@ export default function DayEventsModal({
                 {events.map(event => (
                   <div
                     key={event.id}
-                    className={`p-4 rounded-lg border ${getVariantColors(event.variant)} hover:shadow-md transition-shadow`}
+                    className={`p-4 rounded-lg border cursor-pointer ${getVariantColors(event.variant)} hover:shadow-md transition-shadow`}
+                    onClick={() => handleSelectEvent(event)}
                   >
                     <div className='flex items-start justify-between'>
                       <div className='flex-1 min-w-0'>
@@ -145,7 +169,10 @@ export default function DayEventsModal({
                         <Button
                           size='sm'
                           variant='ghost'
-                          onClick={() => onEditEvent(event)}
+                          onClick={e => {
+                            e.stopPropagation()
+                            onEditEvent(event)
+                          }}
                           className='h-8 w-8 p-0'
                         >
                           <Edit className='w-3 h-3' />
@@ -153,7 +180,10 @@ export default function DayEventsModal({
                         <Button
                           size='sm'
                           variant='ghost'
-                          onClick={() => handleDeleteEvent(event.id)}
+                          onClick={e => {
+                            e.stopPropagation()
+                            setEventToDelete(event)
+                          }}
                           className='h-8 w-8 p-0 text-destructive hover:text-destructive'
                         >
                           <Trash2 className='w-3 h-3' />
@@ -167,6 +197,32 @@ export default function DayEventsModal({
           )}
         </div>
       </DialogContent>
+
+      <AlertDialog
+        open={eventToDelete !== null}
+        onOpenChange={open => {
+          if (!open) setEventToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{eventToDelete?.title}&quot;?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              disabled={isDeleting}
+              onClick={confirmDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }

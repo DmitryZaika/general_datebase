@@ -1,4 +1,11 @@
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { useCallback } from 'react'
+import {
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useRevalidator,
+} from 'react-router'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import SchedulerViewFilteration from '@/components/molecules/schedule/schedular-view-filteration'
 import { db } from '~/db.server'
 import { SchedulerProvider } from '~/providers/scheduler-provider'
@@ -159,13 +166,34 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
 export default function EmployeesSchedule() {
   const { period, events, currentDate } = useLoaderData<typeof loader>()
+  const token = useAuthenticityToken()
+  const revalidator = useRevalidator()
+
+  const handleDeleteEvent = useCallback(
+    async (id: number) => {
+      const formData = new FormData()
+      formData.append('id', String(id))
+      formData.append('csrf', token)
+
+      const response = await fetch('/api/events', {
+        method: 'DELETE',
+        body: formData,
+      })
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to delete event')
+      }
+
+      revalidator.revalidate()
+    },
+    [token, revalidator],
+  )
 
   return (
-    <SchedulerProvider initialState={events}>
-      <div className='m-4 sm:m-8 lg:m-16 bg-gray-50 dark:bg-gray-900 min-h-screen'>
-        <div className='container mx-auto p-4 sm:p-6 lg:p-8'>
-          <SchedulerViewFilteration period={period} currentDate={currentDate} />
-        </div>
+    <SchedulerProvider initialState={events} onDeleteEvent={handleDeleteEvent}>
+      <div className='min-h-screen bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8'>
+        <SchedulerViewFilteration period={period} currentDate={currentDate} />
       </div>
     </SchedulerProvider>
   )

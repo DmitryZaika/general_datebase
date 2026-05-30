@@ -1,13 +1,31 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import AddEventModal from '@/components/molecules/schedule/add-event-modal'
 import DailyView from '@/components/molecules/schedule/day-view'
+import EventDetailsPanel from '@/components/molecules/schedule/event-details-panel'
 import MonthView from '@/components/molecules/schedule/month-view'
 import WeeklyView from '@/components/molecules/schedule/week-view'
 import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { cn } from '@/lib/utils'
+import { useScheduler } from '~/providers/scheduler-provider'
 import type { Period } from '~/types'
 
 const views: Period[] = ['month']
+
+function useIsBelowLg() {
+  const [isBelowLg, setIsBelowLg] = useState(false)
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 1023px)')
+    const onChange = () => setIsBelowLg(mql.matches)
+    onChange()
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
+
+  return isBelowLg
+}
 
 export default function SchedulerViewFilteration({
   period,
@@ -16,6 +34,10 @@ export default function SchedulerViewFilteration({
   period?: Period
   currentDate?: string
 }) {
+  const { selectedEventId, setSelectedEventId, events } = useScheduler()
+  const selectedEvent = events.events.find(event => event.id === selectedEventId)
+  const isBelowLg = useIsBelowLg()
+
   const [eventModalDefaults, setEventModalDefaults] = useState<
     | {
         startDate: Date
@@ -82,13 +104,43 @@ export default function SchedulerViewFilteration({
         </Button>
       </div>
 
-      <div className='min-h-[600px]'>
-        {period === 'day' && <DailyView />}
+      <div className={cn('flex min-h-[600px]', selectedEvent && 'gap-0')}>
+        <div className='min-w-0 flex-1'>
+          {period === 'day' && <DailyView />}
 
-        {period === 'week' && <WeeklyView />}
+          {period === 'week' && <WeeklyView />}
 
-        {period === 'month' && <MonthView />}
+          {period === 'month' && <MonthView />}
+        </div>
+
+        {selectedEvent && (
+          <aside className='hidden lg:flex w-[400px] shrink-0 border-l border-border bg-background sticky top-4 self-start max-h-[calc(100vh-6rem)] overflow-hidden rounded-r-lg'>
+            <EventDetailsPanel
+              event={selectedEvent}
+              onClose={() => setSelectedEventId(null)}
+            />
+          </aside>
+        )}
       </div>
+
+      {selectedEvent && isBelowLg && (
+        <Sheet
+          open={true}
+          onOpenChange={open => {
+            if (!open) setSelectedEventId(null)
+          }}
+        >
+          <SheetContent
+            side='right'
+            className='w-full sm:max-w-md p-0 [&>button]:hidden'
+          >
+            <EventDetailsPanel
+              event={selectedEvent}
+              onClose={() => setSelectedEventId(null)}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
 
       {eventModalDefaults && (
         <AddEventModal

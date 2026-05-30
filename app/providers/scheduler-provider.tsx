@@ -1,7 +1,14 @@
 'use client'
 
 // SchedulerContext.tsx
-import { createContext, type ReactNode, useContext, useEffect, useReducer } from 'react'
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useReducer,
+  useState,
+} from 'react'
 
 import type {
   Action,
@@ -61,21 +68,27 @@ export const SchedulerProvider = ({
 }: {
   onAddEvent?: (event: Event) => void
   onUpdateEvent?: (event: Event) => void
-  onDeleteEvent?: (id: number) => void
+  onDeleteEvent?: (id: number) => void | Promise<void>
   weekStartsOn?: startOfWeek
   children: ReactNode
   initialState?: Event[]
 }) => {
-  const [state, dispatch] = useReducer(
-    schedulerReducer,
-    { events: initialState ?? [] }, // Sets initialState or an empty array as the default
-  )
+  const [state, dispatch] = useReducer(schedulerReducer, { events: initialState ?? [] })
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
 
   useEffect(() => {
     if (initialState) {
       dispatch({ type: 'SET_EVENTS', payload: initialState })
     }
   }, [initialState])
+
+  useEffect(() => {
+    if (selectedEventId === null) return
+    const stillExists = state.events.some(event => event.id === selectedEventId)
+    if (!stillExists) {
+      setSelectedEventId(null)
+    }
+  }, [state.events, selectedEventId])
 
   // global getters
   const getDaysInMonth = (month: number, year: number) => {
@@ -125,13 +138,29 @@ export const SchedulerProvider = ({
 
   // Helper function to filter events for a specific day
   const getEventsForDay = (day: number, currentDate: Date) => {
+    const dayStart = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day,
+      0,
+      0,
+      0,
+      0,
+    )
+    const dayEnd = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day,
+      23,
+      59,
+      59,
+      999,
+    )
+
     return state?.events.filter(event => {
       const eventStart = new Date(event.startDate)
-      return (
-        eventStart.getDate() === day &&
-        eventStart.getMonth() === currentDate.getMonth() &&
-        eventStart.getFullYear() === currentDate.getFullYear()
-      )
+      const eventEnd = new Date(event.endDate)
+      return eventStart <= dayEnd && eventEnd >= dayStart
     })
   }
 
@@ -293,11 +322,14 @@ export const SchedulerProvider = ({
     }
   }
 
-  function handleDeleteEvent(id: number) {
-    dispatch({ type: 'REMOVE_EVENT', payload: { id } })
+  async function handleDeleteEvent(id: number) {
     if (onDeleteEvent) {
-      onDeleteEvent(id)
+      await onDeleteEvent(id)
     }
+    if (selectedEventId === id) {
+      setSelectedEventId(null)
+    }
+    dispatch({ type: 'REMOVE_EVENT', payload: { id } })
   }
 
   const handlers: Handlers = {
@@ -309,7 +341,15 @@ export const SchedulerProvider = ({
 
   return (
     <SchedulerContext.Provider
-      value={{ events: state, dispatch, getters, handlers, weekStartsOn }}
+      value={{
+        events: state,
+        dispatch,
+        getters,
+        handlers,
+        weekStartsOn,
+        selectedEventId,
+        setSelectedEventId,
+      }}
     >
       {children}
     </SchedulerContext.Provider>

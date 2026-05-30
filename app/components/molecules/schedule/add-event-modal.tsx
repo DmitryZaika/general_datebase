@@ -1,7 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import clsx from 'clsx'
+import { CalendarIcon, Clock } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -19,11 +23,226 @@ import {
 import { FormField, FormProvider } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { Variant } from '@/types'
 import { useFullFetcher } from '~/hooks/useFullFetcher'
+import { formatPickerDeadline } from '~/lib/dateHelpers'
 import { eventSchema } from '~/schemas/events'
+
+const HOURS_12 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+const MINUTES_5 = Array.from({ length: 12 }, (_, i) => i * 5)
+
+function to12Hour(h24: number): { hour: number; period: 'AM' | 'PM' } {
+  const period = h24 >= 12 ? ('PM' as const) : ('AM' as const)
+  const hour = h24 % 12 || 12
+  return { hour, period }
+}
+
+function to24Hour(hour: number, period: 'AM' | 'PM'): number {
+  if (period === 'AM') return hour === 12 ? 0 : hour
+  return hour === 12 ? 12 : hour + 12
+}
+
+function startOfDay(date: Date): Date {
+  const next = new Date(date)
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+
+function endOfDay(date: Date): Date {
+  const next = new Date(date)
+  next.setHours(23, 59, 59, 999)
+  return next
+}
+
+function calendarDayTime(date: Date): number {
+  return startOfDay(date).getTime()
+}
+
+function ensureEndAfterStart(start: Date, end: Date, allDay: boolean): Date {
+  if (allDay) {
+    const normalizedEnd = endOfDay(end)
+    if (calendarDayTime(normalizedEnd) >= calendarDayTime(start)) {
+      return normalizedEnd
+    }
+    return endOfDay(start)
+  }
+  if (end >= start) return end
+  const next = new Date(start)
+  next.setHours(start.getHours() + 1, start.getMinutes(), 0, 0)
+  return next
+}
+
+function EventTimeControls({
+  value,
+  onTimeChange,
+}: {
+  value: Date
+  onTimeChange: (hours: number, minutes: number) => void
+}) {
+  const current = to12Hour(value.getHours())
+  const currentMin = value.getMinutes()
+  const minuteOptions = MINUTES_5.includes(currentMin)
+    ? MINUTES_5
+    : [...MINUTES_5, currentMin].sort((a, b) => a - b)
+
+  return (
+    <div className='flex items-center gap-1.5 px-3 pb-3 border-t pt-2'>
+      <Clock className='h-3.5 w-3.5 text-gray-600 shrink-0' />
+      <Select
+        value={String(current.hour)}
+        onValueChange={val => {
+          const h24 = to24Hour(Number(val), current.period)
+          onTimeChange(h24, currentMin)
+        }}
+      >
+        <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent stableScrollButtons>
+          {HOURS_12.map(h => (
+            <SelectItem key={h} value={String(h)}>
+              {h}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <span className='text-sm font-medium text-gray-500'>:</span>
+      <Select
+        value={String(currentMin)}
+        onValueChange={val => {
+          const h24 = to24Hour(current.hour, current.period)
+          onTimeChange(h24, Number(val))
+        }}
+      >
+        <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent stableScrollButtons>
+          {minuteOptions.map(m => (
+            <SelectItem key={m} value={String(m)}>
+              {String(m).padStart(2, '0')}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select
+        value={current.period}
+        onValueChange={val => {
+          const h24 = to24Hour(current.hour, val as 'AM' | 'PM')
+          onTimeChange(h24, currentMin)
+        }}
+      >
+        <SelectTrigger className='w-[62px] h-7 text-sm px-2'>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent stableScrollButtons>
+          <SelectItem value='AM'>AM</SelectItem>
+          <SelectItem value='PM'>PM</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
+function EventDateTimePicker({
+  label,
+  value,
+  onChange,
+  allDay,
+  boundary,
+  minDate,
+  maxDate,
+}: {
+  label: string
+  value: Date
+  onChange: (date: Date) => void
+  allDay: boolean
+  boundary: 'start' | 'end'
+  minDate?: Date
+  maxDate?: Date
+}) {
+  const [open, setOpen] = useState(false)
+  const [calendarKey, setCalendarKey] = useState(0)
+
+  const displayLabel = allDay
+    ? formatPickerDeadline(startOfDay(value))
+    : formatPickerDeadline(value)
+  const calendarSelected = allDay ? startOfDay(value) : value
+
+  const disabledDays =
+    minDate || maxDate
+      ? {
+          ...(minDate ? { before: startOfDay(minDate) } : {}),
+          ...(maxDate ? { after: startOfDay(maxDate) } : {}),
+        }
+      : undefined
+
+  return (
+    <div>
+      <Label>{label}</Label>
+      <Popover
+        open={open}
+        onOpenChange={nextOpen => {
+          setOpen(nextOpen)
+          if (nextOpen) setCalendarKey(k => k + 1)
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            type='button'
+            variant='outline'
+            className={cn(
+              'mt-1 w-full h-9 justify-start text-left text-sm font-normal',
+              !value && 'text-muted-foreground',
+            )}
+          >
+            <CalendarIcon className='mr-1.5 h-3.5 w-3.5 shrink-0' />
+            <span className='truncate'>{displayLabel}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className='w-auto p-0' align='start'>
+          <Calendar
+            key={calendarKey}
+            mode='single'
+            defaultMonth={calendarSelected}
+            selected={calendarSelected}
+            disabled={disabledDays}
+            onSelect={day => {
+              if (!day) return
+              if (allDay) {
+                onChange(boundary === 'start' ? startOfDay(day) : endOfDay(day))
+                return
+              }
+              const next = new Date(day)
+              next.setHours(value.getHours(), value.getMinutes(), 0, 0)
+              onChange(next)
+            }}
+          />
+          {!allDay ? (
+            <EventTimeControls
+              value={value}
+              onTimeChange={(hours, minutes) => {
+                const next = new Date(value)
+                next.setHours(hours, minutes, 0, 0)
+                onChange(next)
+              }}
+            />
+          ) : null}
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
+}
 
 interface AddEventModalProps {
   open: boolean
@@ -36,6 +255,56 @@ interface AddEventModalProps {
     variant?: Variant
     id?: number
     notes?: string
+    allDay?: boolean
+  }
+}
+
+function getEventColor(variant: Variant) {
+  switch (variant) {
+    case 'primary':
+      return 'blue'
+    case 'danger':
+      return 'red'
+    case 'success':
+      return 'green'
+    case 'warning':
+      return 'yellow'
+    default:
+      return 'blue'
+  }
+}
+
+function buildFormValues(defaultValues?: AddEventModalProps['defaultValues']) {
+  const start = defaultValues?.startDate
+    ? new Date(defaultValues.startDate)
+    : new Date()
+  const end = defaultValues?.endDate ? new Date(defaultValues.endDate) : new Date()
+  const allDay = defaultValues?.allDay ?? false
+
+  if (allDay) {
+    return {
+      id: defaultValues?.id || undefined,
+      title: defaultValues?.title || '',
+      description: defaultValues?.description || '',
+      start_date: startOfDay(start),
+      end_date: endOfDay(end),
+      color: getEventColor(defaultValues?.variant || 'primary'),
+      all_day: true,
+      status: 'scheduled',
+      notes: defaultValues?.notes || '',
+    }
+  }
+
+  return {
+    id: defaultValues?.id || undefined,
+    title: defaultValues?.title || '',
+    description: defaultValues?.description || '',
+    start_date: start,
+    end_date: end,
+    color: getEventColor(defaultValues?.variant || 'primary'),
+    all_day: false,
+    status: 'scheduled',
+    notes: defaultValues?.notes || '',
   }
 }
 
@@ -46,17 +315,7 @@ export default function AddEventModal({
 }: AddEventModalProps) {
   const form = useForm({
     resolver: zodResolver(eventSchema),
-    defaultValues: {
-      id: defaultValues?.id || undefined,
-      title: defaultValues?.title || '',
-      description: defaultValues?.description || '',
-      start_date: defaultValues?.startDate || new Date(),
-      end_date: defaultValues?.endDate || new Date(),
-      color: getEventColor(defaultValues?.variant || 'primary'),
-      all_day: false,
-      status: 'scheduled',
-      notes: defaultValues?.notes || '',
-    },
+    defaultValues: buildFormValues(defaultValues),
   })
 
   const { fullSubmit } = useFullFetcher(
@@ -65,8 +324,16 @@ export default function AddEventModal({
     defaultValues?.id ? 'PUT' : 'POST',
   )
 
-  const { watch, setValue, handleSubmit } = form
+  const { watch, setValue, handleSubmit, reset } = form
   const selectedColor = watch('color')
+  const allDay = watch('all_day')
+  const startDate = watch('start_date')
+  const endDate = watch('end_date')
+
+  useEffect(() => {
+    if (!open) return
+    reset(buildFormValues(defaultValues))
+  }, [open, defaultValues, reset])
 
   const colorOptions = [
     { key: 'blue', name: 'Blue' },
@@ -75,33 +342,33 @@ export default function AddEventModal({
     { key: 'yellow', name: 'Yellow' },
   ]
 
-  function getEventColor(variant: Variant) {
-    switch (variant) {
-      case 'primary':
-        return 'blue'
-      case 'danger':
-        return 'red'
-      case 'success':
-        return 'green'
-      case 'warning':
-        return 'yellow'
-      default:
-        return 'blue'
+  const handleAllDayChange = (checked: boolean) => {
+    setValue('all_day', checked)
+    if (checked) {
+      const nextStart = startOfDay(startDate)
+      let nextEnd = endOfDay(endDate)
+      if (nextEnd < nextStart) {
+        nextEnd = endOfDay(nextStart)
+      }
+      setValue('start_date', nextStart)
+      setValue('end_date', nextEnd)
+      return
     }
-  }
-
-  const handleDateChange = (field: 'start_date' | 'end_date', date: Date) => {
-    setValue(field, date)
-  }
-
-  // Helper function to format date for datetime-local input
-  const formatDateTimeLocal = (date: Date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day}T${hours}:${minutes}`
+    const nextStart = new Date(startDate)
+    if (nextStart.getHours() === 0 && nextStart.getMinutes() === 0) {
+      nextStart.setHours(9, 0, 0, 0)
+    }
+    let nextEnd = new Date(endDate)
+    if (
+      nextEnd.getHours() === 23 &&
+      nextEnd.getMinutes() === 59 &&
+      nextEnd.getSeconds() === 59
+    ) {
+      nextEnd = new Date(nextStart)
+      nextEnd.setHours(nextStart.getHours() + 1, nextStart.getMinutes(), 0, 0)
+    }
+    setValue('start_date', nextStart)
+    setValue('end_date', ensureEndAfterStart(nextStart, nextEnd, false))
   }
 
   const onSubmit = async () => {
@@ -133,11 +400,11 @@ export default function AddEventModal({
                     placeholder='Enter event name'
                     className={cn(form.formState.errors.title && 'border-red-500')}
                   />
-                  {form.formState.errors.title && (
+                  {form.formState.errors.title ? (
                     <p className='text-sm text-red-500 mt-1'>
                       {form.formState.errors.title.message}
                     </p>
-                  )}
+                  ) : null}
                 </div>
               )}
             />
@@ -157,22 +424,48 @@ export default function AddEventModal({
               )}
             />
 
-            <div className='grid grid-cols-2 gap-4'>
+            <FormField
+              control={form.control}
+              name='all_day'
+              render={({ field }) => (
+                <div className='flex items-center gap-2'>
+                  <Checkbox
+                    id='all_day'
+                    checked={field.value}
+                    onCheckedChange={checked => handleAllDayChange(checked === true)}
+                  />
+                  <Label htmlFor='all_day' className='cursor-pointer font-normal'>
+                    All day
+                  </Label>
+                </div>
+              )}
+            />
+
+            <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
               <FormField
                 control={form.control}
                 name='start_date'
                 render={({ field }) => (
-                  <div>
-                    <Label htmlFor='start_date'>Start Date</Label>
-                    <Input
-                      id='start_date'
-                      type='datetime-local'
-                      value={formatDateTimeLocal(field.value)}
-                      onChange={e =>
-                        handleDateChange('start_date', new Date(e.target.value))
+                  <EventDateTimePicker
+                    label='Start Date'
+                    value={field.value}
+                    allDay={allDay}
+                    boundary='start'
+                    maxDate={allDay ? endDate : undefined}
+                    onChange={nextStart => {
+                      field.onChange(nextStart)
+                      if (allDay) {
+                        if (calendarDayTime(endDate) < calendarDayTime(nextStart)) {
+                          setValue('end_date', endOfDay(nextStart))
+                        }
+                        return
                       }
-                    />
-                  </div>
+                      setValue(
+                        'end_date',
+                        ensureEndAfterStart(nextStart, endDate, false),
+                      )
+                    }}
+                  />
                 )}
               />
 
@@ -180,20 +473,28 @@ export default function AddEventModal({
                 control={form.control}
                 name='end_date'
                 render={({ field }) => (
-                  <div>
-                    <Label htmlFor='end_date'>End Date</Label>
-                    <Input
-                      id='end_date'
-                      type='datetime-local'
-                      value={formatDateTimeLocal(field.value)}
-                      onChange={e =>
-                        handleDateChange('end_date', new Date(e.target.value))
-                      }
-                    />
-                  </div>
+                  <EventDateTimePicker
+                    label='End Date'
+                    value={field.value}
+                    allDay={allDay}
+                    boundary='end'
+                    minDate={allDay ? startDate : undefined}
+                    onChange={nextEnd => {
+                      field.onChange(
+                        allDay
+                          ? ensureEndAfterStart(startDate, nextEnd, true)
+                          : ensureEndAfterStart(startDate, nextEnd, false),
+                      )
+                    }}
+                  />
                 )}
               />
             </div>
+            {form.formState.errors.end_date ? (
+              <p className='text-sm text-red-500'>
+                {form.formState.errors.end_date.message}
+              </p>
+            ) : null}
 
             <FormField
               control={form.control}

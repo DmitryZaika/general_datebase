@@ -2,6 +2,7 @@ import {
   BookOpen,
   Building2,
   Calculator,
+  Calendar,
   ChevronDown,
   ClipboardList,
   DollarSign,
@@ -207,11 +208,11 @@ const getItems = (
         url: `/employee/user`,
         icon: User,
       },
-      // {
-      //   title: 'Schedule',
-      //   url: `/employee/schedule`,
-      //   icon: Calendar,
-      // },
+      {
+        title: 'Schedule',
+        url: `/employee/schedule`,
+        icon: Calendar,
+      },
       {
         title: 'Samples',
         url: `/${base}/samples`,
@@ -358,7 +359,7 @@ export function EmployeeSidebar({
     'Instructions',
     'Teach Mode',
   ]
-  const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
+  const operationTitles = ['Suppliers', 'Checklists', 'Special Order', 'Schedule']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
   const crmItems = items.filter(item => crmTitles.includes(item.title))

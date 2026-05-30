@@ -784,7 +784,7 @@ function ActivityItem({
   )
 }
 
-const HOURS_12 = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i))
+const HOURS_12 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 const MINUTES_5 = Array.from({ length: 12 }, (_, i) => i * 5)
 
 function to12Hour(h24: number): { hour: number; period: 'AM' | 'PM' } {
@@ -844,7 +844,7 @@ function DeadlineControls({
             <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent stableScrollButtons>
               {HOURS_12.map(h => (
                 <SelectItem key={h} value={String(h)}>
                   {h}
@@ -857,7 +857,7 @@ function DeadlineControls({
             <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent stableScrollButtons>
               {minuteOptions.map(m => (
                 <SelectItem key={m} value={String(m)}>
                   {String(m).padStart(2, '0')}
@@ -869,7 +869,7 @@ function DeadlineControls({
             <SelectTrigger className='w-[62px] h-7 text-sm px-2'>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent stableScrollButtons>
               <SelectItem value='AM'>AM</SelectItem>
               <SelectItem value='PM'>PM</SelectItem>
             </SelectContent>
