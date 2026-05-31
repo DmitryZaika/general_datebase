@@ -53,7 +53,7 @@ const referralOptions = [
 const customerCheckInSchema = z.object({
   company_id: z.number().min(1, 'Company ID is required'),
   name: z.string().min(1, 'Name is required'),
-  phone: z.string().min(1, 'Phone number is required'),
+  phone: z.string().length(12, 'Phone number must be exactly 12 characters'),
   email: optionalEmailSchema,
   address: z.string().optional(),
   address_zip_code: z.string().optional(),
