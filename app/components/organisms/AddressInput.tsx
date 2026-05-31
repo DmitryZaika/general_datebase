@@ -18,23 +18,17 @@ import {
   FormMessage,
 } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
+import type { FinalSuggestion } from '~/services/types'
 
 function replaceZipCode(address: string, zipCode: string) {
   if (address.includes(zipCode)) return address
   return address.replace('USA', zipCode)
 }
 
-async function completeAddress(q: string): Promise<
-  {
-    description: { text: string }
-    place_id: string
-    zip_code: string | null
-  }[]
-> {
+async function completeAddress(q: string): Promise<FinalSuggestion[]> {
   const res = await fetch(`/api/google/address-complete?q=${encodeURIComponent(q)}`)
   if (!res.ok) throw new Error('Failed to fetch address')
-  const data = await res.json()
-  return data.suggestions
+  return await res.json()
 }
 
 export type StringPath<T extends FieldValues> = {
