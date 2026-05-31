@@ -623,7 +623,7 @@ export function CustomersListPage() {
             className={
               compactCustomerAction || compactCustomerActionNav
                 ? 'sm:max-w-[425px] overflow-auto p-5'
-                : 'sm:max-w-[560px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh] p-5'
+                : 'sm:max-w-[560px] max-h-[95vh] overflow-y-auto flex flex-col p-5'
             }
           >
             {showCustomerActionSkeleton ? (
