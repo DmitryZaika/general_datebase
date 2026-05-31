@@ -3,7 +3,7 @@
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Pencil, Plus, X } from 'lucide-react'
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -13,16 +13,20 @@ import {
   useLocation,
   useNavigate,
   useNavigation,
+  useSearchParams,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
+import { InventoryCatalogContentSkeleton } from '~/components/organisms/InventoryCatalogSkeleton'
 import { DataTable } from '~/components/ui/data-table'
 import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
 import { stoneListShouldRevalidate } from '~/utils/stoneListShouldRevalidate'
@@ -182,7 +186,6 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       ) => `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200
                    hover:shadow-md ${stone?.is_display ? '' : 'opacity-60'}`}
       data={stones}
-      animateRowEntrance
     />
   )
 }
@@ -190,23 +193,41 @@ function StoneTable({ stones }: { stones: Stone[] }) {
 export default function AdminStones() {
   const { stones, companyId } = useLoaderData<typeof loader>()
   const [searchParams, updateSearchParams] = useSafeSearchParams(stoneFilterSchema)
+  const [, setSearchParams] = useSearchParams()
   const navigation = useNavigation()
   const navigate = useNavigate()
   const [isAddingStone, setIsAddingStone] = useState(false)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
   const location = useLocation()
   const [isViewTogglePending, startViewToggleTransition] = useTransition()
+  const viewModeHydratedRef = useRef(false)
 
   const viewMode = searchParams.viewMode
+  const isListLoading = isEmployeeListFilterLoading(navigation, location)
+
+  useScrollMainToTopWhenLoading(isListLoading)
 
   useEffect(() => {
+    if (viewModeHydratedRef.current) return
     if (typeof window === 'undefined') return
     const raw = new URLSearchParams(window.location.search).get('viewMode')
-    if (raw === 'grid' || raw === 'table') return
+    if (raw === 'grid' || raw === 'table') {
+      viewModeHydratedRef.current = true
+      return
+    }
     const stored = localStorage.getItem('stoneViewMode')
-    if (stored !== 'grid' && stored !== 'table') return
-    updateSearchParams({ viewMode: stored })
-  }, [updateSearchParams])
+    if (stored !== 'grid' && stored !== 'table') {
+      viewModeHydratedRef.current = true
+      return
+    }
+    viewModeHydratedRef.current = true
+    if (stored === 'grid') {
+      return
+    }
+    const next = new URLSearchParams(window.location.search)
+    next.set('viewMode', stored)
+    setSearchParams(next, { replace: true })
+  }, [setSearchParams])
 
   useEffect(() => {
     const withImage = stones.filter(
@@ -299,104 +320,109 @@ export default function AdminStones() {
         </div>
       </div>
 
-      <div>
-        {viewMode === VIEW_MODE.GRID ? (
-          <ModuleList>
-            {sortedStones.map(stone => {
-              const displayedAmount = stone.amount > 0 ? stone.amount : '—'
-              const displayedAvailable = stone.available
-              const displayedWidth = stone.width && stone.width > 0 ? stone.width : '—'
-              const displayedLength =
-                stone.length && stone.length > 0 ? stone.length : '—'
+      {isListLoading ? (
+        <InventoryCatalogContentSkeleton fieldLineCount={4} />
+      ) : (
+        <div>
+          {viewMode === VIEW_MODE.GRID ? (
+            <ModuleList skipItemMountAnimation>
+              {sortedStones.map(stone => {
+                const displayedAmount = stone.amount > 0 ? stone.amount : '—'
+                const displayedAvailable = stone.available
+                const displayedWidth =
+                  stone.width && stone.width > 0 ? stone.width : '—'
+                const displayedLength =
+                  stone.length && stone.length > 0 ? stone.length : '—'
 
-              const handleGridItemClick = () => {
-                navigate(`${stone.id}${location.search}`)
-              }
+                const handleGridItemClick = () => {
+                  navigate(`${stone.id}${location.search}`)
+                }
 
-              const isRegularStock = !!stone.regular_stock
-              const availableText =
-                isRegularStock && stone.whole_available === 0
-                  ? 'Regular Stock'
-                  : stone.whole_available > 0
-                    ? `${stone.whole_available} / ${stone.whole_amount > 0 ? stone.whole_amount : '—'}${isRegularStock ? ' (Regular stock)' : ''}`
-                    : stone.available > 0
-                      ? 'Remnants Only'
-                      : `${displayedAvailable} / ${displayedAmount}`
+                const isRegularStock = !!stone.regular_stock
+                const availableText =
+                  isRegularStock && stone.whole_available === 0
+                    ? 'Regular Stock'
+                    : stone.whole_available > 0
+                      ? `${stone.whole_available} / ${stone.whole_amount > 0 ? stone.whole_amount : '—'}${isRegularStock ? ' (Regular stock)' : ''}`
+                      : stone.available > 0
+                        ? 'Remnants Only'
+                        : `${displayedAvailable} / ${displayedAmount}`
 
-              return (
-                <div
-                  id={`stone-${stone.id}`}
-                  key={stone.id}
-                  className='group relative w-full module-item'
-                >
+                return (
                   <div
-                    className={`border-2 border-blue-500 rounded cursor-pointer hover:shadow-lg transition-all duration-200 ${
-                      !stone.is_display ? 'opacity-30' : ''
-                    }`}
-                    onClick={handleGridItemClick}
+                    id={`stone-${stone.id}`}
+                    key={stone.id}
+                    className='group relative w-full module-item'
                   >
-                    <div className='relative'>
-                      {stone.url ? (
-                        <img
-                          src={withIconSuffix(stone.url)}
-                          alt={stone.name || 'Stone Image'}
-                          className='object-cover w-full h-40 rounded select-none'
-                          loading='lazy'
-                        />
-                      ) : (
-                        <div className='w-full h-40 rounded bg-gray-200' />
-                      )}
-                      {displayedAmount === '—' && !isRegularStock && (
-                        <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
-                          <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
-                            Out of Stock
+                    <div
+                      className={`border-2 border-blue-500 rounded cursor-pointer hover:shadow-lg transition-all duration-200 ${
+                        !stone.is_display ? 'opacity-30' : ''
+                      }`}
+                      onClick={handleGridItemClick}
+                    >
+                      <div className='relative'>
+                        {stone.url ? (
+                          <img
+                            src={withIconSuffix(stone.url)}
+                            alt={stone.name || 'Stone Image'}
+                            className='object-cover w-full h-40 rounded select-none'
+                            loading='lazy'
+                          />
+                        ) : (
+                          <div className='w-full h-40 rounded bg-gray-200' />
+                        )}
+                        {displayedAmount === '—' && !isRegularStock && (
+                          <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
+                            <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
+                              Out of Stock
+                            </div>
                           </div>
-                        </div>
+                        )}
+                      </div>
+                      <p className='text-center font-bold mt-2'>{stone.name}</p>
+                      <p className='text-center text-sm'>Available: {availableText}</p>
+                      <p className='text-center text-sm'>
+                        Size: {displayedLength} x {displayedWidth}
+                      </p>
+                      <p className='text-center text-sm'>
+                        Price: ${stone.retail_price}/${stone.cost_per_sqft}
+                      </p>
+                      {stone.bundle_number != null && stone.bundle_number !== '' && (
+                        <p className='text-center text-sm'>
+                          Bundle: #{stone.bundle_number}
+                        </p>
                       )}
                     </div>
-                    <p className='text-center font-bold mt-2'>{stone.name}</p>
-                    <p className='text-center text-sm'>Available: {availableText}</p>
-                    <p className='text-center text-sm'>
-                      Size: {displayedLength} x {displayedWidth}
-                    </p>
-                    <p className='text-center text-sm'>
-                      Price: ${stone.retail_price}/${stone.cost_per_sqft}
-                    </p>
-                    {stone.bundle_number != null && stone.bundle_number !== '' && (
-                      <p className='text-center text-sm'>
-                        Bundle: #{stone.bundle_number}
-                      </p>
-                    )}
-                  </div>
 
-                  <div className='absolute inset-0 flex justify-between items-start p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300'>
-                    <Link
-                      to={getEditUrl(stone.id)}
-                      className='text-white bg-gray-800 bg-opacity-60 rounded-full p-2'
-                      title='Edit Stone'
-                      aria-label={`Edit ${stone.name}/information`}
-                    >
-                      <Pencil size={16} />
-                    </Link>
-                    <Link
-                      to={`delete/${stone.id}${location.search}`}
-                      className='text-white bg-gray-800 bg-opacity-60 rounded-full p-2'
-                      title='Delete Stone'
-                      aria-label={`Delete ${stone.name}`}
-                    >
-                      <X size={16} />
-                    </Link>
+                    <div className='absolute inset-0 flex justify-between items-start p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300'>
+                      <Link
+                        to={getEditUrl(stone.id)}
+                        className='text-white bg-gray-800 bg-opacity-60 rounded-full p-2'
+                        title='Edit Stone'
+                        aria-label={`Edit ${stone.name}/information`}
+                      >
+                        <Pencil size={16} />
+                      </Link>
+                      <Link
+                        to={`delete/${stone.id}${location.search}`}
+                        className='text-white bg-gray-800 bg-opacity-60 rounded-full p-2'
+                        title='Delete Stone'
+                        aria-label={`Delete ${stone.name}`}
+                      >
+                        <X size={16} />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </ModuleList>
-        ) : (
-          <StoneTable stones={sortedStones} />
-        )}
+                )
+              })}
+            </ModuleList>
+          ) : (
+            <StoneTable stones={sortedStones} />
+          )}
+        </div>
+      )}
 
-        <Outlet />
-      </div>
+      <Outlet />
     </>
   )
 }

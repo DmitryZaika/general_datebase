@@ -4,12 +4,15 @@ import {
   redirect,
   useLoaderData,
   useLocation,
+  useNavigation,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { Image } from '~/components/molecules/Image'
+import { MediaGridContentSkeleton } from '~/components/organisms/MediaGridSkeleton'
 import { Accordion, AccordionContent, AccordionItem } from '~/components/ui/accordion'
 import { db } from '~/db.server'
 import { useArrowToggle } from '~/hooks/useArrowToggle'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import {
   EMPLOYEE_VIEW_ENTER_EASE,
   employeeViewMotionKey,
@@ -47,6 +50,11 @@ const SUPPORTS_SLIDE_UP = {
 export default function Supports() {
   const { supports } = useLoaderData<typeof loader>()
   const location = useLocation()
+  const navigation = useNavigation()
+  const isListLoading =
+    navigation.state === 'loading' &&
+    navigation.location?.pathname === location.pathname
+  useScrollMainToTopWhenLoading(isListLoading)
   const ids = supports.map(item => item.id)
   const { currentId, setCurrentId } = useArrowToggle(ids)
   return (
@@ -60,19 +68,23 @@ export default function Supports() {
           <AccordionContent>
             <Accordion type='multiple'>
               <AccordionContent>
-                <ModuleList>
-                  {supports.map(support => (
-                    <Image
-                      id={support.id}
-                      key={support.id}
-                      src={support.url}
-                      alt={support.name}
-                      name={support.name}
-                      setImage={setCurrentId}
-                      isOpen={currentId === support.id}
-                    />
-                  ))}
-                </ModuleList>
+                {isListLoading ? (
+                  <MediaGridContentSkeleton cardCount={14} />
+                ) : (
+                  <ModuleList>
+                    {supports.map(support => (
+                      <Image
+                        id={support.id}
+                        key={support.id}
+                        src={support.url}
+                        alt={support.name}
+                        name={support.name}
+                        setImage={setCurrentId}
+                        isOpen={currentId === support.id}
+                      />
+                    ))}
+                  </ModuleList>
+                )}
               </AccordionContent>
             </Accordion>
           </AccordionContent>

@@ -1,11 +1,23 @@
+import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigation,
+} from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { ImageCard } from '~/components/organisms/ImageCard'
+import { InventoryCatalogContentSkeleton } from '~/components/organisms/InventoryCatalogSkeleton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { cleanParams } from '~/hooks/use-safe-search-params'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import { sinkFilterSchema } from '~/schemas/sinks'
 import { SINK_TYPES } from '~/utils/constants'
+import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { type Sink, sinkQueryBuilder } from '~/utils/queries.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -101,6 +113,10 @@ function InteractiveCard({
 
 export default function Sinks() {
   const { sinks } = useLoaderData<typeof loader>()
+  const navigation = useNavigation()
+  const location = useLocation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location)
+  useScrollMainToTopWhenLoading(isListLoading)
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [_, setActiveType] = useState<string | undefined>(undefined)
   const [sortedSinks, setSortedSinks] = useState<Sink[]>(sinks)
@@ -151,25 +167,34 @@ export default function Sinks() {
 
   return (
     <>
-      <ModuleList>
-        <div className='w-full col-span-full'>
-          <SuperCarousel
-            type='sinks'
-            currentId={currentId}
-            setCurrentId={handleSetCurrentId}
-            images={sortedSinks}
-            userRole='employee'
-          />
-        </div>
-        {sortedSinks.map(sink => (
-          <InteractiveCard
-            key={sink.id}
-            sink={sink}
-            setCurrentId={handleSetCurrentId}
-            sinkType={sink.type}
-          />
-        ))}
-      </ModuleList>
+      <motion.div
+        key={location.pathname}
+        className='w-full min-h-0'
+        {...EMPLOYEE_VIEW_ENTER}
+      >
+        {!isListLoading ? (
+          <ModuleList skipItemMountAnimation>
+            <div className='w-full col-span-full'>
+              <SuperCarousel
+                type='sinks'
+                currentId={currentId}
+                setCurrentId={handleSetCurrentId}
+                images={sortedSinks}
+                userRole='employee'
+              />
+            </div>
+            {sortedSinks.map(sink => (
+              <InteractiveCard
+                key={sink.id}
+                sink={sink}
+                setCurrentId={handleSetCurrentId}
+                sinkType={sink.type}
+              />
+            ))}
+          </ModuleList>
+        ) : null}
+      </motion.div>
+      {isListLoading ? <InventoryCatalogContentSkeleton fieldLineCount={3} /> : null}
       <Outlet />
     </>
   )

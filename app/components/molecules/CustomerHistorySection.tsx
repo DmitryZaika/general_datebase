@@ -12,7 +12,8 @@ type CustomerHistoryProps = {
   created_by: string | null
   created_date: string | null
   source?: string | null
-  sales_rep_name?: string | null
+  initial_sales_rep_name?: string | null
+  assigned_date?: string | null
   first_rep_deal_created_at?: string | null
   reassignments?: ReassignmentRow[]
 }
@@ -21,7 +22,8 @@ export function CustomerHistorySection({
   created_by,
   created_date,
   source = null,
-  sales_rep_name = null,
+  initial_sales_rep_name = null,
+  assigned_date = null,
   first_rep_deal_created_at = null,
   reassignments = [],
 }: CustomerHistoryProps) {
@@ -32,8 +34,8 @@ export function CustomerHistorySection({
   const sourceNorm = source?.trim().toLowerCase() ?? ''
   const noCreatedBy = !created_by?.trim()
   const isLeadWithoutCreator = sourceNorm === 'leads' && noCreatedBy
+  const initialRep = initial_sales_rep_name?.trim() ?? ''
 
-  // Temporary: lead + sales-manager copy and deal-based timestamp until customers_history covers lead capture.
   if (isLeadWithoutCreator) {
     const createdAt = created_date ? new Date(created_date) : null
     const t0 = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.getTime() : 0
@@ -48,17 +50,19 @@ export function CustomerHistorySection({
         text: 'Customer added as a lead',
       })
     }
-    const rep = sales_rep_name?.trim()
-    if (rep) {
-      const dealAt = first_rep_deal_created_at
-        ? new Date(first_rep_deal_created_at)
-        : null
-      const dealValid = dealAt && !Number.isNaN(dealAt.getTime())
+
+    if (reassignments.length === 0 && initialRep.length > 0) {
+      const assignedAt = assigned_date
+        ? new Date(assigned_date)
+        : first_rep_deal_created_at
+          ? new Date(first_rep_deal_created_at)
+          : null
+      const assignedValid = assignedAt && !Number.isNaN(assignedAt.getTime())
       items.push({
-        sortKey: dealValid ? dealAt.getTime() : t0 + 1,
-        text: dealValid
-          ? `Assigned by sales manager to ${rep} on ${format(dealAt, 'M/d/yyyy h:mm a')}`
-          : `Assigned by sales manager to ${rep}`,
+        sortKey: assignedValid ? assignedAt.getTime() : t0 + 1,
+        text: assignedValid
+          ? `Assigned to ${initialRep} by sales manager on ${format(assignedAt, 'M/d/yyyy h:mm a')}`
+          : `Assigned to ${initialRep} by sales manager`,
       })
     }
   } else {
@@ -79,23 +83,15 @@ export function CustomerHistorySection({
     }
   }
 
-  let historyOrdinal = 0
   for (const r of reassignments) {
     const by = r.reassigned_by?.trim()
     if (!by) continue
     const at = new Date(r.updated_at)
     if (Number.isNaN(at.getTime())) continue
     const to = r.reassigned_to?.trim()
-    const isFirstHistory = historyOrdinal === 0
-    historyOrdinal += 1
-    let text: string
-    if (isFirstHistory && to) {
-      text = `Assigned to ${to} by ${by} on ${format(at, 'M/d/yyyy h:mm a')}`
-    } else if (to) {
-      text = `Reassigned by ${by} to ${to} on ${format(at, 'M/d/yyyy h:mm a')}`
-    } else {
-      text = `Reassigned by ${by} on ${format(at, 'M/d/yyyy h:mm a')}`
-    }
+    const text = to
+      ? `Assigned to ${to} by ${by} on ${format(at, 'M/d/yyyy h:mm a')}`
+      : `Assigned by ${by} on ${format(at, 'M/d/yyyy h:mm a')}`
     items.push({
       sortKey: at.getTime(),
       text,

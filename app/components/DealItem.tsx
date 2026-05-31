@@ -273,6 +273,7 @@ export default function DealItem({
         <div className='flex w-full items-center gap-2'>
           <Link
             to={projectUrl}
+            prefetch='none'
             className='flex flex-1 flex-col gap-0.5 select-none text-xl font-medium whitespace-normal hover:underline'
             onPointerDown={e => e.stopPropagation()}
           >
@@ -349,6 +350,7 @@ export default function DealItem({
                     ? `${projectUrl}&editActivity=${deal.nearest_activity_id}`
                     : `${projectUrl}?editActivity=${deal.nearest_activity_id}`
                 }
+                prefetch='none'
                 state={{ from: fromState }}
                 className='block w-full text-left rounded-sm hover:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1'
                 onPointerDown={e => e.stopPropagation()}
@@ -499,6 +501,7 @@ export default function DealItem({
           {hasEmail && (
             <Link
               to={mailUrl + location.search}
+              prefetch='none'
               className='text-slate-500 hover:text-black'
               onPointerDown={e => e.stopPropagation()}
               state={{ from: fromState }}
@@ -509,6 +512,7 @@ export default function DealItem({
           {hasImages && (
             <Link
               to={imagesUrl + location.search}
+              prefetch='none'
               className='text-slate-500 hover:text-black'
               onPointerDown={e => e.stopPropagation()}
               state={{ from: fromState }}
@@ -521,6 +525,7 @@ export default function DealItem({
               <PopoverTrigger asChild>
                 <Link
                   to={projectUrl + location.search}
+                  prefetch='none'
                   state={{ from: fromState }}
                   className='cursor-pointer hover:opacity-80'
                   onPointerDown={e => e.stopPropagation()}
@@ -591,6 +596,7 @@ export default function DealItem({
               <PopoverTrigger asChild>
                 <Link
                   to={projectUrl + location.search}
+                  prefetch='none'
                   state={{ from: fromState }}
                   className='cursor-pointer hover:opacity-80'
                   onPointerDown={e => e.stopPropagation()}

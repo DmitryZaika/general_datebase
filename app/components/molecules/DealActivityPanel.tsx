@@ -381,18 +381,18 @@ function ActivityItemReadOnly({
             </Badge>
           ) : null}
           <PriorityBadge priority={activity.priority} />
-          {shouldShowCreatorAttribution(viewerName, activity.created_by) &&
-          activity.created_by ? (
-            <span className='min-w-0 truncate text-xs text-gray-500'>
-              Created by {activity.created_by}
-            </span>
-          ) : null}
         </div>
         {when ? (
           <div className='flex shrink-0 flex-col items-end gap-0.5'>
             <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
               {when}
             </span>
+            {shouldShowCreatorAttribution(viewerName, activity.created_by) &&
+            activity.created_by ? (
+              <span className='max-w-[140px] truncate text-[9px] text-gray-400'>
+                By {formatAttributionName(activity.created_by)}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -699,18 +699,20 @@ function ActivityItem({
               Done
             </Badge>
             <PriorityBadge priority={activity.priority} />
+          </div>
+          <div className='flex shrink-0 flex-col items-end gap-0.5'>
+            <div className='flex items-center gap-1'>
+              {deleteControl}
+              {activity.completed_at ? (
+                <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+                  {formatTimestamp(activity.completed_at)}
+                </span>
+              ) : null}
+            </div>
             {shouldShowCreatorAttribution(viewerName, activity.created_by) &&
             activity.created_by ? (
-              <span className='min-w-0 truncate text-xs text-gray-500'>
-                Created by {activity.created_by}
-              </span>
-            ) : null}
-          </div>
-          <div className='flex shrink-0 items-center gap-1'>
-            {deleteControl}
-            {activity.completed_at ? (
-              <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
-                {formatTimestamp(activity.completed_at)}
+              <span className='max-w-[140px] truncate text-[9px] text-gray-400'>
+                By {formatAttributionName(activity.created_by)}
               </span>
             ) : null}
           </div>
@@ -753,25 +755,30 @@ function ActivityItem({
         <div className='mt-0.5 flex flex-wrap items-center gap-1.5'>
           <PriorityBadge priority={activity.priority} />
           {activity.deadline ? <DeadlineLabel deadline={activity.deadline} /> : null}
-          {shouldShowCreatorAttribution(viewerName, activity.created_by) &&
-          activity.created_by ? (
-            <span className='px-1.5 py-0.5 text-[10px] text-gray-900'>
-              Created by {activity.created_by}
-            </span>
-          ) : null}
         </div>
       </div>
 
-      <div className='flex shrink-0 items-center gap-0.5'>
-        <Button
-          variant='ghost'
-          size='icon'
-          className='h-6 w-6 shrink-0 text-gray-400 opacity-0 transition-opacity hover:text-blue-500 group-hover:opacity-100 focus-visible:opacity-100'
-          onClick={() => onEdit(activity)}
-        >
-          <Pencil className='h-3 w-3' />
-        </Button>
-        {deleteControl}
+      <div className='flex shrink-0 flex-col items-end gap-0.5'>
+        <div className='flex items-center gap-0.5'>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-6 w-6 shrink-0 text-gray-400 opacity-0 transition-opacity hover:text-blue-500 group-hover:opacity-100 focus-visible:opacity-100'
+            onClick={() => onEdit(activity)}
+          >
+            <Pencil className='h-3 w-3' />
+          </Button>
+          {deleteControl}
+          <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+            {formatTimestamp(activity.created_at)}
+          </span>
+        </div>
+        {shouldShowCreatorAttribution(viewerName, activity.created_by) &&
+        activity.created_by ? (
+          <span className='max-w-[140px] truncate text-[9px] text-gray-400'>
+            By {formatAttributionName(activity.created_by)}
+          </span>
+        ) : null}
       </div>
     </div>
   )
@@ -1100,20 +1107,11 @@ function formatAttributionName(raw: string): string {
     .join(' ')
 }
 
-function SmsHistoryRow({
-  message,
-  viewerName,
-}: {
-  message: SmsEntry
-  viewerName?: Nullable<string>
-}) {
+function SmsHistoryRow({ message }: { message: SmsEntry }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const isOutbound = message.direction === 'outbound'
   const sentLabel = formatTimestamp(message.createdDate)
   const showToggle = message.text.length > 90
-  const outboundAgent = isOutbound && message.agent ? message.agent : null
-  const showAgentLine =
-    !!outboundAgent && shouldShowCreatorAttribution(viewerName, outboundAgent)
 
   return (
     <div className='group flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
@@ -1138,26 +1136,19 @@ function SmsHistoryRow({
             {message.text}
           </p>
         </div>
-        <div className='flex shrink-0 flex-col items-end gap-0.5'>
-          <div className='flex items-center gap-2'>
-            {showToggle ? (
-              <button
-                type='button'
-                className='text-[10px] font-medium text-blue-600 opacity-0 transition-opacity hover:text-blue-700 group-hover:opacity-100 focus-visible:opacity-100'
-                onClick={() => setIsExpanded(value => !value)}
-              >
-                {isExpanded ? 'Show less' : 'Show more'}
-              </button>
-            ) : null}
-            <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
-              {sentLabel}
-            </span>
-          </div>
-          {showAgentLine ? (
-            <span className='max-w-[140px] truncate text-[9px] text-gray-400'>
-              By {formatAttributionName(outboundAgent)}
-            </span>
+        <div className='flex shrink-0 items-center gap-2'>
+          {showToggle ? (
+            <button
+              type='button'
+              className='text-[10px] font-medium text-blue-600 opacity-0 transition-opacity hover:text-blue-700 group-hover:opacity-100 focus-visible:opacity-100'
+              onClick={() => setIsExpanded(value => !value)}
+            >
+              {isExpanded ? 'Show less' : 'Show more'}
+            </button>
           ) : null}
+          <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+            {sentLabel}
+          </span>
         </div>
       </div>
     </div>
@@ -1498,13 +1489,14 @@ function ActivityList({
                 audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
                 compact
                 historyCompact
+                dealId={readOnly ? undefined : dealId}
               />
             </TimelineItem>
           )
         case 'sms':
           return (
             <TimelineItem icon={MessageSquare} isLast={isLast}>
-              <SmsHistoryRow message={item.data} viewerName={viewerName} />
+              <SmsHistoryRow message={item.data} />
             </TimelineItem>
           )
         case 'email':
@@ -1610,6 +1602,7 @@ function ActivityList({
                     audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
                     compact
                     historyCompact
+                    dealId={readOnly ? undefined : dealId}
                   />
                 </TimelineItem>
               </motion.div>
@@ -1630,7 +1623,7 @@ function ActivityList({
                   icon={MessageSquare}
                   isLast={index === smsMessages.length - 1}
                 >
-                  <SmsHistoryRow message={message} viewerName={viewerName} />
+                  <SmsHistoryRow message={message} />
                 </TimelineItem>
               </motion.div>
             ))}

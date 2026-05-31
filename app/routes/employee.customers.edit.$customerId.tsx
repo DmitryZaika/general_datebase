@@ -7,6 +7,7 @@ import {
   useNavigate,
 } from 'react-router'
 import { v4 as uuidv4 } from 'uuid'
+import { CustomerActionDialogSkeletonContent } from '~/components/organisms/CustomerActionDialogSkeleton'
 import { CustomerForm } from '~/components/pages/CustomerForm'
 import type { CustomerDialogSchema } from '~/schemas/customers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -65,11 +66,12 @@ export default function CustomersEdit() {
     }
   }
   if (data === undefined) {
-    return null
+    return <CustomerActionDialogSkeletonContent />
   }
 
   return (
     <CustomerForm
+      embedded
       handleChange={handleChange}
       onSuccess={onSuccess}
       companyId={user.company_id}

@@ -21,7 +21,8 @@ FROM base AS prerelease
 COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 
-# build
+ARG VITE_POSTHOG_KEY
+ENV VITE_POSTHOG_KEY=${VITE_POSTHOG_KEY}
 ENV NODE_ENV=production
 RUN bun run build
 

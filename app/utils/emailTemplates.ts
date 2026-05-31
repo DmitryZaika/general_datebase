@@ -1,10 +1,19 @@
 import { decodeHtmlEntities } from '~/utils/stringHelpers'
 
+export interface EmailTemplateAttachment {
+  id: number
+  filename: string
+  url: string
+  content_type: string
+  content_subtype: string
+}
+
 export interface EmailTemplate {
   id: number
   template_name: string
   template_subject: string
   template_body: string
+  attachments?: EmailTemplateAttachment[]
 }
 
 export const TEMPLATE_STALE_TIME = 60_000
@@ -40,4 +49,22 @@ export async function fetchAllTemplates(companyId: number) {
   }
   const data = await response.json()
   return data.templates as EmailTemplate[]
+}
+
+export function mapTemplateAttachmentRows(
+  rows: {
+    id: number
+    content_type: string
+    content_subtype: string
+    filename: string
+    url: string
+  }[],
+): EmailTemplateAttachment[] {
+  return rows.map(row => ({
+    id: row.id,
+    filename: row.filename,
+    url: row.url,
+    content_type: row.content_type,
+    content_subtype: row.content_subtype,
+  }))
 }

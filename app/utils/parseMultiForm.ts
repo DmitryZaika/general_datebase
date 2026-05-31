@@ -9,12 +9,37 @@ const fileSchema = z.object({
   file: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
 })
 
+const optionalFileSchema = z.object({
+  file: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
+})
+
 export async function parseMutliForm<Shape extends z.ZodRawShape>(
   request: Request,
   schema: z.ZodObject<Shape>,
   folder: string,
 ) {
   const finalSchema = schema.extend(fileSchema.shape)
+  const resolver = zodResolver(finalSchema)
+
+  async function uploadHandler(fileUpload: FileUpload) {
+    const response = await s3UploadHandler(fileUpload, folder)
+    return response
+  }
+
+  const formData = await parseFormData(request, uploadHandler)
+
+  csrf.validate(formData, request.headers)
+
+  const receivedValues = generateFormData(formData)
+  return await validateFormData(receivedValues, resolver)
+}
+
+export async function parseOptionalMultiForm<Shape extends z.ZodRawShape>(
+  request: Request,
+  schema: z.ZodObject<Shape>,
+  folder: string,
+) {
+  const finalSchema = schema.extend(optionalFileSchema.shape)
   const resolver = zodResolver(finalSchema)
 
   async function uploadHandler(fileUpload: FileUpload) {

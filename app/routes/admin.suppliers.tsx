@@ -7,13 +7,17 @@ import {
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigation,
 } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { SuppliersPageSkeleton } from '~/components/organisms/DataTableSkeleton'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
@@ -85,6 +89,9 @@ const columns: ColumnDef<Supplier>[] = [
 export default function Suppliers() {
   const { suppliers } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
+  const location = useLocation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location)
+  useScrollMainToTopWhenLoading(isListLoading)
   const [isAddingSupplier, setIsAddingSupplier] = useState(false)
 
   useEffect(() => {
@@ -105,7 +112,11 @@ export default function Suppliers() {
           Add Supplier
         </LoadingButton>
       </Link>
-      <DataTable columns={columns} data={suppliers} />
+      {isListLoading ? (
+        <SuppliersPageSkeleton />
+      ) : (
+        <DataTable columns={columns} data={suppliers} />
+      )}
       <Outlet />
     </div>
   )

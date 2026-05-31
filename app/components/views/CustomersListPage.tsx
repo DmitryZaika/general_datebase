@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   Link,
@@ -9,17 +9,25 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useNavigation,
   useSearchParams,
 } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SelectInput } from '~/components/molecules/SelectItem'
+import { CustomerActionDialogSkeletonContent } from '~/components/organisms/CustomerActionDialogSkeleton'
+import { CustomerCompactActionDialogSkeletonContent } from '~/components/organisms/CustomerCompactActionDialogSkeleton'
+import {
+  CustomersPaginationSkeleton,
+  CustomersTableSkeleton,
+} from '~/components/organisms/CustomersPageSkeleton'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import { DataTable } from '~/components/ui/data-table'
 import { DataTablePagination } from '~/components/ui/data-table-pagination'
+import { Dialog, DialogContent } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
 import {
   Select,
@@ -217,12 +225,98 @@ function CustomerActions({ customer }: { customer: CustomersListCustomer }) {
   )
 }
 
+function isCustomerActionPath(pathname: string) {
+  return (
+    pathname.includes('/customers/info/') ||
+    pathname.includes('/customers/edit/') ||
+    pathname.includes('/customers/invalid/') ||
+    pathname.includes('/customers/delete/') ||
+    pathname.includes('/customers/add')
+  )
+}
+
+function isCompactCustomerAction(pathname: string) {
+  return (
+    pathname.includes('/customers/invalid/') || pathname.includes('/customers/delete/')
+  )
+}
+
+function customerActionId(pathname: string) {
+  const match = pathname.match(/\/customers\/(?:info|edit|view)\/(\d+)/)
+  return match?.[1] ?? null
+}
+
+function getCustomersListPath(pathname: string) {
+  const match = pathname.match(/^(.*\/customers)/)
+  return match?.[1] ?? pathname.replace(/\/$/, '')
+}
+
+function isSameCustomerActionNavigation(from: string, to: string) {
+  const fromId = customerActionId(from)
+  const toId = customerActionId(to)
+  return fromId !== null && fromId === toId
+}
+
 export function CustomersListPage() {
   const { customers } = useLoaderData<{ customers: CustomersListCustomer[] }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const navigation = useNavigation()
   const location = useLocation()
-  const customersBasePath = location.pathname.replace(/\/$/, '')
+  const [customerActionDismissed, setCustomerActionDismissed] = useState(false)
+  const customersBasePath = getCustomersListPath(location.pathname)
+  const isListLoading =
+    navigation.state === 'loading' &&
+    navigation.location?.pathname === location.pathname
+  const navPath = navigation.location?.pathname ?? ''
+  const isOnCustomerAction = isCustomerActionPath(location.pathname)
+  const isNavigatingToCustomerAction =
+    navigation.state === 'loading' &&
+    navPath !== location.pathname &&
+    isCustomerActionPath(navPath)
+  const isCustomerActionLoading =
+    isNavigatingToCustomerAction &&
+    !isSameCustomerActionNavigation(location.pathname, navPath)
+  const showCustomerDialog =
+    !customerActionDismissed && (isOnCustomerAction || isNavigatingToCustomerAction)
+  const compactCustomerAction = isCompactCustomerAction(location.pathname)
+  const compactCustomerActionNav = isCompactCustomerAction(navPath)
+  const showCompactActionSkeleton =
+    isCustomerActionLoading && (compactCustomerAction || compactCustomerActionNav)
+  const showCustomerActionSkeleton =
+    isCustomerActionLoading && !compactCustomerAction && !compactCustomerActionNav
+
+  useEffect(() => {
+    if (navigation.state === 'idle' && !isCustomerActionPath(location.pathname)) {
+      setCustomerActionDismissed(false)
+    }
+  }, [navigation.state, location.pathname])
+
+  useEffect(() => {
+    if (
+      customerActionDismissed &&
+      navigation.state === 'idle' &&
+      isCustomerActionPath(location.pathname)
+    ) {
+      navigate(
+        { pathname: getCustomersListPath(location.pathname), search: location.search },
+        { replace: true },
+      )
+    }
+  }, [
+    customerActionDismissed,
+    navigation.state,
+    location.pathname,
+    location.search,
+    navigate,
+  ])
+
+  const handleCustomerDialogClose = (open: boolean) => {
+    if (!open) {
+      setCustomerActionDismissed(true)
+      navigate({ pathname: customersBasePath, search: location.search })
+    }
+  }
 
   const { data: reps = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['sales-reps'],
@@ -468,49 +562,80 @@ export function CustomersListPage() {
           </Link>
         )}
       </div>
-      <DataTablePagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        pageSize={pageSize}
-        totalRows={fullDisplayed.length}
-        onPageChange={p => {
-          const params = new URLSearchParams(searchParams)
-          params.set('page', String(p))
-          navigate({ pathname: location.pathname, search: params.toString() })
-        }}
-        onPageSizeChange={s => {
-          const params = new URLSearchParams(searchParams)
-          params.set('pageSize', String(s))
-          params.set('page', '1')
-          navigate({ pathname: location.pathname, search: params.toString() })
-        }}
-      />
-      <DataTable
-        key={`${tabParam}-${currentPage}-${viewParam}-${pageSize}-${salesRepParam ?? 'all'}`}
-        columns={columns}
-        data={rows}
-        getRowId={row => String(row.id)}
-        rowClassName={getRowClassName}
-        onRowClick={customer => navigate(`info/${customer.id}${location.search}`)}
-      />
-      <DataTablePagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        pageSize={pageSize}
-        totalRows={fullDisplayed.length}
-        onPageChange={p => {
-          const params = new URLSearchParams(searchParams)
-          params.set('page', String(p))
-          navigate({ pathname: location.pathname, search: params.toString() })
-        }}
-        onPageSizeChange={s => {
-          const params = new URLSearchParams(searchParams)
-          params.set('pageSize', String(s))
-          params.set('page', '1')
-          navigate({ pathname: location.pathname, search: params.toString() })
-        }}
-      />
-      <Outlet />
+      {isListLoading ? (
+        <CustomersPaginationSkeleton />
+      ) : (
+        <DataTablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalRows={fullDisplayed.length}
+          onPageChange={p => {
+            const params = new URLSearchParams(searchParams)
+            params.set('page', String(p))
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+          onPageSizeChange={s => {
+            const params = new URLSearchParams(searchParams)
+            params.set('pageSize', String(s))
+            params.set('page', '1')
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+        />
+      )}
+      {isListLoading ? (
+        <>
+          <CustomersTableSkeleton />
+          <CustomersPaginationSkeleton />
+        </>
+      ) : (
+        <DataTable
+          key={`${tabParam}-${currentPage}-${viewParam}-${pageSize}-${salesRepParam ?? 'all'}`}
+          columns={columns}
+          data={rows}
+          getRowId={row => String(row.id)}
+          rowClassName={getRowClassName}
+          onRowClick={customer => navigate(`info/${customer.id}${location.search}`)}
+        />
+      )}
+      {!isListLoading ? (
+        <DataTablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalRows={fullDisplayed.length}
+          onPageChange={p => {
+            const params = new URLSearchParams(searchParams)
+            params.set('page', String(p))
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+          onPageSizeChange={s => {
+            const params = new URLSearchParams(searchParams)
+            params.set('pageSize', String(s))
+            params.set('page', '1')
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+        />
+      ) : null}
+      {showCustomerDialog ? (
+        <Dialog open={true} onOpenChange={handleCustomerDialogClose}>
+          <DialogContent
+            className={
+              compactCustomerAction || compactCustomerActionNav
+                ? 'sm:max-w-[425px] overflow-auto p-5'
+                : 'sm:max-w-[560px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh] p-5'
+            }
+          >
+            {showCustomerActionSkeleton ? (
+              <CustomerActionDialogSkeletonContent />
+            ) : showCompactActionSkeleton ? (
+              <CustomerCompactActionDialogSkeletonContent />
+            ) : (
+              <Outlet />
+            )}
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </PageLayout>
   )
 }

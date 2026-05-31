@@ -2,13 +2,14 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
+import { syncCustomerToCloudTalk } from '~/services/lambda.server'
 import type { Customer } from '~/types/customer'
-import { syncCustomerToCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import {
   auditDisplayName,
   fetchUserDisplayNameById,
   normalizeSalesRepId,
   recordCustomerReassignment,
+  recordLeadManagerAssignmentBeforeReassign,
 } from '~/utils/customerAudit.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -73,6 +74,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const nextRep = normalizeSalesRepId(salesRep)
   const repChanged = prevRep !== nextRep
 
+  if (repChanged) {
+    await recordLeadManagerAssignmentBeforeReassign(db, customerId, prevRep)
+  }
+
   await db.execute<ResultSetHeader>(
     `UPDATE customers SET name = ?, phone = ?, phone_2 = ?, email = ?, address = ?, your_message = ?, referral_source = ?, source = ?, company_id = ?, company_name = ?, sales_rep = ? WHERE id = ?`,
     [
@@ -103,7 +108,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
   }
 
-  syncCustomerToCloudTalk(customerId).catch(() => undefined)
+  await syncCustomerToCloudTalk(validatedData.company_id, customerId)
 
   return data({
     success: true,

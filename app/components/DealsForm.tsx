@@ -96,16 +96,6 @@ export function DealsForm({
           <div className='flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2'>
             {dealId ? (
               <div className='flex flex-wrap items-center gap-2'>
-                <Link to={`../images${location.search}`} relative='path'>
-                  <Button variant='outline' type='button'>
-                    Images
-                  </Button>
-                </Link>
-                <Link to={`../documents${location.search}`} relative='path'>
-                  <Button variant='outline' type='button'>
-                    Documents
-                  </Button>
-                </Link>
                 <Link to={`../delete${location.search}`} relative='path'>
                   <Button variant='destructive' type='button'>
                     Delete

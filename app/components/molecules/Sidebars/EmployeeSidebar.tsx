@@ -491,8 +491,9 @@ export function EmployeeSidebar({
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
-                              <a
-                                href={sub.url}
+                              <Link
+                                to={sub.url}
+                                onClick={handleLinkClick}
                                 className='flex w-full items-center gap-2'
                               >
                                 <sub.icon />
@@ -502,7 +503,7 @@ export function EmployeeSidebar({
                                     {unreadEmailCount}
                                   </span>
                                 ) : null}
-                              </a>
+                              </Link>
                             </SidebarMenuSubButton>
                             {sub.component && isActive && <sub.component />}
                           </SidebarMenuSubItem>
@@ -541,8 +542,9 @@ export function EmployeeSidebar({
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
-                              <a
-                                href={sub.url}
+                              <Link
+                                to={sub.url}
+                                onClick={handleLinkClick}
                                 className='flex w-full items-center gap-2'
                               >
                                 <sub.icon />
@@ -555,7 +557,7 @@ export function EmployeeSidebar({
                                 {sub.title === 'CloudTalk SMS' ? (
                                   <SidebarCloudtalkBadge />
                                 ) : null}
-                              </a>
+                              </Link>
                             </SidebarMenuSubButton>
                             {sub.component && isActive && <sub.component />}
                           </SidebarMenuSubItem>
@@ -596,10 +598,10 @@ export function EmployeeSidebar({
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
-                              <a href={sub.url}>
+                              <Link to={sub.url} onClick={handleLinkClick}>
                                 <sub.icon />
                                 <span>{sub.title}</span>
-                              </a>
+                              </Link>
                             </SidebarMenuSubButton>
                             {sub.component && isActive && <sub.component />}
                           </SidebarMenuSubItem>
@@ -640,10 +642,10 @@ export function EmployeeSidebar({
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
-                              <a href={sub.url}>
+                              <Link to={sub.url} onClick={handleLinkClick}>
                                 <sub.icon />
                                 <span>{sub.title}</span>
-                              </a>
+                              </Link>
                             </SidebarMenuSubButton>
                             {sub.component && isActive && <sub.component />}
                           </SidebarMenuSubItem>
@@ -663,7 +665,11 @@ export function EmployeeSidebar({
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
-                      <a href={item.url} className='flex w-full items-center gap-2'>
+                      <Link
+                        to={item.url}
+                        onClick={handleLinkClick}
+                        className='flex w-full items-center gap-2'
+                      >
                         <item.icon />
                         <span className='group-data-[collapsible=icon]:hidden'>
                           {item.title}
@@ -673,7 +679,7 @@ export function EmployeeSidebar({
                             {unreadEmailCount}
                           </span>
                         ) : null}
-                      </a>
+                      </Link>
                     </SidebarMenuButton>
                     {item.component && isActive && <item.component />}
                   </SidebarMenuItem>

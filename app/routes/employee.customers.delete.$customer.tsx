@@ -13,8 +13,6 @@ import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -192,22 +190,8 @@ export default function CustomerDelete() {
 
   return (
     <>
-      <Dialog
-        open={step1Open}
-        onOpenChange={open => {
-          if (!open && !isPosting) closeToList()
-        }}
-      >
-        <DialogContent
-          className='sm:max-w-[425px]'
-          hideClose={isPosting}
-          onPointerDownOutside={e => {
-            if (isPosting) e.preventDefault()
-          }}
-          onEscapeKeyDown={e => {
-            if (isPosting) e.preventDefault()
-          }}
-        >
+      {step1Open ? (
+        <>
           <DialogHeader>
             <DialogTitle>Delete customer</DialogTitle>
             <DialogDescription>
@@ -244,25 +228,11 @@ export default function CustomerDelete() {
               Confirm
             </LoadingButton>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </>
+      ) : null}
 
-      <Dialog
-        open={step2Open}
-        onOpenChange={open => {
-          if (!open && !isPosting) closeToList()
-        }}
-      >
-        <DialogContent
-          className='sm:max-w-[425px]'
-          hideClose={isPosting}
-          onPointerDownOutside={e => {
-            if (isPosting) e.preventDefault()
-          }}
-          onEscapeKeyDown={e => {
-            if (isPosting) e.preventDefault()
-          }}
-        >
+      {step2Open ? (
+        <>
           <DialogHeader>
             <DialogTitle>Delete customer</DialogTitle>
             <DialogDescription>
@@ -293,8 +263,8 @@ export default function CustomerDelete() {
               Confirm
             </LoadingButton>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </>
+      ) : null}
 
       <Form
         ref={simpleFormRef}

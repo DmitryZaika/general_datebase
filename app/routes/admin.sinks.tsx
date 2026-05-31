@@ -8,14 +8,18 @@ import {
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigation,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { InventoryCatalogContentSkeleton } from '~/components/organisms/InventoryCatalogSkeleton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { cleanParams } from '~/hooks/use-safe-search-params'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import { sinkFilterSchema } from '~/schemas/sinks'
 import { SINK_TYPES } from '~/utils/constants'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { type Sink, sinkQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
 
@@ -50,6 +54,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminSinks() {
   const { sinks } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
+  const location = useLocation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location)
+  useScrollMainToTopWhenLoading(isListLoading)
   const [isAddingSink, setIsAddingSink] = useState(false)
   const [sortedSinks, setSortedSinks] = useState<Sink[]>(sinks)
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
@@ -117,8 +124,10 @@ export default function AdminSinks() {
         </Link>
       </div>
 
-      <div>
-        <ModuleList>
+      {isListLoading ? (
+        <InventoryCatalogContentSkeleton fieldLineCount={3} />
+      ) : (
+        <ModuleList skipItemMountAnimation>
           <div className='w-full col-span-full'>
             <SuperCarousel
               type='sinks'
@@ -208,8 +217,8 @@ export default function AdminSinks() {
             )
           })}
         </ModuleList>
-        <Outlet />
-      </div>
+      )}
+      <Outlet />
     </>
   )
 }

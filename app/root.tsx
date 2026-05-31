@@ -13,6 +13,7 @@ import {
   ScrollRestoration,
   useLoaderData,
   useLocation,
+  useNavigation,
 } from 'react-router'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
@@ -20,9 +21,18 @@ import { SidebarProvider } from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
+import {
+  useScrollMainToTopOnSectionIdle,
+  useScrollMainToTopWhenLoading,
+} from '~/hooks/useScrollMainToTopWhenLoading'
 import type { ISupplier } from '~/schemas/suppliers'
 import { queryClient } from '~/utils/api'
+import { renderAppNavigationSkeleton } from '~/utils/appNavigationSkeleton'
 import { csrf } from '~/utils/csrf.server'
+import {
+  getSidebarSection,
+  isSidebarSectionChange,
+} from '~/utils/employeeSidebarNavigation'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import {
   getSuperAdminCompanies,
@@ -65,8 +75,10 @@ export function Posthog() {
     if (typeof window !== 'undefined') {
       import('posthog-js').then(({ default: posthog }) => {
         if (!posthog.__loaded) {
-          posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
-            api_host: 'https://t.granite-manager.com',
+          const posthogKey = import.meta.env.VITE_POSTHOG_KEY
+          if (!posthogKey) return
+          posthog.init(posthogKey, {
+            api_host: `${window.location.origin}/ingest`,
             ui_host: 'https://us.posthog.com',
             person_profiles: 'always',
           })
@@ -326,6 +338,20 @@ export default function App() {
     userIsSuperAdmin,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
+  const navigation = useNavigation()
+  const navPath = navigation.location?.pathname ?? ''
+  const showSidebarPageSkeleton =
+    (pathname.startsWith('/employee') || pathname.startsWith('/admin')) &&
+    navigation.state === 'loading' &&
+    (navPath.startsWith('/employee') || navPath.startsWith('/admin')) &&
+    navPath !== pathname &&
+    isSidebarSectionChange(pathname, navPath)
+  useScrollMainToTopWhenLoading(showSidebarPageSkeleton)
+  useScrollMainToTopOnSectionIdle(pathname, navigation.state)
+  const sidebarNavigationSkeleton = renderAppNavigationSkeleton(
+    getSidebarSection(navPath),
+    navPath,
+  )
   const { toast } = useToast()
   const _isMobile = useIsMobile()
   const isLogin = pathname === '/login'
@@ -378,7 +404,10 @@ export default function App() {
   return (
     <html lang='en'>
       <head>
-        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        <meta
+          name='viewport'
+          content='width=device-width, initial-scale=1.0, viewport-fit=cover'
+        />
         <meta charSet='utf-8' />
         <Meta />
         <Links />
@@ -417,10 +446,19 @@ export default function App() {
                   />
                 )}
                 <div className='relative'>
-                  <Outlet />
+                  {showSidebarPageSkeleton ? sidebarNavigationSkeleton : <Outlet />}
                 </div>
                 <Toaster />
-                <ScrollRestoration />
+                <ScrollRestoration
+                  getKey={location => {
+                    const section = getSidebarSection(location.pathname)
+                    const root = location.pathname.split('/').filter(Boolean)[0]
+                    if ((root === 'employee' || root === 'admin') && section) {
+                      return `${root}/${section}`
+                    }
+                    return location.pathname
+                  }}
+                />
                 <Scripts />
                 <Posthog />
                 {!isInstallerRoute && !isCheckIn && user && <Chat />}

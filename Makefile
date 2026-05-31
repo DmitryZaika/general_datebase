@@ -3,7 +3,7 @@ AWS_ACCOUNT_ID := 741448943665
 REGION := us-east-2
 REPO_NAME := granite-manager-remix
 EC2_USER := ec2-user
-EC2_IP := ec2-3-133-141-247.us-east-2.compute.amazonaws.com
+EC2_IP := ec2-18-220-106-116.us-east-2.compute.amazonaws.com
 SSH_KEY = ~/colin.pem
 
 # Full Image URI
@@ -41,8 +41,10 @@ setup-host:
 		sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose && \
 		sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose"
 
+VITE_POSTHOG_KEY := $(shell grep '^VITE_POSTHOG_KEY=' .env.prod | cut -d= -f2-)
+
 build-push: login
-	docker build -t $(REPO_NAME) .
+	docker build --build-arg VITE_POSTHOG_KEY=$(VITE_POSTHOG_KEY) -t $(REPO_NAME) .
 	docker tag $(REPO_NAME):latest $(IMAGE_URI)
 	docker push $(IMAGE_URI)
 

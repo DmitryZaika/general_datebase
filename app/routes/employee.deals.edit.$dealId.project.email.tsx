@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -66,12 +66,11 @@ import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
 import type { EmailTemplate } from '~/utils/emailTemplates'
 import {
   getUnfilledCustomVariables,
   hasAnyVariables,
-  replaceTemplateVariables,
-  type TemplateVariableData,
 } from '~/utils/emailTemplateVariables'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 
@@ -330,7 +329,7 @@ function EmailFormFields({
   companyId,
   selectedTemplate,
   onTemplateChange,
-  templateVariableData,
+  onTemplateApply,
   onFilesDrop,
   recipientEmail,
   customerName,
@@ -339,7 +338,7 @@ function EmailFormFields({
   companyId: number
   selectedTemplate: EmailTemplate | undefined
   onTemplateChange: (template: EmailTemplate | undefined) => void
-  templateVariableData: TemplateVariableData
+  onTemplateApply: (template: EmailTemplate) => Promise<void>
   onFilesDrop?: (files: File[]) => void
   recipientEmail: string
   customerName: string
@@ -372,12 +371,9 @@ function EmailFormFields({
         onChange={template => {
           onTemplateChange(template)
           if (template) {
-            form.setValue('subject', template.template_subject)
-            const filledBody = replaceTemplateVariables(
-              template.template_body,
-              templateVariableData,
-            )
-            form.setValue('text', filledBody)
+            void onTemplateApply(template)
+          } else {
+            form.setValue('attachments', [])
           }
         }}
       />
@@ -714,6 +710,23 @@ export default function DealEmailDialog() {
 
   const [previews, setPreviews] = useState<Record<string, string>>({})
   const [editingAttachment, setEditingAttachment] = useState<File | null>(null)
+
+  const applyTemplate = useCallback(
+    async (template: EmailTemplate) => {
+      const applied = await applyEmailTemplateContent(template, templateVariableData)
+      form.setValue('subject', applied.subject)
+      form.setValue('text', applied.body)
+      form.setValue('attachments', applied.attachments)
+      setPreviews(prev => {
+        for (const url of Object.values(prev)) {
+          if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+        }
+        return applied.previews
+      })
+    },
+    [form, templateVariableData],
+  )
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files
     if (files && files.length > 0) {
@@ -881,7 +894,7 @@ export default function DealEmailDialog() {
               companyId={companyId}
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
-              templateVariableData={templateVariableData}
+              onTemplateApply={applyTemplate}
               recipientEmail={email}
               customerName={customerName}
               onFilesDrop={files => {

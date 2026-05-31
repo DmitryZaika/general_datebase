@@ -21,6 +21,7 @@ interface NotificationProps {
 async function getNotifications(): Promise<NotificationItem[]> {
   const response = await fetch('/api/notifications', {
     cache: 'no-store',
+    credentials: 'same-origin',
   })
   if (!response.ok) {
     throw Error('Bad Request')
@@ -35,8 +36,12 @@ export function Notification({ className }: NotificationProps) {
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['notifications'],
     queryFn: getNotifications,
-    refetchInterval: 30000,
-    refetchIntervalInBackground: true,
+    staleTime: 55_000,
+    refetchInterval: () =>
+      typeof document !== 'undefined' && document.visibilityState === 'hidden'
+        ? false
+        : 60_000,
+    refetchIntervalInBackground: false,
   })
 
   const handleDismiss = useCallback(

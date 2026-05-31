@@ -42,12 +42,7 @@ import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { MultiEmailRecipientInput } from '~/components/molecules/MultiEmailRecipientInput'
 import { QuillInput } from '~/components/molecules/QuillInput'
 import { Button } from '~/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+import { DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import {
   FormControl,
   FormField,
@@ -69,13 +64,10 @@ import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
 import { zodEmail } from '~/utils/constants'
 import type { EmailTemplate } from '~/utils/emailTemplates'
-import {
-  getUnfilledCustomVariables,
-  replaceTemplateVariables,
-  type TemplateVariableData,
-} from '~/utils/emailTemplateVariables'
+import { getUnfilledCustomVariables } from '~/utils/emailTemplateVariables'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 
 // ============================================================================
@@ -462,7 +454,7 @@ function EmailFormFields({
   companyId,
   selectedTemplate,
   onTemplateChange,
-  templateVariableData,
+  onTemplateApply,
   canEditTo = false,
   onFilesDrop,
   toLabels,
@@ -472,7 +464,7 @@ function EmailFormFields({
   companyId: number
   selectedTemplate: EmailTemplate | undefined
   onTemplateChange: (template: EmailTemplate | undefined) => void
-  templateVariableData: TemplateVariableData
+  onTemplateApply: (template: EmailTemplate) => Promise<void>
   canEditTo?: boolean
   onFilesDrop?: (files: File[]) => void
   toLabels: Record<string, string>
@@ -517,12 +509,9 @@ function EmailFormFields({
         onChange={template => {
           onTemplateChange(template)
           if (template) {
-            form.setValue('subject', template.template_subject)
-            const filledBody = replaceTemplateVariables(
-              template.template_body,
-              templateVariableData,
-            )
-            form.setValue('text', filledBody)
+            void onTemplateApply(template)
+          } else {
+            form.setValue('attachments', [])
           }
         }}
       />
@@ -842,10 +831,6 @@ export default function DealEmailDialog() {
     mutate(values)
   }
 
-  const handleDialogClose = (open: boolean) => {
-    if (!open) navigate(`/employee/emails${location.search}`)
-  }
-
   const isMobile = useIsMobile()
 
   const handleGenerateWithAI = async () => {
@@ -874,6 +859,22 @@ export default function DealEmailDialog() {
 
   const [previews, setPreviews] = useState<Record<string, string>>({})
   const [editingAttachment, setEditingAttachment] = useState<File | null>(null)
+
+  const applyTemplate = useCallback(
+    async (template: EmailTemplate) => {
+      const applied = await applyEmailTemplateContent(template, templateVariableData)
+      form.setValue('subject', applied.subject)
+      form.setValue('text', applied.body)
+      form.setValue('attachments', applied.attachments)
+      setPreviews(prev => {
+        for (const url of Object.values(prev)) {
+          if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+        }
+        return applied.previews
+      })
+    },
+    [form, templateVariableData],
+  )
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files
@@ -1020,9 +1021,9 @@ export default function DealEmailDialog() {
     : undefined
 
   return (
-    <Dialog open={true} onOpenChange={handleDialogClose}>
-      <DialogContent
-        className={`sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5 transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
+    <>
+      <div
+        className={`flex min-h-[500px] flex-1 flex-col transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
         onPasteCapture={handlePaste}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -1042,7 +1043,7 @@ export default function DealEmailDialog() {
               companyId={companyId}
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
-              templateVariableData={templateVariableData}
+              onTemplateApply={applyTemplate}
               canEditTo={!dealId}
               onFilesDrop={files => {
                 addFiles(files)
@@ -1254,7 +1255,7 @@ export default function DealEmailDialog() {
             setShowDocumentsPicker(false)
           }}
         />
-      </DialogContent>
+      </div>
       <AttachmentImageEditorDialog
         file={editingAttachment}
         previewUrl={editingAttachmentPreviewUrl}
@@ -1266,6 +1267,6 @@ export default function DealEmailDialog() {
           if (editingAttachment) replaceAttachment(editingAttachment, file)
         }}
       />
-    </Dialog>
+    </>
   )
 }

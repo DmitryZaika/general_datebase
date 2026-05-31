@@ -1,11 +1,23 @@
+import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigation,
+} from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { ImageCard } from '~/components/organisms/ImageCard'
+import { InventoryCatalogContentSkeleton } from '~/components/organisms/InventoryCatalogSkeleton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { cleanParams } from '~/hooks/use-safe-search-params'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import { faucetFilterSchema } from '~/schemas/faucets'
 import { FAUCET_TYPES } from '~/utils/constants'
+import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { type Faucet, faucetQueryBuilder } from '~/utils/queries.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -100,6 +112,10 @@ function InteractiveCard({
 
 export default function Faucets() {
   const { faucets } = useLoaderData<typeof loader>()
+  const navigation = useNavigation()
+  const location = useLocation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location)
+  useScrollMainToTopWhenLoading(isListLoading)
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [_, setActiveType] = useState<string | undefined>(undefined)
   const [sortedFaucets, setSortedFaucets] = useState<Faucet[]>(faucets)
@@ -152,25 +168,34 @@ export default function Faucets() {
 
   return (
     <>
-      <ModuleList>
-        <div className='w-full col-span-full'>
-          <SuperCarousel
-            type='faucets'
-            currentId={currentId}
-            setCurrentId={handleSetCurrentId}
-            images={sortedFaucets}
-          />
-        </div>
-        {sortedFaucets.map(faucet => (
-          <InteractiveCard
-            key={faucet.id}
-            faucet={faucet}
-            setCurrentId={handleSetCurrentId}
-            faucetType={faucet.type}
-            disabled={true}
-          />
-        ))}
-      </ModuleList>
+      <motion.div
+        key={location.pathname}
+        className='w-full min-h-0'
+        {...EMPLOYEE_VIEW_ENTER}
+      >
+        {!isListLoading ? (
+          <ModuleList skipItemMountAnimation>
+            <div className='w-full col-span-full'>
+              <SuperCarousel
+                type='faucets'
+                currentId={currentId}
+                setCurrentId={handleSetCurrentId}
+                images={sortedFaucets}
+              />
+            </div>
+            {sortedFaucets.map(faucet => (
+              <InteractiveCard
+                key={faucet.id}
+                faucet={faucet}
+                setCurrentId={handleSetCurrentId}
+                faucetType={faucet.type}
+                disabled={true}
+              />
+            ))}
+          </ModuleList>
+        ) : null}
+      </motion.div>
+      {isListLoading ? <InventoryCatalogContentSkeleton fieldLineCount={2} /> : null}
       <Outlet />
     </>
   )

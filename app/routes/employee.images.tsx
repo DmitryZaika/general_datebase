@@ -1,124 +1,126 @@
-import { useEffect, useState } from 'react'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { motion } from 'framer-motion'
+import { ChevronLeft } from 'lucide-react'
+import { useEffect } from 'react'
+import {
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigation,
+} from 'react-router'
 import ModuleList from '~/components/ModuleList'
-import { ImageCard } from '~/components/organisms/ImageCard'
-import { SuperCarousel } from '~/components/organisms/SuperCarousel'
-import { Accordion, AccordionContent, AccordionItem } from '~/components/ui/accordion'
+import { Image } from '~/components/molecules/Image'
+import { ImageFolderCard } from '~/components/molecules/ImageFolderCard'
+import { MediaGridContentSkeleton } from '~/components/organisms/MediaGridSkeleton'
+import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
-import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
-
-interface ItemImage {
-  id: number
-  name: string
-  url: string | null
-}
-
-function itemToCarouselInput(row: ItemImage) {
-  return {
-    id: row.id,
-    url: row.url,
-    name: row.name,
-    type: 'images',
-    available: null,
-    retail_price: null,
-    cost_per_sqft: 0,
-  }
-}
-
-function InteractiveImageCard({
-  image,
-  setCurrentId,
-}: {
-  image: ItemImage
-  setCurrentId: (value: number) => void
-}) {
-  return (
-    <div
-      className='relative group w-full module-item overflow-hidden'
-      onAuxClick={e => {
-        if (e.button === 1 && image.url) {
-          e.preventDefault()
-          window.open(image.url, '_blank')
-        }
-      }}
-    >
-      <ImageCard disabled={true} title={image.name}>
-        {image.url ? (
-          <img
-            src={image.url}
-            alt={image.name || 'Image'}
-            className='object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
-            loading='lazy'
-            onClick={() => setCurrentId(image.id)}
-          />
-        ) : (
-          <div
-            className='w-full h-40 border-2 border-gray-300 rounded cursor-pointer bg-gray-200'
-            onClick={() => setCurrentId(image.id)}
-            role='button'
-            tabIndex={0}
-            onKeyDown={e => e.key === 'Enter' && setCurrentId(image.id)}
-          />
-        )}
-      </ImageCard>
-    </div>
-  )
-}
+import { useArrowToggle } from '~/hooks/useArrowToggle'
+import { useImagesFolderNavigation } from '~/hooks/useImagesFolderNavigation'
+import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
+import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
+import { loadImagesLibrary } from '~/utils/imagesLibrary.server'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  const user = await getEmployeeUser(request)
-  const images = await selectMany<ItemImage>(
-    db,
-    'SELECT id, name, url FROM images WHERE company_id = ?',
-    [user.company_id],
-  )
-  return { images }
+  return loadImagesLibrary(db, user.company_id)
 }
 
 export default function Images() {
-  const { images } = useLoaderData<typeof loader>()
-  const [currentId, setCurrentId] = useState<number | undefined>(undefined)
-  const [sortedImages, setSortedImages] = useState<ItemImage[]>(images)
+  const { folders, rootImages } = useLoaderData<typeof loader>()
+  const location = useLocation()
+  const navigation = useNavigation()
+  const isListLoading = isEmployeeListFilterLoading(navigation, location, ['folder_id'])
+  useScrollMainToTopWhenLoading(isListLoading)
+  const { activeFolderId, activeFolder, isFolderOpen, openFolder, closeFolder } =
+    useImagesFolderNavigation(folders)
 
   useEffect(() => {
-    setSortedImages([...images].sort((a, b) => a.name.localeCompare(b.name)))
-  }, [images])
+    if (activeFolderId && !activeFolder) {
+      closeFolder()
+    }
+  }, [activeFolderId, activeFolder, closeFolder])
 
-  const carouselImages = sortedImages.map(itemToCarouselInput)
+  const visibleImages = isFolderOpen && activeFolder ? activeFolder.images : rootImages
+  const ids = visibleImages.map(item => item.id)
+  const { currentId, setCurrentId } = useArrowToggle(ids)
+  const isEmpty =
+    (!isFolderOpen && folders.length === 0 && rootImages.length === 0) ||
+    (isFolderOpen && visibleImages.length === 0)
 
   return (
-    <Accordion type='single' defaultValue='images' className=''>
-      <AccordionItem value='images'>
-        <AccordionContent>
-          <Accordion type='multiple'>
-            <AccordionContent>
-              <ModuleList>
-                <div className='w-full col-span-full'>
-                  <SuperCarousel
-                    type='images'
-                    currentId={currentId}
-                    setCurrentId={setCurrentId}
-                    images={carouselImages}
+    <>
+      {isFolderOpen && activeFolder && !isListLoading ? (
+        <div className='mb-4 flex flex-wrap items-center gap-3 px-2'>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            onClick={closeFolder}
+            className='gap-1'
+          >
+            <ChevronLeft className='h-4 w-4' />
+            All images
+          </Button>
+          <h2 className='text-lg font-semibold'>{activeFolder.name}</h2>
+        </div>
+      ) : null}
+      {isListLoading ? (
+        <div className='px-2'>
+          <MediaGridContentSkeleton
+            showFolderHeader={isFolderOpen}
+            showFolders={!isFolderOpen}
+            folderCount={4}
+            cardCount={isFolderOpen ? 12 : 14}
+          />
+        </div>
+      ) : (
+        <motion.div
+          key={location.pathname}
+          className='w-full min-h-0'
+          {...EMPLOYEE_VIEW_ENTER}
+        >
+          {isEmpty ? (
+            <p className='px-2 text-muted-foreground'>
+              {isFolderOpen
+                ? 'This folder has no images yet.'
+                : 'No images or folders yet.'}
+            </p>
+          ) : (
+            <ModuleList skipItemMountAnimation>
+              {!isFolderOpen
+                ? folders.map(folder => (
+                    <div key={`folder-${folder.id}`} className='module-item'>
+                      <ImageFolderCard
+                        name={folder.name}
+                        onOpen={() => openFolder(folder.id)}
+                      />
+                    </div>
+                  ))
+                : null}
+              {visibleImages.map(image => (
+                <div key={image.id} className='module-item'>
+                  <Image
+                    id={image.id}
+                    src={image.url}
+                    alt={image.name}
+                    name={image.name}
+                    setImage={setCurrentId}
+                    isOpen={currentId === image.id}
+                    carouselLens
                   />
                 </div>
-                {sortedImages.map(image => (
-                  <InteractiveImageCard
-                    key={image.id}
-                    image={image}
-                    setCurrentId={setCurrentId}
-                  />
-                ))}
-              </ModuleList>
-            </AccordionContent>
-          </Accordion>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+              ))}
+            </ModuleList>
+          )}
+        </motion.div>
+      )}
+    </>
   )
 }
