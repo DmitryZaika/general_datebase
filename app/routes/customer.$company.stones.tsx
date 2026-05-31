@@ -1,13 +1,21 @@
 import { useMemo, useState } from 'react'
-import { type LoaderFunctionArgs, Outlet, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  Outlet,
+  useLoaderData,
+  useLocation,
+  useNavigation,
+} from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { ImageCard } from '~/components/organisms/ImageCard'
+import { InventoryCatalogContentSkeleton } from '~/components/organisms/InventoryCatalogSkeleton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { db } from '~/db.server'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
+import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { stoneQueryBuilder } from '~/utils/queries.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { capitalizeFirstLetter } from '~/utils/words'
@@ -153,6 +161,12 @@ export default function Stones() {
   const sortedStones = useMemo(() => sortStonesLikeAdminEmployee(stones), [stones])
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [_, setActiveType] = useState<string | undefined>(undefined)
+  const location = useLocation()
+  const navigation = useNavigation()
+  const customerStonesPath = `/customer/${companyId}/stones`
+  const isOnStonesList = location.pathname === customerStonesPath
+  const isListLoading =
+    isOnStonesList && isEmployeeListFilterLoading(navigation, location)
 
   const handleCardClick = (id: number, type: string) => {
     setCurrentId(id)
@@ -178,25 +192,32 @@ export default function Stones() {
         <StoneSearch userRole='customer' companyId={companyId} />
       </div>
 
-      <ModuleList>
-        <div className='w-full col-span-full'>
-          <SuperCarousel
-            type='stones'
-            currentId={currentId}
-            setCurrentId={handleCarouselChange}
-            images={sortedStones}
-            userRole='customer'
-          />
-        </div>
-        {sortedStones.map(stone => (
-          <InteractiveCard
-            key={stone.id}
-            stone={stone}
-            setCurrentId={handleCardClick}
-            stoneType={stone.type}
-          />
-        ))}
-      </ModuleList>
+      <div className='w-full min-h-0'>
+        {!isListLoading ? (
+          <ModuleList skipItemMountAnimation>
+            <div className='w-full col-span-full'>
+              <SuperCarousel
+                type='stones'
+                currentId={currentId}
+                setCurrentId={handleCarouselChange}
+                images={sortedStones}
+                userRole='customer'
+              />
+            </div>
+            {sortedStones.map(stone => (
+              <InteractiveCard
+                key={stone.id}
+                stone={stone}
+                setCurrentId={handleCardClick}
+                stoneType={stone.type}
+              />
+            ))}
+          </ModuleList>
+        ) : null}
+      </div>
+
+      {isListLoading ? <InventoryCatalogContentSkeleton fieldLineCount={4} /> : null}
+
       <Outlet />
     </>
   )
