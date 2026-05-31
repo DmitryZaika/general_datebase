@@ -110,7 +110,7 @@ export function AddressInput<T extends FieldValues>({
                 onKeyDown={e => {
                   if (e.key === 'Tab' && open && data.length > 0) {
                     e.preventDefault()
-                    handleSelect(data[0].description.text, data[0].zip_code ?? '')
+                    handleSelect(data[0].description.text, data[0].address.zip ?? '')
                     setOpen(false)
                   }
                 }}
@@ -125,9 +125,11 @@ export function AddressInput<T extends FieldValues>({
                 {data.map(s => (
                   <CommandItem
                     key={s.place_id}
-                    onSelect={() => handleSelect(s.description.text, s.zip_code ?? '')}
+                    onSelect={() =>
+                      handleSelect(s.description.text, s.address.zip ?? '')
+                    }
                   >
-                    {replaceZipCode(s.description.text, s.zip_code ?? '')}
+                    {replaceZipCode(s.description.text, s.address.zip ?? '')}
                   </CommandItem>
                 ))}
               </CommandGroup>
