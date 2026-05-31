@@ -27,6 +27,7 @@ import { cn } from '~/lib/utils'
 import { sourceEnum } from '~/schemas/customers'
 import { NullableString } from '~/schemas/general'
 import { commitSession, getSession } from '~/sessions.server'
+import { optionalZodPhone } from '~/utils/constants'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { posthogClient } from '~/utils/posthog.server'
 import { getMarketingUser } from '~/utils/session.server'
@@ -50,7 +51,7 @@ const referralSourceEnum = [
 const leadSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: NullableString,
-  phone: NullableString,
+  phone: optionalZodPhone,
   your_message: NullableString,
   address: NullableString,
   source: z.enum(sourceEnum),
