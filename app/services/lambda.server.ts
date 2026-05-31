@@ -1,5 +1,3 @@
-import type { FinalSuggestion } from '~/services/types'
-
 async function fetchFromLambda<T>(
   path: string,
   data: T | undefined = undefined,
@@ -28,12 +26,4 @@ export async function syncCustomerToCloudTalk(
     )
   }
   return await response.text()
-}
-
-export async function googleAutocomplete(query: string): Promise<FinalSuggestion[]> {
-  const response = await fetchFromLambda('/google/address-autocomplete', { query })
-  if (!response.ok) {
-    throw new Error(`Failed to autocomplete ${query}: ${response.statusText}`)
-  }
-  return await response.json()
 }
