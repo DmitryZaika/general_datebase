@@ -1,3 +1,4 @@
+import { isValidPhoneNumber } from 'libphonenumber-js/min'
 import z from 'zod'
 
 export const DONE_KEY = '[DONE]035d8eba-9f8c-44c5-a1e0-290d1da033f7[/DONE]'
@@ -50,6 +51,21 @@ export const zodEmail = z.preprocess(
   val => (typeof val === 'string' ? val.trim() : val),
   z.email('Invalid email address').transform(val => val.toLowerCase()),
 )
+
+const strictPhone = z
+  .string()
+  .length(12, 'Phone number must be exactly 12 characters (e.g., 123-456-7890)')
+  .regex(
+    /^\d{3}-\d{3}-\d{4}$/, // Relaxed regex: just checks for digits and hyphens
+    'Format must be XXX-XXX-XXXX.',
+  )
+  .refine(val => isValidPhoneNumber(val, 'US'), 'Invalid US phone number or area code.')
+
+//  Export Option 1: Required phone number
+export const zodPhone = strictPhone
+
+//  Export Option 2: Optional phone number
+export const optionalZodPhone = z.union([z.literal(''), z.undefined(), strictPhone])
 
 export const optionalEmailSchema = z.preprocess(
   val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
