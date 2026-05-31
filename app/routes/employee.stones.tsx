@@ -1,6 +1,5 @@
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
-import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   Link,
@@ -24,9 +23,7 @@ import { StoneTable } from '~/components/organisms/StoneTable'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { cleanParams } from '~/hooks/use-safe-search-params'
-import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
 import { stoneFilterSchema } from '~/schemas/stones'
-import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
 import { withIconSuffix } from '~/utils/files'
 import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
@@ -35,6 +32,8 @@ import { stoneListShouldRevalidate } from '~/utils/stoneListShouldRevalidate'
 import { capitalizeFirstLetter } from '~/utils/words'
 
 type ViewMode = 'grid' | 'table'
+
+const EMPLOYEE_STONES_LIST_PATH = '/employee/stones'
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -204,9 +203,9 @@ export default function Stones() {
   const navigate = useNavigate()
   const location = useLocation()
   const navigation = useNavigation()
-  const isListLoading = isEmployeeListFilterLoading(navigation, location)
-
-  useScrollMainToTopWhenLoading(isListLoading)
+  const isOnStonesList = location.pathname === EMPLOYEE_STONES_LIST_PATH
+  const isListLoading =
+    isOnStonesList && isEmployeeListFilterLoading(navigation, location)
 
   useEffect(() => {
     const withImage = stones.filter(
@@ -366,11 +365,7 @@ export default function Stones() {
 
   return (
     <>
-      <motion.div
-        key={location.pathname}
-        className='w-full min-h-0'
-        {...EMPLOYEE_VIEW_ENTER}
-      >
+      <div className='w-full min-h-0'>
         <div className='flex justify-between flex-wrap items-center items-end mb-2'>
           <div className='flex items-center gap-4'>
             <LoadingButton
@@ -428,7 +423,7 @@ export default function Stones() {
             )}
           </>
         ) : null}
-      </motion.div>
+      </div>
 
       {isListLoading ? <InventoryCatalogContentSkeleton fieldLineCount={4} /> : null}
 
