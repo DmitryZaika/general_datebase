@@ -42,7 +42,6 @@ import {
 import type { ToastMessage } from '~/utils/toastHelpers.server'
 import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
-import { Chat } from './components/organisms/Chat'
 import { MarketingHeader } from './components/organisms/MarketingHeader'
 import { Toaster } from './components/ui/toaster'
 import { commitSession, getSession } from './sessions.server'
@@ -164,13 +163,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
     companyName = company?.name ?? null
   }
 
-  let stoneSuppliers: ISupplier[] | undefined
-  let sinkSuppliers: ISupplier[] | undefined
-  let faucetSuppliers: ISupplier[] | undefined
   let position: string | null = null
-  let unreadEmailCount = 0
 
-  const colors = await selectMany<{ id: number; name: string; hex_code: string }>(
+  const positionPromise = user
+    ? db.query<(RowDataPacket & { position: string })[]>(
+        `SELECT p.name AS position
+         FROM users u
+         LEFT JOIN users_positions up ON up.user_id = u.id
+         LEFT JOIN positions p ON p.id = up.position_id
+         WHERE u.id = ? AND p.name IN ('external_marketing','check-in','installer','shop_worker') AND u.is_deleted = 0`,
+        [user.id],
+      )
+    : Promise.resolve(null)
+
+  const colorsPromise = selectMany<{ id: number; name: string; hex_code: string }>(
     db,
     `SELECT c.id, c.name, c.hex_code
       FROM colors c
@@ -178,77 +184,56 @@ export async function loader({ request }: LoaderFunctionArgs) {
     [],
   )
 
-  if (companyId !== undefined) {
-    stoneSuppliers = await selectMany<ISupplier>(
-      db,
-      `SELECT s.id, s.supplier_name
-       FROM suppliers s
-       INNER JOIN stones st ON s.id = st.supplier_id
-       WHERE s.company_id = ?
-       GROUP BY s.id, s.supplier_name`,
-      [companyId],
-    )
+  const stoneSuppliersPromise =
+    companyId !== undefined
+      ? selectMany<ISupplier>(
+          db,
+          `SELECT s.id, s.supplier_name
+           FROM suppliers s
+           INNER JOIN stones st ON s.id = st.supplier_id
+           WHERE s.company_id = ?
+           GROUP BY s.id, s.supplier_name`,
+          [companyId],
+        )
+      : Promise.resolve(undefined)
 
-    sinkSuppliers = await selectMany<ISupplier>(
-      db,
-      `SELECT s.id, s.supplier_name
-       FROM suppliers s
-       INNER JOIN sink_type sk ON s.id = sk.supplier_id
-       WHERE s.company_id = ?
-       GROUP BY s.id, s.supplier_name`,
-      [companyId],
-    )
+  const sinkSuppliersPromise =
+    companyId !== undefined
+      ? selectMany<ISupplier>(
+          db,
+          `SELECT s.id, s.supplier_name
+           FROM suppliers s
+           INNER JOIN sink_type sk ON s.id = sk.supplier_id
+           WHERE s.company_id = ?
+           GROUP BY s.id, s.supplier_name`,
+          [companyId],
+        )
+      : Promise.resolve(undefined)
 
-    faucetSuppliers = await selectMany<ISupplier>(
-      db,
-      `SELECT s.id, s.supplier_name
-       FROM suppliers s
-       INNER JOIN faucet_type ft ON s.id = ft.supplier_id
-       WHERE s.company_id = ?
-       GROUP BY s.id, s.supplier_name`,
-      [companyId],
-    )
-  }
+  const faucetSuppliersPromise =
+    companyId !== undefined
+      ? selectMany<ISupplier>(
+          db,
+          `SELECT s.id, s.supplier_name
+           FROM suppliers s
+           INNER JOIN faucet_type ft ON s.id = ft.supplier_id
+           WHERE s.company_id = ?
+           GROUP BY s.id, s.supplier_name`,
+          [companyId],
+        )
+      : Promise.resolve(undefined)
 
-  if (user) {
-    const userEmail =
-      typeof user.email === 'string' ? user.email.trim().toLowerCase() : ''
-    const userEmailLike = `%<${userEmail}>`
+  const [colors, stoneSuppliers, sinkSuppliers, faucetSuppliers, positionResult] =
+    await Promise.all([
+      colorsPromise,
+      stoneSuppliersPromise,
+      sinkSuppliersPromise,
+      faucetSuppliersPromise,
+      positionPromise,
+    ])
 
-    const unreadEmailRows = await selectMany<{ c: number }>(
-      db,
-      `SELECT COUNT(DISTINCT e.thread_id) AS c
-       FROM emails e
-       LEFT JOIN (
-         SELECT thread_id, MAX(deal_id) AS deal_id
-         FROM emails
-         WHERE deleted_at IS NULL AND thread_id IS NOT NULL AND deal_id IS NOT NULL
-         GROUP BY thread_id
-       ) td ON td.thread_id = e.thread_id
-       LEFT JOIN deals d ON d.id = COALESCE(e.deal_id, td.deal_id) AND d.deleted_at IS NULL
-       WHERE e.deleted_at IS NULL
-         AND e.thread_id IS NOT NULL
-         AND e.sender_user_id IS NULL
-         AND e.employee_read_at IS NULL
-         AND (
-           e.receiver_user_id = ?
-           OR d.user_id = ?
-           OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.receiver_email, '<', -1), '>', 1))) = ?
-           OR (e.receiver_email NOT LIKE '%<%' AND LOWER(TRIM(e.receiver_email)) = ?)
-           OR e.receiver_email LIKE ?
-         )`,
-      [user.id, user.id, userEmail, userEmail, userEmailLike],
-    )
-    unreadEmailCount = unreadEmailRows[0]?.c ?? 0
-
-    const [rows] = await db.query<(RowDataPacket & { position: string })[]>(
-      `SELECT p.name AS position
-       FROM users u
-       LEFT JOIN users_positions up ON up.user_id = u.id
-       LEFT JOIN positions p ON p.id = up.position_id
-       WHERE u.id = ? AND p.name IN ('external_marketing','check-in','installer','shop_worker') AND u.is_deleted = 0`,
-      [user.id],
-    )
+  if (user && positionResult) {
+    const [rows] = positionResult
     const hasCheckIn = Array.isArray(rows) && rows.some(r => r.position === 'check-in')
     const hasExternalMarketing =
       Array.isArray(rows) && rows.some(r => r.position === 'external_marketing')
@@ -310,7 +295,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       superadminCompanies,
       activeCompanyId,
       userIsSuperAdmin,
-      unreadEmailCount,
     },
 
     {
@@ -461,7 +445,6 @@ export default function App() {
                 />
                 <Scripts />
                 <Posthog />
-                {!isInstallerRoute && !isCheckIn && user && <Chat />}
                 {/* <ScrollToTopButton /> */}
               </main>
             </AuthenticityTokenProvider>

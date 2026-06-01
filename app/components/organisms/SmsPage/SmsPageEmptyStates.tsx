@@ -1,5 +1,6 @@
 import { AlertTriangle, MessageSquare, Search } from 'lucide-react'
 import { Skeleton } from '~/components/ui/skeleton'
+import { cn } from '~/lib/utils'
 
 export function NoThreadsEmpty() {
   return (
@@ -61,14 +62,45 @@ export function AgentNotLinkedBanner() {
   )
 }
 
-const THREAD_SKELETON_KEYS = ['t1', 't2', 't3', 't4', 't5']
-const LIST_SKELETON_KEYS = ['l1', 'l2', 'l3', 'l4', 'l5', 'l6']
+// Mirrors a real conversation: alternating inbound (left) / outbound (right)
+// bubbles, matching SmsBubble's rounded-2xl shape and blue outbound tint.
+const THREAD_SKELETON_BUBBLES = [
+  { id: 'm1', side: 'in', width: 'w-1/2', height: 'h-8' },
+  { id: 'm2', side: 'out', width: 'w-3/5', height: 'h-12' },
+  { id: 'm3', side: 'in', width: 'w-2/5', height: 'h-8' },
+  { id: 'm4', side: 'out', width: 'w-2/5', height: 'h-8' },
+  { id: 'm5', side: 'in', width: 'w-3/5', height: 'h-12' },
+  { id: 'm6', side: 'out', width: 'w-1/3', height: 'h-8' },
+] as const
+
+// Mirrors SmsThreadListItem: title + timestamp on top, direction icon +
+// message preview below, separated by the same border.
+const LIST_SKELETON_ROWS = [
+  { id: 'l1', title: 'w-2/5', preview: 'w-3/4' },
+  { id: 'l2', title: 'w-1/3', preview: 'w-2/3' },
+  { id: 'l3', title: 'w-1/2', preview: 'w-5/6' },
+  { id: 'l4', title: 'w-2/5', preview: 'w-1/2' },
+  { id: 'l5', title: 'w-1/3', preview: 'w-3/4' },
+  { id: 'l6', title: 'w-1/2', preview: 'w-2/3' },
+] as const
 
 export function ThreadLoading() {
   return (
-    <div className='flex-1 px-4 py-6 space-y-3'>
-      {THREAD_SKELETON_KEYS.map(k => (
-        <Skeleton key={k} className='h-8 w-2/3 rounded-2xl' />
+    <div className='flex-1 px-4 py-4 space-y-2.5'>
+      {THREAD_SKELETON_BUBBLES.map(b => (
+        <div
+          key={b.id}
+          className={cn('flex', b.side === 'out' ? 'justify-end' : 'justify-start')}
+        >
+          <Skeleton
+            className={cn(
+              'rounded-2xl',
+              b.width,
+              b.height,
+              b.side === 'out' && 'bg-blue-100',
+            )}
+          />
+        </div>
       ))}
     </div>
   )
@@ -76,14 +108,20 @@ export function ThreadLoading() {
 
 export function ThreadListLoading() {
   return (
-    <div className='divide-y divide-slate-100'>
-      {LIST_SKELETON_KEYS.map(k => (
-        <div key={k} className='px-4 py-3 space-y-2'>
-          <div className='flex justify-between'>
-            <Skeleton className='h-3 w-1/2' />
-            <Skeleton className='h-3 w-12' />
+    <div>
+      {LIST_SKELETON_ROWS.map(row => (
+        <div
+          key={row.id}
+          className='px-4 py-3 border-b border-slate-100 flex flex-col gap-1.5'
+        >
+          <div className='flex items-center justify-between gap-2'>
+            <Skeleton className={cn('h-3.5 rounded', row.title)} />
+            <Skeleton className='h-2.5 w-12 rounded shrink-0' />
           </div>
-          <Skeleton className='h-3 w-5/6' />
+          <div className='flex items-center gap-1.5'>
+            <Skeleton className='size-3 rounded-full shrink-0' />
+            <Skeleton className={cn('h-3 rounded', row.preview)} />
+          </div>
         </div>
       ))}
     </div>

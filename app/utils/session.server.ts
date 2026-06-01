@@ -1,11 +1,10 @@
-// utils/session.server.ts
-
 import bcrypt from 'bcryptjs'
 import type { RowDataPacket } from 'mysql2'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '~/db.server'
 import { getSession } from '~/sessions.server'
 import { Positions } from '~/types'
+import type { Nullable } from '~/types/utils'
 import { selectMany } from '~/utils/queryHelpers'
 
 interface LoginUser {
@@ -35,6 +34,7 @@ export interface SessionUser {
   is_superuser: boolean
   company_id: number
   pined_bar: number
+  cloudtalk_agent_id: Nullable<string>
 }
 
 export interface SessionUserNew extends Omit<SessionUser, 'company_id'> {
@@ -89,7 +89,7 @@ export async function login(
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.pined_bar, users.is_deleted FROM users
+    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.pined_bar, users.cloudtalk_agent_id, users.is_deleted FROM users
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
        AND sessions.expiration_date > CURRENT_TIMESTAMP
@@ -143,7 +143,7 @@ async function handlePermissions(
     throw new TypeError('Could not find session')
   }
 
-  // Check SuperAdmin position — grants admin-level access + company switching
+  // SuperAdmin position grants admin-level access plus company switching.
   const activeCompanyId = session.get('activeCompanyId')
   const [saRows] = await db.query<RowDataPacket[]>(
     'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = ?',
@@ -159,7 +159,6 @@ async function handlePermissions(
     throw new TypeError('Invalid user permissions')
   }
 
-  // Company switching: check activeCompanyId is in SuperAdmin's assigned companies
   if (hasSuperAdmin && activeCompanyId !== undefined) {
     const hasCompany = saRows.some(
       (r: RowDataPacket) => r.company_id === activeCompanyId,

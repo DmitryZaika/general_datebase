@@ -21,17 +21,20 @@ import {
   User,
   Users,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useFetcher, useLoaderData, useLocation } from 'react-router'
 import { Collapsible } from '~/components/Collapsible'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
 import { SinkIcon } from '~/components/icons/SinkIcon'
 import { LinkButton } from '~/components/molecules/LinkButton'
 import { SuperAdminCompanySelect } from '~/components/molecules/SuperAdminCompanySelect'
+import { Chat } from '~/components/organisms/Chat'
+import { fetchUnreadEmailCount } from '~/components/organisms/SmsPage/service'
 import { Button } from '~/components/ui/button'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -142,11 +145,6 @@ const getItems = (
       title: 'Emails',
       url: `/employee/emails`,
       icon: MailIcon,
-    })
-    finalList.push({
-      title: 'CloudTalk SMS',
-      url: `/employee/cloudtalk`,
-      icon: MessageSquare,
     })
   }
   if (['admin', 'employee'].includes(base)) {
@@ -275,6 +273,13 @@ const getItems = (
       },
     )
   }
+  if (['admin', 'employee'].includes(base)) {
+    finalList.push({
+      title: 'CloudTalk SMS',
+      url: `/${base}/cloudtalk`,
+      icon: MessageSquare,
+    })
+  }
 
   return finalList
 }
@@ -299,7 +304,6 @@ export function EmployeeSidebar({
     superadminCompanies?: { id: number; name: string }[]
     activeCompanyId?: number
     userIsSuperAdmin?: boolean
-    unreadEmailCount?: number
     token: string
   }>()
 
@@ -320,7 +324,27 @@ export function EmployeeSidebar({
   const superadminCompanies = data?.superadminCompanies ?? []
   const activeCompanyId = data?.activeCompanyId
   const userIsSuperAdmin = data?.userIsSuperAdmin ?? false
-  const unreadEmailCount = data?.unreadEmailCount ?? 0
+  const [unreadEmailCount, setUnreadEmailCount] = useState(0)
+  const emailBadgeEnabled =
+    Boolean(data?.user) && (base === 'employee' || base === 'admin')
+  useEffect(() => {
+    if (!emailBadgeEnabled) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const { count } = await fetchUnreadEmailCount()
+        if (!cancelled) setUnreadEmailCount(count)
+      } catch {
+        if (!cancelled) setUnreadEmailCount(0)
+      }
+    }
+    load()
+    const interval = setInterval(load, 30_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [emailBadgeEnabled])
   const { handleCompanySwitch } = useSuperAdminCompanySwitch()
 
   const buildCustomerUrl = () => {
@@ -735,6 +759,9 @@ export function EmployeeSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <Chat />
+      </SidebarFooter>
     </Sidebar>
   )
 }

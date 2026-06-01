@@ -80,7 +80,9 @@ export function SmsThreadList(props: SmsThreadListProps) {
 
   return (
     <aside
-      className='w-80 border-r border-slate-200 bg-white flex flex-col h-full shrink-0'
+      className={`${
+        props.activePhoneDigits ? 'hidden md:flex' : 'flex'
+      } w-full md:w-80 border-r border-slate-200 bg-white flex-col h-full shrink-0`}
       aria-label='SMS conversations'
     >
       <div className='px-4 py-3 border-b border-slate-200'>

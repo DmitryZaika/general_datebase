@@ -1,12 +1,16 @@
 import { data, redirect } from 'react-router'
+import { csrf } from '~/utils/csrf.server'
 import { posthogClient } from '~/utils/posthog.server'
+import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 
 export enum HttpStatus {
   OK = 200,
   BadRequest = 400,
   Unauthorized = 401,
+  Forbidden = 403,
   NotFound = 404,
   InternalServerError = 500,
+  BadGateway = 502,
 }
 
 interface SuccessResponse {
@@ -26,17 +30,15 @@ export function success(): ReturnType<typeof data<SuccessResponse>> {
 }
 
 export function badRequest(message: string): ReturnType<typeof data<ErrorResponse>> {
-  return data(
-    { success: false, error: message } satisfies ErrorResponse,
-    { status: HttpStatus.BadRequest },
-  )
+  return data({ success: false, error: message } satisfies ErrorResponse, {
+    status: HttpStatus.BadRequest,
+  })
 }
 
 export function notFound(message: string): ReturnType<typeof data<ErrorResponse>> {
-  return data(
-    { success: false, error: message } satisfies ErrorResponse,
-    { status: HttpStatus.NotFound },
-  )
+  return data({ success: false, error: message } satisfies ErrorResponse, {
+    status: HttpStatus.NotFound,
+  })
 }
 
 export function serverError(
@@ -45,15 +47,36 @@ export function serverError(
   context?: Record<string, unknown>,
 ): ReturnType<typeof data<ErrorResponse>> {
   posthogClient.captureException(error, message, context)
-  return data(
-    { success: false, error: message } satisfies ErrorResponse,
-    { status: HttpStatus.InternalServerError },
-  )
+  return data({ success: false, error: message } satisfies ErrorResponse, {
+    status: HttpStatus.InternalServerError,
+  })
 }
 
-export function handleAuthError(error: unknown): ReturnType<typeof redirect> | ReturnType<typeof data<ErrorResponse>> {
+export class InvalidCsrfError extends Error {
+  constructor() {
+    super('invalid_csrf')
+    this.name = 'InvalidCsrfError'
+  }
+}
+
+export function handleAuthError(
+  error: unknown,
+): ReturnType<typeof redirect> | ReturnType<typeof data<ErrorResponse>> {
+  if (error instanceof InvalidCsrfError) {
+    return badRequest('invalid_csrf')
+  }
   if (error instanceof TypeError) {
     return redirect('/login')
   }
   return serverError('An unexpected error occurred', error)
+}
+
+export async function requireEmployeeWithCsrf(request: Request): Promise<SessionUser> {
+  const user = await getEmployeeUser(request)
+  try {
+    await csrf.validate(request)
+  } catch {
+    throw new InvalidCsrfError()
+  }
+  return user
 }

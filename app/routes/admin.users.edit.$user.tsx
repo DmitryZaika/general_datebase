@@ -1,12 +1,13 @@
-// app/routes/users.$user.tsx
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Info } from 'lucide-react'
-import { useForm } from 'react-hook-form'
+import { useEffect } from 'react'
+import { type FieldPath, useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
   Form,
   type LoaderFunctionArgs,
   redirect,
+  useActionData,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -38,6 +39,7 @@ import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
 import { Positions } from '~/types'
+import type { Nullable } from '~/types/utils'
 import { optionalTrimmedEmailOrEmpty } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
@@ -81,6 +83,15 @@ const userschema = z.object({
     .optional()
     .prefault([]),
   is_admin: z.boolean(),
+  cloudtalk_agent_id: z
+    .preprocess(
+      val => {
+        if (val === null || val === undefined) return ''
+        return typeof val === 'string' ? val.trim() : String(val).trim()
+      },
+      z.union([z.string().max(36), z.literal('')]),
+    )
+    .optional(),
   superadmin_company_ids: z
     .union([
       z.string().transform(val => {
@@ -130,10 +141,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     data.superadmin_company_ids = []
   }
 
-  // SuperAdmin position grants admin access
   if (data.positions.includes(Positions.SuperAdmin)) {
     data.is_admin = true
   }
+
+  const cloudtalkAgentId =
+    data.cloudtalk_agent_id && data.cloudtalk_agent_id.trim() !== ''
+      ? data.cloudtalk_agent_id.trim()
+      : null
 
   await db.execute(
     `
@@ -143,10 +158,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
       email = ?,
       phone_number = ?,
       company_id = ?,
-      is_admin = ?
+      is_admin = ?,
+      cloudtalk_agent_id = ?
     WHERE id = ?
     `,
-    [data.name, data.email, data.phone_number, data.company_id, data.is_admin, userId],
+    [
+      data.name,
+      data.email,
+      data.phone_number,
+      data.company_id,
+      data.is_admin,
+      cloudtalkAgentId,
+      userId,
+    ],
   )
 
   await db.execute('DELETE FROM users_positions WHERE user_id = ?', [userId])
@@ -204,13 +228,14 @@ interface Company {
 
 interface User {
   id: number
-  name: null | string
-  email: null | string
-  phone_number: null | string
+  name: Nullable<string>
+  email: Nullable<string>
+  phone_number: Nullable<string>
   company_id: number
-  is_admin: null | number
-  is_superuser: null | number
-  is_employee: null | number
+  is_admin: Nullable<number>
+  is_superuser: Nullable<number>
+  is_employee: Nullable<number>
+  cloudtalk_agent_id: Nullable<string>
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -234,7 +259,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const user = await selectId<User>(
     db,
-    'SELECT id, name, email, phone_number, company_id, is_admin, is_superuser, is_employee FROM users WHERE id = ? AND is_deleted = 0',
+    'SELECT id, name, email, phone_number, company_id, is_admin, is_superuser, is_employee, cloudtalk_agent_id FROM users WHERE id = ? AND is_deleted = 0',
     userId,
   )
   if (!user) {
@@ -292,6 +317,10 @@ export default function User() {
     loggedInIsSuperuser,
   } = useLoaderData<typeof loader>()
 
+  const actionData = useActionData<{
+    error?: string
+    errors?: Record<string, { message?: string }>
+  }>()
   const token = useAuthenticityToken()
   const form = useForm({
     resolver,
@@ -303,17 +332,28 @@ export default function User() {
       positions: userPositions,
       marketing_company_ids: marketingCompanyIds,
       is_admin: user.is_admin === 1,
+      cloudtalk_agent_id: user.cloudtalk_agent_id || '',
       superadmin_company_ids: superadminCompanyIds,
     },
   })
 
-  const fullSubmit = useFullSubmit(form)
+  const fullSubmit = useFullSubmit(form, undefined, 'POST', undefined, true)
   const isSubmitting = form.formState.isSubmitting
   const handleChange = (open: boolean) => {
     if (!open) {
       navigate(`..${location.search}`)
     }
   }
+
+  useEffect(() => {
+    if (!actionData?.errors) return
+    for (const [field, err] of Object.entries(actionData.errors)) {
+      form.setError(field as FieldPath<typeof form.formState.defaultValues>, {
+        type: 'server',
+        message: err?.message ?? 'invalid',
+      })
+    }
+  }, [actionData, form])
 
   const formPositions = form.watch('positions')
   const visiblePositions = loggedInIsSuperuser
@@ -322,13 +362,18 @@ export default function User() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-106.25'>
+      <DialogContent className='sm:max-w-106.25 max-h-[90vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>User</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
           <Form method='post' onSubmit={fullSubmit}>
             <input type='hidden' name='csrf' value={token} />
+            {actionData?.error && (
+              <div className='mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700'>
+                {actionData.error}
+              </div>
+            )}
             <FormField
               control={form.control}
               name='name'
@@ -355,6 +400,23 @@ export default function User() {
               name='company_id'
               render={({ field }) => (
                 <SelectInput field={field} name='Company' options={companies} />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='cloudtalk_agent_id'
+              render={({ field }) => (
+                <div className='mb-6'>
+                  <InputItem
+                    name='CloudTalk agent ID'
+                    placeholder='CloudTalk agent ID'
+                    field={field}
+                  />
+                  <p className='text-xs text-gray-500 -mt-1'>
+                    Set this to enable sending SMS from the CRM. Find the value in
+                    CloudTalk → Settings → Agents.
+                  </p>
+                </div>
               )}
             />
             <div className='grid grid-cols-2 gap-2'>

@@ -1,22 +1,23 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { type LoaderFunctionArgs, data as routerData, useParams } from 'react-router'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import { SmsConversationPane } from '~/components/organisms/SmsPage/SmsConversationPane'
+import { SmsLinkCustomerDialog } from '~/components/organisms/SmsPage/SmsLinkCustomerDialog'
 import {
   fetchThread,
   markThreadRead,
   sendSms,
-} from '~/components/organisms/SmsPage/mock-service'
-import { SmsConversationPane } from '~/components/organisms/SmsPage/SmsConversationPane'
-import { SmsLinkCustomerDialog } from '~/components/organisms/SmsPage/SmsLinkCustomerDialog'
+} from '~/components/organisms/SmsPage/service'
 import type { SmsMessage, SmsThread } from '~/components/organisms/SmsPage/types'
-import { useSmsStoreInvalidation } from '~/components/organisms/SmsPage/useSmsStoreInvalidation'
+import type { Nullable } from '~/types/utils'
+import { PHONE_DIGITS_REGEX } from '~/utils/phone'
 
-const PHONE_DIGITS_RE = /^\d{10,15}$/
 const INITIAL_MESSAGE_PAGE = 30
 
 export async function loader({ params }: LoaderFunctionArgs) {
   const phoneDigits = params.phoneDigits ?? ''
-  if (!PHONE_DIGITS_RE.test(phoneDigits)) {
+  if (!PHONE_DIGITS_REGEX.test(phoneDigits)) {
     throw routerData(
       { error: 'Invalid phone format' },
       { status: 400, statusText: 'Bad Request' },
@@ -26,7 +27,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 }
 
 interface ThreadResponse {
-  thread: SmsThread | null
+  thread: Nullable<SmsThread>
   canSend: boolean
   hasOlder: boolean
 }
@@ -35,20 +36,19 @@ export default function CloudTalkThread() {
   const params = useParams()
   const phoneDigits = params.phoneDigits ?? ''
   const queryClient = useQueryClient()
-
-  useSmsStoreInvalidation()
+  const csrfToken = useAuthenticityToken()
 
   const [linkOpen, setLinkOpen] = useState(false)
   const [pending, setPending] = useState<SmsMessage[]>([])
   const [isSending, setIsSending] = useState(false)
   const [messageLimit, setMessageLimit] = useState(INITIAL_MESSAGE_PAGE)
   const [isFetchingOlder, setIsFetchingOlder] = useState(false)
-  const lastMarkedPhoneRef = useRef<string | null>(null)
+  const lastMarkedPhoneRef = useRef<Nullable<string>>(null)
 
   useEffect(() => {
     setMessageLimit(INITIAL_MESSAGE_PAGE)
     setPending([])
-  }, [])
+  }, [phoneDigits])
 
   const threadQuery = useQuery<ThreadResponse>({
     queryKey: ['cloudtalk-sms-thread', phoneDigits, messageLimit],
@@ -57,19 +57,19 @@ export default function CloudTalkThread() {
     refetchIntervalInBackground: false,
   })
 
-  // Skip the POST when there's nothing to mark — and only fire once per phone,
-  // since `useFetcher` would otherwise re-fire on every render.
+  // Fire mark-read at most once per phone, only when there's actually
+  // something unread — guards against React-Router re-firing on every render.
   useEffect(() => {
     if (!phoneDigits) return
     if (lastMarkedPhoneRef.current === phoneDigits) return
     const t = threadQuery.data?.thread
     if (!t || t.unreadCount === 0) return
     lastMarkedPhoneRef.current = phoneDigits
-    void markThreadRead(phoneDigits).then(() => {
+    void markThreadRead(phoneDigits, csrfToken).then(() => {
       queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
       queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-unread-count'] })
     })
-  }, [phoneDigits, threadQuery.data, queryClient])
+  }, [phoneDigits, threadQuery.data, queryClient, csrfToken])
 
   useEffect(() => {
     if (!threadQuery.data?.thread) return
@@ -97,7 +97,7 @@ export default function CloudTalkThread() {
       setPending(prev => [...prev, optimistic])
       setIsSending(true)
       try {
-        await sendSms({ phoneDigits, text })
+        await sendSms({ phoneDigits, text, csrfToken })
         queryClient.invalidateQueries({
           queryKey: ['cloudtalk-sms-thread', phoneDigits],
         })
@@ -110,7 +110,7 @@ export default function CloudTalkThread() {
         setIsSending(false)
       }
     },
-    [phoneDigits, queryClient],
+    [phoneDigits, queryClient, csrfToken],
   )
 
   const handleRetry = useCallback(
@@ -122,7 +122,7 @@ export default function CloudTalkThread() {
       )
       setIsSending(true)
       try {
-        await sendSms({ phoneDigits, text: failed.text })
+        await sendSms({ phoneDigits, text: failed.text, csrfToken })
         setPending(prev => prev.filter(p => p.id !== messageId))
         queryClient.invalidateQueries({
           queryKey: ['cloudtalk-sms-thread', phoneDigits],
@@ -136,7 +136,7 @@ export default function CloudTalkThread() {
         setIsSending(false)
       }
     },
-    [pending, phoneDigits, queryClient],
+    [pending, phoneDigits, queryClient, csrfToken],
   )
 
   const handleLoadOlder = useCallback(async () => {

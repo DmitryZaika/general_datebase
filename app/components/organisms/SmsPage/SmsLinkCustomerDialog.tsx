@@ -1,5 +1,6 @@
 import { Search, UserPlus } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SearchInput } from '~/components/molecules/SearchInput'
 import {
@@ -10,12 +11,13 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import type { Nullable } from '~/types/utils'
 import { formatPhoneForDisplay } from '~/utils/phone'
 import {
   createCustomerForPhone,
   linkExistingCustomer,
   searchCustomers,
-} from './mock-service'
+} from './service'
 import type { MockCustomer } from './types'
 
 export interface SmsLinkCustomerDialogProps {
@@ -29,13 +31,14 @@ type Tab = 'existing' | 'new'
 
 export function SmsLinkCustomerDialog(props: SmsLinkCustomerDialogProps) {
   const newNameId = useId()
+  const csrfToken = useAuthenticityToken()
   const [tab, setTab] = useState<Tab>('existing')
   const [searchTerm, setSearchTerm] = useState('')
   const [results, setResults] = useState<MockCustomer[]>([])
   const [searchInFlight, setSearchInFlight] = useState(false)
   const [newName, setNewName] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<Nullable<string>>(null)
 
   useEffect(() => {
     if (!props.open) {
@@ -73,7 +76,11 @@ export function SmsLinkCustomerDialog(props: SmsLinkCustomerDialogProps) {
     setSubmitting(true)
     setError(null)
     try {
-      await linkExistingCustomer({ phoneDigits: props.phoneDigits, customerId })
+      await linkExistingCustomer({
+        phoneDigits: props.phoneDigits,
+        customerId,
+        csrfToken,
+      })
       props.onLinked()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to link')
@@ -90,6 +97,7 @@ export function SmsLinkCustomerDialog(props: SmsLinkCustomerDialogProps) {
       await createCustomerForPhone({
         phoneDigits: props.phoneDigits,
         name: newName.trim(),
+        csrfToken,
       })
       props.onLinked()
     } catch (e) {

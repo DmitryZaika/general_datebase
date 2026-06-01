@@ -6,7 +6,7 @@ export type SmsDirection = 'inbound' | 'outbound'
 export type SmsRow = {
   id: number
   cloudtalk_id: Nullable<number>
-  sender: string
+  sender: Nullable<string>
   recipient: string
   text: string
   agent: Nullable<string>
@@ -34,10 +34,12 @@ export function mapRowToSmsEntry(
   row: SmsRow,
   customerPhoneDigits: readonly string[],
 ): SmsEntry {
-  const direction: SmsDirection = customerPhoneDigits.includes(row.sender)
-    ? 'inbound'
-    : 'outbound'
-  const customerPhone = direction === 'inbound' ? row.sender : row.recipient
+  const direction: SmsDirection =
+    row.sender != null && customerPhoneDigits.includes(row.sender)
+      ? 'inbound'
+      : 'outbound'
+  const customerPhone =
+    direction === 'inbound' && row.sender != null ? row.sender : row.recipient
   return {
     id: row.id,
     direction,

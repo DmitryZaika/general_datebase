@@ -1,8 +1,9 @@
 import { format } from 'date-fns'
-import { ArrowDown, ChevronUp, Link as LinkIcon } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ChevronUp, Link as LinkIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link as RouterLink } from 'react-router'
+import { Link as RouterLink, useLocation } from 'react-router'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { Skeleton } from '~/components/ui/skeleton'
 import { formatPhoneForDisplay } from '~/utils/phone'
 import { formatDayLabel } from './dayLabel'
 import { SmsBubble } from './SmsBubble'
@@ -54,6 +55,11 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [newSinceScroll, setNewSinceScroll] = useState(0)
   const messageCountRef = useRef(0)
+  const location = useLocation()
+  // Mobile-only "back to list" target; on desktop the list stays visible beside us.
+  const backHref = location.pathname.startsWith('/admin')
+    ? '/admin/cloudtalk'
+    : '/employee/cloudtalk'
 
   const allMessages = useMemo(() => {
     if (!props.thread) return []
@@ -112,10 +118,24 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
   if (props.isLoading && !props.thread) {
     return (
       <div className='flex flex-col h-full bg-white'>
-        <div className='border-b border-slate-200 px-4 py-3 h-14 animate-pulse'>
-          <div className='h-4 w-40 bg-slate-100 rounded' />
+        <div className='border-b border-slate-200 px-4 py-3 flex items-center gap-2'>
+          <RouterLink
+            to={backHref}
+            aria-label='Back to SMS conversations'
+            className='md:hidden -ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100'
+          >
+            <ArrowLeft size={20} />
+          </RouterLink>
+          <div className='flex flex-col gap-1.5'>
+            <Skeleton className='h-3.5 w-32 rounded' />
+            <Skeleton className='h-2.5 w-24 rounded' />
+          </div>
         </div>
         <ThreadLoading />
+        <div className='border-t border-slate-200 p-3 flex items-center gap-2'>
+          <Skeleton className='h-11 flex-1 rounded-full' />
+          <Skeleton className='size-11 rounded-full shrink-0' />
+        </div>
       </div>
     )
   }
@@ -128,29 +148,38 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
   return (
     <div className='flex flex-col h-full bg-white'>
       <div className='border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-2'>
-        <div className='min-w-0'>
-          <div className='font-medium text-slate-900 truncate flex items-center gap-2'>
-            {customer ? (
-              <RouterLink
-                to={`/employee/customers/info/${customer.id}/info`}
-                className='hover:underline'
-              >
-                {customer.name}
-              </RouterLink>
-            ) : (
-              <>
-                <span>{formatPhoneForDisplay(props.phoneDigits)}</span>
-                <span className='inline-block text-[10px] uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1.5 py-0.5'>
-                  Unlinked
-                </span>
-              </>
+        <div className='flex items-center gap-1 min-w-0'>
+          <RouterLink
+            to={backHref}
+            aria-label='Back to SMS conversations'
+            className='md:hidden -ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100'
+          >
+            <ArrowLeft size={20} />
+          </RouterLink>
+          <div className='min-w-0'>
+            <div className='font-medium text-slate-900 truncate flex items-center gap-2'>
+              {customer ? (
+                <RouterLink
+                  to={`/employee/customers/info/${customer.id}/info`}
+                  className='hover:underline'
+                >
+                  {customer.name}
+                </RouterLink>
+              ) : (
+                <>
+                  <span>{formatPhoneForDisplay(props.phoneDigits)}</span>
+                  <span className='inline-block text-[10px] uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1.5 py-0.5'>
+                    Unlinked
+                  </span>
+                </>
+              )}
+            </div>
+            {customer && (
+              <div className='text-xs text-slate-500'>
+                {formatPhoneForDisplay(props.phoneDigits)}
+              </div>
             )}
           </div>
-          {customer && (
-            <div className='text-xs text-slate-500'>
-              {formatPhoneForDisplay(props.phoneDigits)}
-            </div>
-          )}
         </div>
         {isUnlinked && (
           <button

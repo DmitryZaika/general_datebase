@@ -1,10 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchUnreadCount } from '~/components/organisms/SmsPage/mock-service'
-import { useSmsStoreInvalidation } from '~/components/organisms/SmsPage/useSmsStoreInvalidation'
+import { fetchUnreadCount } from '~/components/organisms/SmsPage/service'
 
 export function SidebarCloudtalkBadge() {
-  useSmsStoreInvalidation()
-
   const query = useQuery({
     queryKey: ['cloudtalk-sms-unread-count'],
     queryFn: () => fetchUnreadCount(),
