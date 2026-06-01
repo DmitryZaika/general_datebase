@@ -2,6 +2,10 @@ import type { Nullable } from '~/types/utils'
 
 export const PHONE_DIGITS_REGEX = /^\d{10,15}$/
 
+// SMS body limits, shared by the composer and the server send action.
+export const SMS_MAX_TEXT = 1600
+export const SMS_SEGMENT_LEN = 160
+
 export function phoneDigitsOnly(phone: string): string {
   return phone.replace(/\D/g, '')
 }

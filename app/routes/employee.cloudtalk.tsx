@@ -18,6 +18,7 @@ import { fetchThreads } from '~/components/organisms/SmsPage/service'
 import type { ThreadSummary } from '~/components/organisms/SmsPage/types'
 import type { Nullable } from '~/types/utils'
 import { getEmployeeUser } from '~/utils/session.server'
+import { cloudtalkBasePath } from '~/utils/urlHelpers'
 
 const PAGE_SIZE = 20
 
@@ -48,10 +49,13 @@ export default function CloudTalkPage() {
   const params = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const cloudtalkBase = location.pathname.startsWith('/admin')
-    ? '/admin/cloudtalk'
-    : '/employee/cloudtalk'
+  const cloudtalkBase = cloudtalkBasePath(location.pathname)
+  const isAdminBase = cloudtalkBase === '/admin/cloudtalk'
   const activePhone = (params.phoneDigits ?? null) as Nullable<string>
+  // Company SMS settings are an admin-only action; the gear shows on the admin view.
+  const settingsHref =
+    isAdminBase && data.isAdmin ? '/admin/cloudtalk/settings' : undefined
+  const isSettings = location.pathname.endsWith('/cloudtalk/settings')
   const [search, setSearch] = useState('')
 
   const threadsQuery = useInfiniteQuery<ThreadsPage>({
@@ -109,6 +113,7 @@ export default function CloudTalkPage() {
           onSearchChange={setSearch}
           onSelect={handleSelect}
           onLoadMore={handleLoadMore}
+          settingsHref={settingsHref}
         />
         <main
           className={`${
@@ -116,7 +121,7 @@ export default function CloudTalkPage() {
           } flex-1 flex-col bg-white`}
         >
           <div className='flex-1 min-h-0 bg-white'>
-            {activePhone ? <Outlet /> : <NoThreadSelected />}
+            {activePhone || isSettings ? <Outlet /> : <NoThreadSelected />}
           </div>
         </main>
       </div>

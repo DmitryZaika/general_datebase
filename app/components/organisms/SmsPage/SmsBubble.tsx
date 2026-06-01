@@ -45,7 +45,7 @@ export function SmsBubble({ message, onRetry }: SmsBubbleProps) {
               onClick={onRetry}
               className='underline hover:text-red-800'
             >
-              Failed — Retry
+              Failed. Retry
             </button>
           )}
           {message.status === 'sent' && (

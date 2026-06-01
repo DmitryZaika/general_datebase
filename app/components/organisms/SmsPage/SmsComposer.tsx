@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Textarea } from '~/components/ui/textarea'
 import { cn } from '~/lib/utils'
+import { SMS_MAX_TEXT, SMS_SEGMENT_LEN } from '~/utils/phone'
 import { SmsEmojiPicker } from './SmsEmojiPicker'
 
 export interface SmsComposerProps {
@@ -12,8 +13,6 @@ export interface SmsComposerProps {
   onSubmit: (text: string) => void
 }
 
-const MAX_TEXT = 1600
-const SEGMENT_LEN = 160
 const MIN_HEIGHT = 44 // ~1 line, matches the Send button height
 const MAX_HEIGHT = 180
 
@@ -62,15 +61,14 @@ export function SmsComposer(props: SmsComposerProps) {
     [text, resizeTextarea],
   )
 
-  const isOver = text.length > MAX_TEXT
-  const isDisabled =
-    !props.canSend || props.isSending || isOver || text.trim().length === 0
+  const isOver = text.length > SMS_MAX_TEXT
+  const isDisabled = props.isSending || isOver || text.trim().length === 0
 
   const counterVisible = text.length > 0
   const counterColor =
-    text.length > MAX_TEXT
+    text.length > SMS_MAX_TEXT
       ? 'text-red-500'
-      : text.length > SEGMENT_LEN
+      : text.length > SMS_SEGMENT_LEN
         ? 'text-amber-500'
         : 'text-slate-400'
 
@@ -98,6 +96,18 @@ export function SmsComposer(props: SmsComposerProps) {
     }
   }
 
+  // Read-only: a wrapping notice instead of a disabled textarea (whose long
+  // placeholder overflowed on mobile).
+  if (!props.canSend) {
+    return (
+      <div className='border-t border-slate-200 bg-white px-4 py-3'>
+        <p className='text-center text-xs leading-snug text-slate-400'>
+          Sending disabled — no CloudTalk agent linked
+        </p>
+      </div>
+    )
+  }
+
   return (
     <form onSubmit={handleSubmit} className='border-t border-slate-200 bg-white p-3'>
       {/* Always-rendered row reserves space so the textarea doesn't shift up/down
@@ -111,7 +121,7 @@ export function SmsComposer(props: SmsComposerProps) {
       >
         {counterVisible && (
           <span>
-            {text.length} / {MAX_TEXT}
+            {text.length} / {SMS_MAX_TEXT}
           </span>
         )}
       </div>
@@ -121,12 +131,7 @@ export function SmsComposer(props: SmsComposerProps) {
           value={text}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={
-            props.canSend
-              ? 'Type a reply…'
-              : 'Sending disabled — no CloudTalk agent linked'
-          }
-          disabled={!props.canSend}
+          placeholder='Type a reply…'
           rows={1}
           className='flex-1 resize-none text-sm overflow-y-auto py-2.5'
           style={{
@@ -134,9 +139,10 @@ export function SmsComposer(props: SmsComposerProps) {
             maxHeight: `${MAX_HEIGHT}px`,
           }}
         />
-        <SmsEmojiPicker onPick={handleEmojiPick} disabled={!props.canSend} />
+        <SmsEmojiPicker onPick={handleEmojiPick} />
         <LoadingButton
           type='submit'
+          variant='blue'
           loading={props.isSending}
           disabled={isDisabled}
           className='shrink-0 h-11'

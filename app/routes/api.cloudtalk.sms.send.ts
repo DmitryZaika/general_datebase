@@ -7,18 +7,19 @@ import {
   requireEmployeeWithCsrf,
 } from '~/utils/apiResponse.server'
 import {
+  getCompanySmsSender,
   mapCloudTalkSendError,
   sendSmsViaCloudTalk,
 } from '~/utils/cloudtalkSendSms.server'
 import {
+  canUserSendSms,
   finalizeOutboundSms,
   insertPendingOutboundSms,
   toApiSmsMessage,
 } from '~/utils/cloudtalkSmsService.server'
-import { normalizeToE164, PHONE_DIGITS_REGEX } from '~/utils/phone'
+import { normalizeToE164, PHONE_DIGITS_REGEX, SMS_MAX_TEXT } from '~/utils/phone'
 import { acquireUserSlot } from '~/utils/userRateLimiter.server'
 
-const MAX_TEXT = 1600
 const RATE_LIMIT_PER_MIN = Math.max(
   1,
   Number(process.env.SMS_SEND_RATE_LIMIT_PER_MIN) || 10,
@@ -29,21 +30,28 @@ export async function action({ request }: ActionFunctionArgs) {
     const user = await requireEmployeeWithCsrf(request)
     if (request.method !== 'POST') return badRequest('method_not_allowed')
 
-    if (!user.cloudtalk_agent_id) {
+    const form = await request.formData()
+    const phoneDigits = String(form.get('phoneDigits') ?? '')
+    const text = String(form.get('text') ?? '').trim()
+
+    if (!canUserSendSms(user)) {
       return data(
         { success: false, error: 'agent_not_linked' },
         { status: HttpStatus.Forbidden },
       )
     }
 
-    const form = await request.formData()
-    const phoneDigits = String(form.get('phoneDigits') ?? '')
-    const text = String(form.get('text') ?? '').trim()
-
     if (!PHONE_DIGITS_REGEX.test(phoneDigits)) return badRequest('invalid_phone')
     if (text.length === 0) return badRequest('empty_text')
-    if (text.length > MAX_TEXT) return badRequest('text_too_long')
+    if (text.length > SMS_MAX_TEXT) return badRequest('text_too_long')
 
+    const e164 = normalizeToE164(phoneDigits)
+    if (!e164) return badRequest('invalid_phone')
+
+    const senderE164 = await getCompanySmsSender(user.company_id)
+    if (!senderE164) return badRequest('sms_sender_not_configured')
+
+    // Rate-limit after validation so config errors don't burn slots / mask the failure.
     if (
       !acquireUserSlot({
         userId: user.id,
@@ -54,9 +62,6 @@ export async function action({ request }: ActionFunctionArgs) {
       return data({ success: false, error: 'rate_limited' }, { status: 429 })
     }
 
-    const e164 = normalizeToE164(phoneDigits)
-    if (!e164) return badRequest('invalid_phone')
-
     // Idempotency-Key: the pending row's UUID protects against accidental
     // immediate double-sends (e.g. a double-clicked Send) and lets ops trace
     // the SMS across our logs and CloudTalk's dashboard. It does NOT yet cover
@@ -66,7 +71,7 @@ export async function action({ request }: ActionFunctionArgs) {
     try {
       const sendResult = await sendSmsViaCloudTalk({
         companyId: user.company_id,
-        agentId: user.cloudtalk_agent_id,
+        senderE164,
         toPhoneE164: e164,
         text,
         idempotencyKey: pending.idempotencyKey,

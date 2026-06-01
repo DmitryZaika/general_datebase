@@ -146,6 +146,11 @@ export function __resetPendingCleanupThrottle(): void {
 
 // Admins/superusers see every row in their company; employees only see rows
 // they participated in (matched by agent id, falling back to sender_user_id).
+// Any user with a linked CloudTalk agent may send; without one it's read-only.
+export function canUserSendSms(user: SessionUser): boolean {
+  return Boolean(user.cloudtalk_agent_id)
+}
+
 function buildVisibilityClause(user: SessionUser, alias: string): VisibilityClause {
   if (user.is_admin || user.is_superuser) {
     return { sql: '', params: [] }
@@ -470,7 +475,21 @@ export async function fetchCustomerByPhone(
       LIMIT 1`,
     [companyId, phoneDigits, phoneDigits],
   )
-  return rows[0] ?? null
+  if (rows[0]) return rows[0]
+
+  // Fallback when the customer isn't in cloudtalk_contacts yet: match the free-text
+  // customers.phone / phone_2 by last-10 digits.
+  const direct = await selectMany<{ id: number; name: string }>(
+    db,
+    `SELECT c.id, c.name
+       FROM customers c
+      WHERE c.company_id = ?
+        AND (RIGHT(REGEXP_REPLACE(COALESCE(c.phone, ''), '[^0-9]', ''), 10) = RIGHT(?, 10)
+          OR RIGHT(REGEXP_REPLACE(COALESCE(c.phone_2, ''), '[^0-9]', ''), 10) = RIGHT(?, 10))
+      LIMIT 1`,
+    [companyId, phoneDigits, phoneDigits],
+  )
+  return direct[0] ?? null
 }
 
 function mapRowToExpanded(r: ThreadMessageRow): SmsRowExpanded {

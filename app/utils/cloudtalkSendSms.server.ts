@@ -1,9 +1,11 @@
+import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
 import { CloudTalkApiError, cloudtalkRequest } from './cloudtalk.server'
+import { selectId } from './queryHelpers'
 
 export interface SendSmsParams {
   companyId: number
-  agentId: string
+  senderE164: string
   toPhoneE164: string
   text: string
   idempotencyKey: string
@@ -16,44 +18,65 @@ export interface SendSmsResult {
 interface SendSmsResponse {
   responseData?:
     | {
-        data?: { id?: number } | { id?: number }[]
+        success?: boolean | string
+        data?: { id?: number } | { id?: number }[] | string | null
         status?: number
         message?: string
+        id?: number
       }
     | { id?: number; status?: number; message?: string }[]
 }
 
-// CloudTalk's success-response envelope is documented inconsistently. We've
-// observed `responseData: [{status, message}]` (array-at-top) for error paths;
-// list endpoints use `responseData: { data: [...] }`. Until we see a real
-// successful send, we tolerate all three shapes and pick the first id we find.
-// After the first verified success, the unused branches can be removed.
+// sms/send.json success data has no message id today; tolerate the legacy list shapes
+// in case one ever appears (used for inbound-echo dedupe).
 function extractCloudtalkId(json: SendSmsResponse): Nullable<number> {
   const rd = json.responseData
   if (!rd) return null
-  if (Array.isArray(rd)) {
-    return rd[0]?.id ?? null
-  }
+  if (Array.isArray(rd)) return rd[0]?.id ?? null
   const data = rd.data
   if (Array.isArray(data)) return data[0]?.id ?? null
-  return data?.id ?? null
+  if (data && typeof data === 'object') {
+    return (data as { id?: number }).id ?? null
+  }
+  return rd.id ?? null
 }
 
-// CloudTalk can return HTTP 200 with an error envelope; treat an explicit error
-// status as a failed send so it is not recorded as 'sent'.
+// A failed send comes back as HTTP 200 with `responseData.success = false` and `data`
+// holding the provider error — detect it (plus the legacy status>=400 shape) as failure.
 function extractSendError(json: SendSmsResponse): Nullable<string> {
   const rd = json.responseData
-  const node = Array.isArray(rd) ? rd[0] : rd
-  if (node && typeof node === 'object') {
-    const status = (node as { status?: unknown }).status
-    if (typeof status === 'number' && status >= 400) {
-      const message = (node as { message?: unknown }).message
-      return typeof message === 'string' && message.length > 0
-        ? message
-        : `cloudtalk_${status}`
+  if (!rd) return null
+  if (Array.isArray(rd)) {
+    const node = rd[0]
+    if (node && typeof node.status === 'number' && node.status >= 400) {
+      return node.message && node.message.length > 0
+        ? node.message
+        : `cloudtalk_${node.status}`
     }
+    return null
+  }
+  if (rd.success === false || rd.success === 'false') {
+    return typeof rd.data === 'string' && rd.data.length > 0
+      ? rd.data
+      : 'sms_send_failed'
+  }
+  if (typeof rd.status === 'number' && rd.status >= 400) {
+    return rd.message && rd.message.length > 0 ? rd.message : `cloudtalk_${rd.status}`
   }
   return null
+}
+
+// The company's CloudTalk SMS-capable sender number (E.164), or null if not configured.
+export async function getCompanySmsSender(
+  companyId: number,
+): Promise<Nullable<string>> {
+  const row = await selectId<{ cloudtalk_sms_sender: Nullable<string> }>(
+    db,
+    'SELECT cloudtalk_sms_sender FROM company WHERE id = ?',
+    companyId,
+  )
+  const sender = row?.cloudtalk_sms_sender?.trim()
+  return sender && sender.length > 0 ? sender : null
 }
 
 export async function sendSmsViaCloudTalk(
@@ -62,9 +85,9 @@ export async function sendSmsViaCloudTalk(
   const response = await cloudtalkRequest('sms/send.json', params.companyId, {
     method: 'POST',
     body: {
-      agent_id: params.agentId,
-      to: params.toPhoneE164,
-      text: params.text,
+      sender: params.senderE164,
+      recipient: params.toPhoneE164,
+      message: params.text,
     },
     extraHeaders: { 'Idempotency-Key': params.idempotencyKey },
   })
@@ -76,13 +99,17 @@ export async function sendSmsViaCloudTalk(
   return { cloudtalkId: extractCloudtalkId(json) }
 }
 
-// Map CloudTalk API errors to stable client-facing tokens. The `apiMessage`
-// field comes from CloudTalk's response body (parsed in cloudtalkRequest).
+// Map CloudTalk errors to stable client-facing tokens.
 export function mapCloudTalkSendError(err: unknown): string {
   if (!(err instanceof CloudTalkApiError)) return 'send_failed'
   const msg = err.apiMessage?.toLowerCase() ?? ''
   if (msg.includes('insufficient funds')) return 'cloudtalk_insufficient_funds'
-  if (msg.includes('invalid phone')) return 'cloudtalk_invalid_phone'
+  if (msg.includes('limit exceeded')) return 'cloudtalk_limit_exceeded'
+  if (msg.includes('not allowed country')) return 'cloudtalk_country_not_allowed'
+  if (msg.includes('unknown number') || msg.includes('invalid phone')) {
+    return 'cloudtalk_invalid_phone'
+  }
+  if (msg.includes('bad number configuration')) return 'cloudtalk_bad_number_config'
   if (msg.includes('agent')) return 'cloudtalk_agent_unavailable'
   return `cloudtalk_${err.status}`
 }

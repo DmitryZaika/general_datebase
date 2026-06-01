@@ -26,7 +26,7 @@ describe('sendSmsViaCloudTalk', () => {
     })
     const result = await sendSmsViaCloudTalk({
       companyId: 1,
-      agentId: 'agent-A',
+      senderE164: '+15555550000',
       toPhoneE164: '+13173161456',
       text: 'hello',
       idempotencyKey: FAKE_KEY,
@@ -34,7 +34,11 @@ describe('sendSmsViaCloudTalk', () => {
     expect(result.cloudtalkId).toBe(12345)
     expect(cloudtalkRequestMock).toHaveBeenCalledWith('sms/send.json', 1, {
       method: 'POST',
-      body: { agent_id: 'agent-A', to: '+13173161456', text: 'hello' },
+      body: {
+        sender: '+15555550000',
+        recipient: '+13173161456',
+        message: 'hello',
+      },
       extraHeaders: { 'Idempotency-Key': FAKE_KEY },
     })
   })
@@ -46,7 +50,7 @@ describe('sendSmsViaCloudTalk', () => {
     })
     const result = await sendSmsViaCloudTalk({
       companyId: 1,
-      agentId: 'agent-A',
+      senderE164: '+15555550000',
       toPhoneE164: '+13173161456',
       text: 'hello',
       idempotencyKey: FAKE_KEY,
@@ -61,7 +65,7 @@ describe('sendSmsViaCloudTalk', () => {
     })
     const result = await sendSmsViaCloudTalk({
       companyId: 1,
-      agentId: 'agent-A',
+      senderE164: '+15555550000',
       toPhoneE164: '+13173161456',
       text: 'hi',
       idempotencyKey: FAKE_KEY,
@@ -76,7 +80,7 @@ describe('sendSmsViaCloudTalk', () => {
     })
     const result = await sendSmsViaCloudTalk({
       companyId: 1,
-      agentId: 'agent-A',
+      senderE164: '+15555550000',
       toPhoneE164: '+13173161456',
       text: 'hi',
       idempotencyKey: FAKE_KEY,
@@ -91,7 +95,7 @@ describe('sendSmsViaCloudTalk', () => {
     await expect(
       sendSmsViaCloudTalk({
         companyId: 1,
-        agentId: 'agent-A',
+        senderE164: '+15555550000',
         toPhoneE164: '+13173161456',
         text: 'hello',
         idempotencyKey: FAKE_KEY,
@@ -110,12 +114,57 @@ describe('sendSmsViaCloudTalk', () => {
     await expect(
       sendSmsViaCloudTalk({
         companyId: 1,
-        agentId: 'agent-A',
+        senderE164: '+15555550000',
         toPhoneE164: '+13173161456',
         text: 'hello',
         idempotencyKey: FAKE_KEY,
       }),
     ).rejects.toBeInstanceOf(CloudTalkApiError)
+  })
+
+  test('throws on the documented success:false envelope', async () => {
+    cloudtalkRequestMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        responseData: { success: false, data: 'Unknown number' },
+      }),
+    })
+    await expect(
+      sendSmsViaCloudTalk({
+        companyId: 1,
+        senderE164: '+15555550000',
+        toPhoneE164: '+13173161456',
+        text: 'hello',
+        idempotencyKey: FAKE_KEY,
+      }),
+    ).rejects.toMatchObject({ apiMessage: 'Unknown number' })
+  })
+
+  test('treats success:true as a successful send (no id in payload)', async () => {
+    cloudtalkRequestMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        responseData: {
+          success: true,
+          data: {
+            recipient: '+13173161456',
+            message: 'hello',
+            sender: '+15555550000',
+            country_code: 'US',
+          },
+        },
+      }),
+    })
+    const result = await sendSmsViaCloudTalk({
+      companyId: 1,
+      senderE164: '+15555550000',
+      toPhoneE164: '+13173161456',
+      text: 'hello',
+      idempotencyKey: FAKE_KEY,
+    })
+    expect(result.cloudtalkId).toBeNull()
   })
 })
 
@@ -136,6 +185,23 @@ describe('mapCloudTalkSendError', () => {
     expect(
       mapCloudTalkSendError(new CloudTalkApiError(403, 'x', 'Agent not available')),
     ).toBe('cloudtalk_agent_unavailable')
+  })
+
+  test('maps CloudTalk SMS provider error strings', () => {
+    expect(
+      mapCloudTalkSendError(new CloudTalkApiError(200, 'x', 'Unknown number')),
+    ).toBe('cloudtalk_invalid_phone')
+    expect(
+      mapCloudTalkSendError(new CloudTalkApiError(200, 'x', 'Not allowed country.')),
+    ).toBe('cloudtalk_country_not_allowed')
+    expect(
+      mapCloudTalkSendError(new CloudTalkApiError(200, 'x', 'Limit exceeded')),
+    ).toBe('cloudtalk_limit_exceeded')
+    expect(
+      mapCloudTalkSendError(
+        new CloudTalkApiError(200, 'x', 'Bad number configuration'),
+      ),
+    ).toBe('cloudtalk_bad_number_config')
   })
 
   test('falls back to cloudtalk_<status> for unknown api message', () => {

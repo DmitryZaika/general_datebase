@@ -71,18 +71,6 @@ export default function CloudTalkThread() {
     })
   }, [phoneDigits, threadQuery.data, queryClient, csrfToken])
 
-  useEffect(() => {
-    if (!threadQuery.data?.thread) return
-    const confirmedTexts = new Set(
-      threadQuery.data.thread.messages
-        .filter(m => m.direction === 'outbound' && m.status === 'sent')
-        .map(m => m.text),
-    )
-    setPending(prev =>
-      prev.filter(p => p.status === 'failed' || !confirmedTexts.has(p.text)),
-    )
-  }, [threadQuery.data])
-
   const handleSend = useCallback(
     async (text: string) => {
       const tempId = `pending-${Date.now()}`
@@ -98,17 +86,21 @@ export default function CloudTalkThread() {
       setIsSending(true)
       try {
         await sendSms({ phoneDigits, text, csrfToken })
-        queryClient.invalidateQueries({
-          queryKey: ['cloudtalk-sms-thread', phoneDigits],
-        })
-        queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
       } catch {
         setPending(prev =>
           prev.map(p => (p.id === tempId ? { ...p, status: 'failed' } : p)),
         )
-      } finally {
         setIsSending(false)
+        return
       }
+      setIsSending(false)
+      // Load the server row first, then drop the optimistic bubble by id — never by
+      // text, so a trimmed/identical message can't leave a duplicate behind.
+      await queryClient.invalidateQueries({
+        queryKey: ['cloudtalk-sms-thread', phoneDigits],
+      })
+      setPending(prev => prev.filter(p => p.id !== tempId))
+      queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
     },
     [phoneDigits, queryClient, csrfToken],
   )
@@ -123,18 +115,19 @@ export default function CloudTalkThread() {
       setIsSending(true)
       try {
         await sendSms({ phoneDigits, text: failed.text, csrfToken })
-        setPending(prev => prev.filter(p => p.id !== messageId))
-        queryClient.invalidateQueries({
-          queryKey: ['cloudtalk-sms-thread', phoneDigits],
-        })
-        queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
       } catch {
         setPending(prev =>
           prev.map(p => (p.id === messageId ? { ...p, status: 'failed' } : p)),
         )
-      } finally {
         setIsSending(false)
+        return
       }
+      setIsSending(false)
+      await queryClient.invalidateQueries({
+        queryKey: ['cloudtalk-sms-thread', phoneDigits],
+      })
+      setPending(prev => prev.filter(p => p.id !== messageId))
+      queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
     },
     [pending, phoneDigits, queryClient, csrfToken],
   )

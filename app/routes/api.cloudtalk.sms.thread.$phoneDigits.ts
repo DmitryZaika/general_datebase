@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from 'react-router'
 import { data } from 'react-router'
 import { badRequest, handleAuthError } from '~/utils/apiResponse.server'
 import {
+  canUserSendSms,
   fetchCustomerByPhone,
   getThreadForUser,
   getThreadUnreadCountForUser,
@@ -20,16 +21,24 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const beforeId = url.searchParams.get('beforeId') ?? undefined
 
     const result = await getThreadForUser({ user, phoneDigits, limit, beforeId })
+    const customer = await fetchCustomerByPhone(user.company_id, phoneDigits)
 
+    // Empty thread: return a non-null thread so the pane renders a composer for a
+    // brand-new conversation; the first send creates it.
     if (result.messages.length === 0) {
       return data({
-        thread: null,
-        canSend: Boolean(user.cloudtalk_agent_id),
+        thread: {
+          phoneDigits,
+          customer,
+          messages: [],
+          unreadCount: 0,
+          assignedToCurrentUser: true,
+        },
+        canSend: canUserSendSms(user),
         hasOlder: false,
       })
     }
 
-    const customer = await fetchCustomerByPhone(user.company_id, phoneDigits)
     const unreadCount = await getThreadUnreadCountForUser(user, phoneDigits)
 
     return data({
@@ -40,7 +49,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         unreadCount,
         assignedToCurrentUser: true,
       },
-      canSend: Boolean(user.cloudtalk_agent_id),
+      canSend: canUserSendSms(user),
       hasOlder: result.hasOlder,
     })
   } catch (err) {

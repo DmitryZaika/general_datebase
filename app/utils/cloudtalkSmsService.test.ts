@@ -11,6 +11,7 @@ import type { Nullable } from '~/types/utils'
 import { DatabaseTestHelper, TestDataFactory } from '../../tests/testDatabase'
 import {
   __resetPendingCleanupThrottle,
+  canUserSendSms,
   fetchCustomerByPhone,
   finalizeOutboundSms,
   getThreadForUser,
@@ -370,6 +371,83 @@ describe('fetchCustomerByPhone', () => {
     const company = await factory.company()
     const result = await fetchCustomerByPhone(company.id, '9999999999')
     expect(result).toBeNull()
+  })
+
+  test('falls back to customers.phone when not yet in cloudtalk_contacts', async () => {
+    const company = await factory.company()
+    const customer = await factory.customer({
+      company_id: company.id,
+      name: 'Unsynced Customer',
+      phone: '(317) 316-1456',
+    })
+
+    const result = await fetchCustomerByPhone(company.id, '3173161456')
+    expect(result?.id).toBe(customer.id)
+    expect(result?.name).toBe('Unsynced Customer')
+  })
+
+  test('falls back to customers.phone_2 when not yet in cloudtalk_contacts', async () => {
+    const company = await factory.company()
+    const customer = await factory.customer({
+      company_id: company.id,
+      name: 'Second Phone Unsynced',
+      phone: '555-555-0001',
+      phone_2: '317-316-1456',
+    })
+
+    const result = await fetchCustomerByPhone(company.id, '3173161456')
+    expect(result?.id).toBe(customer.id)
+  })
+
+  test('direct fallback does not cross company boundaries', async () => {
+    const company = await factory.company()
+    const otherCompany = await factory.company()
+    await factory.customer({
+      company_id: otherCompany.id,
+      name: 'Other Co Unsynced',
+      phone: '3173161456',
+    })
+
+    const result = await fetchCustomerByPhone(company.id, '3173161456')
+    expect(result).toBeNull()
+  })
+})
+
+describe('canUserSendSms', () => {
+  test('any user with a linked agent id may send', async () => {
+    const company = await factory.company()
+    const employee = await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      cloudtalk_agent_id: 'agent-A',
+    })
+    expect(canUserSendSms(employee)).toBe(true)
+  })
+
+  test('a user without an agent id is read-only', async () => {
+    const company = await factory.company()
+    const employee = await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      cloudtalk_agent_id: null,
+    })
+    expect(canUserSendSms(employee)).toBe(false)
+  })
+
+  test('admins and superusers may send when they have an agent id', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: 'agent-A',
+    })
+    const superuser = await factory.user({
+      company_id: company.id,
+      is_superuser: true,
+      cloudtalk_agent_id: 'agent-B',
+    })
+    expect(canUserSendSms(admin)).toBe(true)
+    expect(canUserSendSms(superuser)).toBe(true)
   })
 
   test('does not cross company boundaries', async () => {
