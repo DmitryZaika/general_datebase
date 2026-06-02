@@ -47,10 +47,12 @@ export function CallItemContent({
       <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
         {call.recorded ? (
           <CallTranscriptionProvider
+            key={call.callId}
             callId={call.callId}
             recordingLink={call.recordingLink}
             dealId={dealId}
             callStartedAt={call.startedAt}
+            isVoicemail={call.isVoicemail}
           >
             <div className='flex items-center justify-between gap-2'>
               <div className='flex items-center gap-2 min-w-0'>
@@ -211,6 +213,7 @@ export function CallItemContent({
               recordingLink={call.recordingLink}
               dealId={dealId}
               callStartedAt={call.startedAt}
+              isVoicemail={call.isVoicemail}
               showRecording={showRecording}
               onToggleRecording={() => setShowRecording(value => !value)}
               buttonClassName='opacity-100'

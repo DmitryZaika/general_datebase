@@ -1,6 +1,13 @@
 import OpenAI from 'openai'
 import type { ActionFunctionArgs } from 'react-router'
 import { z } from 'zod'
+import {
+  countWords,
+  isVoicemailGreetingOnly,
+  resolveIsVoicemail,
+  sanitizeCallNoteContent,
+  VOICEMAIL_NO_ANSWER_NOTE,
+} from '~/lib/callAiHelpers'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -10,6 +17,7 @@ const client = new OpenAI({
 
 const summarizeSchema = z.object({
   transcript: z.string().min(1),
+  isVoicemail: z.boolean().optional(),
 })
 
 function createErrorResponse(message: string, status: number): Response {
@@ -19,9 +27,18 @@ function createErrorResponse(message: string, status: number): Response {
   })
 }
 
-function countWords(text: string): number {
-  return text.split(/\s+/).filter(Boolean).length
-}
+const VOICEMAIL_NOTE_SYSTEM = `Summarize this outbound sales voicemail into a minimal CRM note for a countertop company.
+
+Return plain text only. Use "- Label: details" bullets. Do not include Voicemail, Call type, or Customer bullets. Maximum 2 bullets.
+
+Required:
+- Action: One line combining (a) why the rep called and (b) any prior timing they mention from an older conversation — use a semicolon between them (~18 words total). Example: "Follow-up on inquiry ~5–6 months ago; prior note: ready in May". Never use a separate Previously or Project timing bullet.
+
+Rules:
+- Prior customer timing the rep recalls belongs inside Action after a semicolon, not its own bullet.
+- Never imply the customer spoke on this voicemail unless they did.
+- Never quote, copy, or paraphrase the transcript as prose — output only the bullet lines.
+- No filler. Never include personal names.`
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
@@ -44,24 +61,31 @@ export async function action({ request }: ActionFunctionArgs) {
     return createErrorResponse('Transcript is empty', 400)
   }
 
-  if (countWords(transcript) <= 25) {
-    return new Response(JSON.stringify({ content: transcript }), {
+  const isVoicemail = resolveIsVoicemail(parsed.isVoicemail === true, transcript)
+
+  if (isVoicemail && isVoicemailGreetingOnly(transcript)) {
+    return new Response(JSON.stringify({ content: VOICEMAIL_NO_ANSWER_NOTE }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  if (!isVoicemail && countWords(transcript) <= 25) {
+    const content = sanitizeCallNoteContent(transcript, false, transcript)
+    return new Response(JSON.stringify({ content }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
   }
 
   try {
-    const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
-      messages: [
-        {
-          role: 'system',
-          content: `Summarize this phone sales call into a CRM note for a countertop and stone fabrication company.
+    const systemContent = isVoicemail
+      ? VOICEMAIL_NOTE_SYSTEM
+      : `Summarize this phone sales call into a CRM note for a countertop and stone fabrication company.
 
 Return plain text only. Use one bullet per topic. Every bullet must use the format "- Label: details" with a colon after the label (e.g. "- Project: ...", "- Sink: ..."). The note must be complete—never end mid-sentence or mid-thought.
 
-Include only job-relevant facts. Use plain, direct wording—do not rephrase into formal CRM language. Do not stack synonyms (e.g. avoid "provided by the customer, updated and retained"). Never include customer names, caller names, or other personal names—use "customer" or omit. Location may be city or area only.
+Include only job-relevant facts. Use plain, direct wording—do not rephrase into formal CRM language. Do not stack synonyms (e.g. avoid "provided by the customer, updated and retained"). Never include customer names, caller names, or other personal names. Do not add Customer or Call type bullets. Location may be city or area only.
 
 Whenever the call states a calendar date, day (today, tomorrow, Monday), or clock time (3 pm, 6:00, this afternoon), include that exact wording in the relevant bullet—never drop or generalize it. Apply this in Project timing, Next steps discussed, and any other bullet where timing was said.
 
@@ -71,15 +95,20 @@ When mentioned, always include these bullets using exactly these labels:
 - Backsplash: height and which walls
 - Edge profile: flat, rounded, ogee, 1/4 bevel, 1/2 bevel, bullnose, etc.
 - Location: city or area only
-- Project timing: only the customer's desired start or schedule, quoted exactly as they said it (days, weeks, months). If they give more than one timeframe, list all of them. Do not include company turnaround, lead time, or install timeline—that is already known internally and is not note-worthy when only the salesperson told the customer
-- Tear-out: only if removing existing countertops was discussed. Use plain words (remove existing countertops)—not industry jargon the customer did not use or understand. If the customer asked what tear-out means or only agreed after the rep explained, say they agreed to removal when explained; do not write that they requested tear-out. For current top material, include only what the customer confirmed; if they said they do not know the material, write material unknown—never state laminate, stone, or any type the rep guessed or asked about. Pending photos for material identification belongs in Next steps discussed, not as a confirmed material in Tear-out
+- Project timing: only what the customer said about their project status or when they might proceed—never the salesperson's callback offers (e.g. "call in two weeks"). If the customer is waiting on something (litigation, permits, other issue), state that. If the customer said they will contact the company when ready or after an issue is resolved, write that explicitly (e.g. customer will call when litigation is resolved). If the customer said they have not forgotten and will reach out when they can move forward, say that—do not rephrase as the customer agreeing to the rep's two-or-three-week callback window
+- Tear-out: only if removing existing countertops was discussed. Always state who will remove them: company removes existing countertops, customer removes existing countertops, or removal discussed but party not confirmed. If the customer wants the company to do removal, write company removes existing countertops. If the customer will remove themselves, write customer removes existing countertops. For current top material, include only what the customer confirmed; if they do not know the material, write material unknown—never state a material type the rep guessed or asked about. Never put send photos, links, quotes, or callbacks in Tear-out.
 
 Do not include plumbing unless the customer asked about it or raised it as part of their project. Omit plumbing when only the salesperson stated company policy. Same rule for company turnaround or standard timelines the salesperson explained to the customer—omit from the note.
 
-You may end with one bullet "Next steps discussed" only for agreements from the call (e.g. send options link, customer sends photos). Include exact timing when stated (today, tomorrow, a little later, 6–8 weeks, etc.). No filler such as "no details discussed".`,
-        },
+Never include a Next steps discussed bullet or any task list (send link, send photos, quotes, callbacks, follow-ups, website, inventory). Notes are job facts only—tasks are handled separately as CRM activities. No filler such as "no details discussed".`
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4.1-mini-2025-04-14',
+      messages: [
+        { role: 'system', content: systemContent },
         { role: 'user', content: transcript },
       ],
+      ...(isVoicemail ? { max_tokens: 180 } : {}),
     })
 
     const content = completion.choices[0]?.message?.content ?? ''
@@ -89,10 +118,15 @@ You may end with one bullet "Next steps discussed" only for agreements from the 
       return createErrorResponse('No work-related content found in transcript', 422)
     }
 
-    return new Response(JSON.stringify({ content: note }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({
+        content: sanitizeCallNoteContent(note, isVoicemail, transcript),
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    )
   } catch (error) {
     posthogClient.captureException(error)
     return createErrorResponse('Failed to summarize call', 500)

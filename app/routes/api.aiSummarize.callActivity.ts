@@ -1,6 +1,12 @@
 import OpenAI from 'openai'
 import type { ActionFunctionArgs } from 'react-router'
 import { z } from 'zod'
+import {
+  countWords,
+  isVoicemailGreetingOnly,
+  resolveIsVoicemail,
+  VOICEMAIL_GREETING_ACTIVITY_NAME,
+} from '~/lib/callAiHelpers'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -12,7 +18,11 @@ const summarizeSchema = z.object({
   transcript: z.string().min(1),
   callStartedAt: z.string().optional(),
   committedAt: z.string().optional(),
+  isVoicemail: z.boolean().optional(),
 })
+
+const VOICEMAIL_ACTIVITY_SKIP_AI_WORDS = 50
+const VOICEMAIL_DEFAULT_ACTIVITY_NAME = 'Follow-up to confirm interest'
 
 const activityItemSchema = z.object({
   name: z.string().optional(),
@@ -105,12 +115,20 @@ function zonedWallTimeToUtcIso(
   return new Date(utcMs).toISOString()
 }
 
+function getStoreCalendarDateParts(from: Date): {
+  year: number
+  month: number
+  day: number
+} {
+  const parts = getZonedParts(from, STORE_BUSINESS_TIMEZONE)
+  return { year: parts.year, month: parts.month, day: parts.day }
+}
+
 function addStoreCalendarDays(
   from: Date,
   days: number,
 ): { year: number; month: number; day: number } {
-  const start = formatStoreDateOnlyPlusDays(from, 0)
-  const [year, month, day] = start.split('-').map(Number)
+  const { year, month, day } = getStoreCalendarDateParts(from)
   const shifted = new Date(Date.UTC(year, month - 1, day + days))
   return {
     year: shifted.getUTCFullYear(),
@@ -128,6 +146,120 @@ function storeCloseDeadlineOnCallDay(committedAt: Date, dayOffset: number): stri
   const { year, month, day } = addStoreCalendarDays(committedAt, dayOffset)
   const dueHour = STORE_CLOSE_HOUR - DEADLINE_HOURS_BEFORE_STORE_CLOSE
   return zonedWallTimeToUtcIso(year, month, day, dueHour, 0, STORE_BUSINESS_TIMEZONE)
+}
+
+const REP_TWO_THREE_WEEK_CALLBACK_PATTERN =
+  /\b(?:would you like (?:me|us) to )?call(?: you| back)?\b[^.]{0,120}\b(?:in\s+)?(?:about\s+)?(?:two|2)\s*(?:or|to|-)\s*(?:three|3)\s*weeks?\b|\b(?:i(?:'ll| will)|we will)\s+call(?: you| back)?\b[^.]{0,80}\b(?:in\s+)?(?:two|2)\s*(?:or|to|-)\s*(?:three|3)\s*weeks?\b/i
+
+const TWO_THREE_WEEKS_MENTION_PATTERN =
+  /\b(?:two|2)\s*(?:or|to|-)\s*(?:three|3)\s*weeks?\b/i
+
+const CALLBACK_ACTIVITY_NAME_PATTERN = /\b(?:call\s+back|follow[- ]?up|callback)\b/i
+
+const REP_TWO_THREE_WEEK_CALLBACK_DAYS = 14
+
+function stripCalendarDatesFromActivityName(name: string): string {
+  return name
+    .replace(
+      /\b(?:on\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:,?\s*\d{4})?\b/gi,
+      '',
+    )
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '')
+    .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .replace(/^,\s*|\s*,\s*$/g, '')
+    .trim()
+}
+
+function buildRepTwoThreeWeekCallBackName(transcript: string): string {
+  const lower = transcript.toLowerCase()
+  if (/\blitigation\b/.test(lower)) {
+    return 'Call back, check if litigation is finished'
+  }
+  if (/\bmove forward\b/.test(lower)) {
+    return 'Call back, check if ready to move forward'
+  }
+  if (/\bconfirm\b/.test(lower) && /\binterest\b/.test(lower)) {
+    return 'Call back, confirm still interested'
+  }
+  if (/\bkitchen\b/.test(lower)) {
+    return 'Call back, follow up on kitchen project'
+  }
+  return 'Call back, follow up'
+}
+
+function isRepTwoThreeWeekCallBackTask(
+  activityName: string,
+  transcript: string,
+): boolean {
+  const transcriptLower = transcript.toLowerCase()
+  const nameLower = activityName.toLowerCase()
+  if (!REP_TWO_THREE_WEEK_CALLBACK_PATTERN.test(transcriptLower)) return false
+  return (
+    CALLBACK_ACTIVITY_NAME_PATTERN.test(nameLower) ||
+    TWO_THREE_WEEKS_MENTION_PATTERN.test(nameLower)
+  )
+}
+
+function inferRepTwoThreeWeekCallbackDeadline(
+  activityName: string,
+  transcript: string,
+  committedAt: Date,
+): string | null {
+  if (!isRepTwoThreeWeekCallBackTask(activityName, transcript)) return null
+  return formatStoreDateOnlyPlusDays(committedAt, REP_TWO_THREE_WEEK_CALLBACK_DAYS)
+}
+
+function applyRepTwoThreeWeekCallBackActivity(
+  activity: ExtractedCallActivity,
+  committedAt: Date,
+  transcript: string,
+): ExtractedCallActivity {
+  if (!isRepTwoThreeWeekCallBackTask(activity.name, transcript)) return activity
+  return {
+    name: buildRepTwoThreeWeekCallBackName(transcript),
+    deadline: formatStoreDateOnlyPlusDays(
+      committedAt,
+      REP_TWO_THREE_WEEK_CALLBACK_DAYS,
+    ),
+  }
+}
+
+function isVoicemailFollowUpActivity(name: string): boolean {
+  const lower = name.toLowerCase()
+  return (
+    /\bfollow[- ]?up\b/.test(lower) ||
+    /\bconfirm\s+interest\b/.test(lower) ||
+    /\bcall\s+back\b/.test(lower)
+  )
+}
+
+function isDeadlineOnCommittedStoreDay(
+  deadline: string,
+  committedAt: Date,
+  dayOffset: number,
+): boolean {
+  const expected = formatStoreDateOnlyPlusDays(committedAt, dayOffset)
+  const trimmed = deadline.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed === expected
+  const parsed = new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return false
+  return formatStoreDateOnlyPlusDays(parsed, 0) === expected
+}
+
+function applyVoicemailFollowUpDeadlineRules(
+  deadline: string | null,
+  activityName: string,
+  committedAt: Date,
+): string | null {
+  if (!isVoicemailFollowUpActivity(activityName)) return deadline
+  if (!deadline) return null
+  const normalized = normalizeTimedDeadline(deadline)
+  if (!normalized) return null
+  if (isDeadlineOnCommittedStoreDay(normalized, committedAt, 0)) return normalized
+  if (isDeadlineOnCommittedStoreDay(normalized, committedAt, 1)) return normalized
+  return null
 }
 
 function isQuoteOrEstimateActivity(name: string): boolean {
@@ -354,7 +486,9 @@ function isCustomerPhotoRequestActivity(name: string): boolean {
 }
 
 function sanitizeActivityName(name: string): string {
-  return name.replace(/\s+from\s+[A-Za-z]+\s*$/i, '').trim()
+  return stripCalendarDatesFromActivityName(
+    name.replace(/\s+from\s+[A-Za-z]+\s*$/i, '').trim(),
+  )
 }
 
 function isEdgePhotoSendActivityName(name: string): boolean {
@@ -528,6 +662,19 @@ function applyActivityDeadlineRules(
   committedAt: Date,
   transcript: string,
 ): string | null {
+  if (isVoicemailFollowUpActivity(activityName)) {
+    return applyVoicemailFollowUpDeadlineRules(deadline, activityName, committedAt)
+  }
+
+  const repTwoThreeWeekDeadline = inferRepTwoThreeWeekCallbackDeadline(
+    activityName,
+    transcript,
+    committedAt,
+  )
+  if (repTwoThreeWeekDeadline) {
+    return repTwoThreeWeekDeadline
+  }
+
   const nameHaystack = activityName.toLowerCase()
   const deadlineHaystack = (deadline ?? '').toLowerCase()
   const transcriptLower = transcript.toLowerCase()
@@ -743,7 +890,13 @@ function finalizeExtractedActivities(
   const sorted = [...dedupedAgain].sort(
     (a, b) => activitySchedulingOrder(a.name) - activitySchedulingOrder(b.name),
   )
-  return applyQuoteMinimumLeadTime(staggerTimedDeadlines(sorted), committedAt)
+  const staggered = applyQuoteMinimumLeadTime(
+    staggerTimedDeadlines(sorted),
+    committedAt,
+  )
+  return staggered.map(activity =>
+    applyRepTwoThreeWeekCallBackActivity(activity, committedAt, transcript),
+  )
 }
 
 function resolveActivityName(name: string | undefined): string | null {
@@ -837,32 +990,69 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const callStartedAt = parseIsoDate(parsed.callStartedAt)
   const committedAt = parseIsoDate(parsed.committedAt)
-  const callReference = parsed.callStartedAt?.trim()
-    ? `Call date/time for relative deadlines (ISO): ${parsed.callStartedAt.trim()}`
-    : `Call date/time for relative deadlines (ISO): ${callStartedAt.toISOString()}`
+  const isVoicemail = resolveIsVoicemail(parsed.isVoicemail === true, transcript)
 
-  try {
-    const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: `Extract every distinct follow-up task from a phone call transcript for a CRM to-do list.
+  const callReference = isVoicemail
+    ? `Activity creation time for relative deadlines (ISO): ${committedAt.toISOString()}`
+    : parsed.callStartedAt?.trim()
+      ? `Call date/time for relative deadlines (ISO): ${parsed.callStartedAt.trim()}`
+      : `Call date/time for relative deadlines (ISO): ${callStartedAt.toISOString()}`
+
+  if (isVoicemail && isVoicemailGreetingOnly(transcript)) {
+    const activities = finalizeExtractedActivities(
+      [{ name: VOICEMAIL_GREETING_ACTIVITY_NAME, deadline: null }],
+      committedAt,
+      transcript,
+    )
+    return new Response(JSON.stringify({ activities }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  if (isVoicemail && countWords(transcript) <= VOICEMAIL_ACTIVITY_SKIP_AI_WORDS) {
+    const activities = finalizeExtractedActivities(
+      [{ name: VOICEMAIL_DEFAULT_ACTIVITY_NAME, deadline: null }],
+      committedAt,
+      transcript,
+    )
+    return new Response(JSON.stringify({ activities }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const voicemailActivitySystem = `Extract follow-up tasks from a sales voicemail for a countertop company CRM.
 
 Return JSON only: {"activities": [{"name": string, "deadline": string | null}, ...]}
 
-Create a separate activity only for commitments that are truly different (different action or different due date). Never create two activities for the same action.
+Focus on what the salesperson asked the customer to do next (confirm interest, call back, send photos). Usually one activity such as "Follow-up to confirm interest".
 
-Include:
-- Tasks the salesperson committed to (send link, send quote, call back, schedule visit)
-- When the salesperson offers to send pictures right after discussing edge style (flat, square, rounded, etc.), add a separate activity such as "Send square edge profile photos"—never merge that into the inventory link or customer photo tasks
-- One task when the customer will send photos: "Request kitchen photos" (covers kitchen, countertop, or material photos—never duplicate)
+Rules for deadline: null unless the rep gives a follow-up due date for this task (today or tomorrow relative to activity creation). Never use project timing (May, months ago, ready in) as the deadline.
+
+No commitments -> {"activities":[]}
+
+${callReference}`
+
+  const liveCallActivitySystem = `Extract follow-up tasks from a phone call for a CRM activity list. The note records job facts only; every commitment from the call belongs here as activities.
+
+Return JSON only: {"activities": [{"name": string, "deadline": string | null}, ...]}
+
+Create a separate activity for each distinct commitment (different action or different due date). Never merge unrelated tasks into one activity.
+
+Include when stated:
+- Salesperson will send something (inventory link, website, granite/stone options, quote, edge photos, samples)
+- Customer will send something (kitchen photos, countertop photos, material photos)
+- Salesperson offers or agrees to call back (including "call you in two or three weeks")
+- Schedule visit or other follow-up the rep committed to
+- Do not create an outbound call-back activity when only the customer said they will call the company later
+- When edge style was discussed and the rep offers to send edge photos, add a separate edge-photo activity—do not merge with link or customer-photo tasks
 
 Rules for name:
-- Clear imperative title, usually 4-10 words
+- Clear imperative title, usually 4-12 words with brief context (why you are calling back)
 - Never include customer or caller names
-- Do not repeat the due date in the name when deadline is set
+- Never include calendar dates in the name—use deadline only for when the task is due
+- For "two or three weeks" call-back from the salesperson: set deadline null; use a descriptive name such as "Call back, check if litigation is finished" when litigation was discussed, or "Call back, follow up on kitchen project" for kitchen follow-ups
 - This company sells stone countertops. When sending stone options, samples, links, or pricing, include the stone type if specified (granite, quartz, marble, etc.)
 - Examples: "Send granite inventory link", "Request kitchen photos", "Send edge profile photos"
 
@@ -876,6 +1066,7 @@ Rules for deadline (prefer setting a deadline when timing was discussed; null on
 - "I'll send the link today" (or similar send-today, no time) → YYYY-MM-DD for the call day only, never a datetime
 - "Tomorrow" for non-quote tasks (e.g. customer sends photos) → YYYY-MM-DD for the day after the call
 - Quote or estimate with "by tomorrow" or before the store closes → omit deadline; server sets due today at 4:00 PM store time (two hours before 6:00 PM close), but never earlier than one hour after activity creation
+- Salesperson: "Would you like me to call you in two or three weeks?" while customer is in litigation → {"name":"Call back, check if litigation is finished","deadline":null}
 
 Examples:
 - Salesperson discusses square edges, then says "I can also send you pictures"
@@ -892,10 +1083,20 @@ Examples:
 - Only one vague follow-up with no timing -> single activity with deadline null
 - No commitments -> {"activities":[]}
 
-${callReference}`,
+${callReference}`
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4.1-mini-2025-04-14',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: isVoicemail ? voicemailActivitySystem : liveCallActivitySystem,
         },
         { role: 'user', content: transcript },
       ],
+      ...(isVoicemail ? { max_tokens: 250 } : {}),
     })
 
     const rawContent = completion.choices[0]?.message?.content ?? '{}'
@@ -907,7 +1108,26 @@ ${callReference}`,
       return createErrorResponse('Failed to parse activity response', 500)
     }
 
-    const activities = extractActivitiesFromResponse(json, committedAt, transcript)
+    let activities = extractActivitiesFromResponse(json, committedAt, transcript)
+
+    if (
+      isVoicemail &&
+      activities.length === 1 &&
+      activities[0].name === DEFAULT_ACTIVITY_NAME
+    ) {
+      activities = [{ ...activities[0], name: VOICEMAIL_DEFAULT_ACTIVITY_NAME }]
+    }
+
+    if (isVoicemail) {
+      activities = activities.map(activity => ({
+        ...activity,
+        deadline: applyVoicemailFollowUpDeadlineRules(
+          activity.deadline,
+          activity.name,
+          committedAt,
+        ),
+      }))
+    }
 
     return new Response(JSON.stringify({ activities }), {
       status: 200,

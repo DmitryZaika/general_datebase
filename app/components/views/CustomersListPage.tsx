@@ -260,13 +260,7 @@ function isSameCustomerActionNavigation(from: string, to: string) {
   return fromId !== null && fromId === toId
 }
 
-type CustomersListPageProps = {
-  showWalkInCountsByRep?: boolean
-}
-
-export function CustomersListPage({
-  showWalkInCountsByRep = false,
-}: CustomersListPageProps) {
+export function CustomersListPage() {
   const { customers, walkInsBySalesRep = [] } = useLoaderData<{
     customers: CustomersListCustomer[]
     walkInsBySalesRep?: WalkInSalesRepCount[]
@@ -573,9 +567,7 @@ export function CustomersListPage({
             </LoadingButton>
           </Link>
         )}
-        {showWalkInCountsByRep &&
-        viewParam === 'customers' &&
-        walkInsBySalesRep.length > 0 ? (
+        {walkInsBySalesRep.length > 0 ? (
           <div className='flex flex-wrap items-center gap-2'>
             <span className='text-sm text-slate-500'>Walk-ins this month:</span>
             {walkInsBySalesRep.map(item => (

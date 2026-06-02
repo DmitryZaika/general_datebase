@@ -18,7 +18,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function EmployeeCustomers() {
   return (
     <motion.div className='w-full' {...EMPLOYEE_VIEW_ENTER}>
-      <CustomersListPage showWalkInCountsByRep />
+      <CustomersListPage />
     </motion.div>
   )
 }

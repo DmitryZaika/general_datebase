@@ -1,8 +1,19 @@
 import { cn } from '~/lib/utils'
 
 const BOLD_LABEL_PATTERN = /^(-\s*)(.+?)(:)(.*)$/
+const VOICEMAIL_HEADING_PATTERN = /^(-\s*)Voicemail\s*$/i
 
 function NoteContentLine({ line }: { line: string }) {
+  const voicemailMatch = line.match(VOICEMAIL_HEADING_PATTERN)
+  if (voicemailMatch) {
+    return (
+      <>
+        {voicemailMatch[1]}
+        <strong>Voicemail</strong>
+      </>
+    )
+  }
+
   const match = line.match(BOLD_LABEL_PATTERN)
   if (!match) return line
 
