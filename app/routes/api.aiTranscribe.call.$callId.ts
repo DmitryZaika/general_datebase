@@ -109,7 +109,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const transcription = await client.audio.transcriptions.create({
       file,
-      model: 'whisper-1',
+      model: 'gpt-4o-mini-transcribe',
+      language: 'en',
     })
 
     const text = transcription.text.trim()

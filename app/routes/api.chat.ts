@@ -5,6 +5,7 @@ import { db } from '~/db.server'
 import { getSession } from '~/sessions.server'
 import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
+import { collectRelatedInstructionImages } from '~/utils/instructionImages'
 import { selectMany } from '../utils/queryHelpers'
 import { getUserBySessionId } from '../utils/session.server'
 
@@ -69,6 +70,18 @@ async function newContext(
     ],
     id: chatHistoryId,
   }
+}
+
+async function loadRelatedInstructionImages(
+  companyId: number,
+  query: string,
+): Promise<string[]> {
+  const instructions = await selectMany<InstructionSlim>(
+    db,
+    'SELECT id, title, rich_text from instructions WHERE company_id = ?',
+    [companyId],
+  )
+  return collectRelatedInstructionImages(instructions, query)
 }
 
 async function insertContext(user_id: number, messages: Message[], answer: string) {
@@ -146,6 +159,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         let answer = ''
 
         try {
+          const relatedImages = await loadRelatedInstructionImages(
+            user.company_id,
+            query,
+          )
+          if (relatedImages.length > 0) {
+            send({ event: 'images', data: JSON.stringify(relatedImages) })
+          }
+
           for await (const chunk of response) {
             const message = chunk.choices[0].delta.content
             if (message) {

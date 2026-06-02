@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLocation, useRevalidator } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import NoteIcon from '~/components/icons/NoteIcon'
+import { NoteContent } from '~/components/molecules/NoteContent'
 import {
   formatDeadlineLabel,
   isDateOnlyDeadline,
@@ -636,9 +637,10 @@ export default function DealItem({
                                 Pinned
                               </span>
                             ) : null}
-                            <p className='whitespace-pre-wrap break-words'>
-                              {note.content}
-                            </p>
+                            <NoteContent
+                              content={note.content}
+                              className='mt-0 text-xs'
+                            />
                             <div className='flex items-center gap-1.5 mt-0.5 flex-wrap text-[10px] text-slate-500'>
                               {note.created_by ? <span>{note.created_by}</span> : null}
                               <span>{formatActivityTime(note.created_at)}</span>

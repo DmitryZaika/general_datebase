@@ -36,7 +36,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import type { CustomersListCustomer } from '~/utils/customersListLoader.server'
+import type {
+  CustomersListCustomer,
+  WalkInSalesRepCount,
+} from '~/utils/customersListLoader.server'
 
 function SalesRepCell({ customer }: { customer: CustomersListCustomer }) {
   const { data: reps = [] } = useQuery<{ id: number; name: string }[]>({
@@ -257,8 +260,17 @@ function isSameCustomerActionNavigation(from: string, to: string) {
   return fromId !== null && fromId === toId
 }
 
-export function CustomersListPage() {
-  const { customers } = useLoaderData<{ customers: CustomersListCustomer[] }>()
+type CustomersListPageProps = {
+  showWalkInCountsByRep?: boolean
+}
+
+export function CustomersListPage({
+  showWalkInCountsByRep = false,
+}: CustomersListPageProps) {
+  const { customers, walkInsBySalesRep = [] } = useLoaderData<{
+    customers: CustomersListCustomer[]
+    walkInsBySalesRep?: WalkInSalesRepCount[]
+  }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const navigation = useNavigation()
@@ -548,7 +560,7 @@ export function CustomersListPage() {
           />
         </div>
       </div>
-      <div className='w-fit'>
+      <div className='flex flex-wrap items-center gap-3'>
         {viewParam === 'customers' && (
           <Link
             to={`add${location.search}`}
@@ -561,6 +573,22 @@ export function CustomersListPage() {
             </LoadingButton>
           </Link>
         )}
+        {showWalkInCountsByRep &&
+        viewParam === 'customers' &&
+        walkInsBySalesRep.length > 0 ? (
+          <div className='flex flex-wrap items-center gap-2'>
+            <span className='text-sm text-slate-500'>Walk-ins this month:</span>
+            {walkInsBySalesRep.map(item => (
+              <span
+                key={item.salesRepId ?? 'unassigned'}
+                className='inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700'
+              >
+                {item.salesRepName}:{' '}
+                <span className='ml-1 font-semibold text-slate-900'>{item.count}</span>
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
       {isListLoading ? (
         <CustomersPaginationSkeleton />

@@ -5,10 +5,12 @@ import { DONE_KEY } from '~/utils/constants'
 import { DialogFullHeader } from '../molecules/DialogFullHeader'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import '~/styles/instructions.css'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  images?: string[]
 }
 
 interface ChatAnchorPercent {
@@ -172,6 +174,35 @@ function savePercent(percent: ChatAnchorPercent) {
   localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(percent))
 }
 
+function parseImageUrlsPayload(data: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(data)
+    if (!Array.isArray(parsed)) return []
+    const urls: string[] = []
+    for (const item of parsed) {
+      if (typeof item === 'string' && item.trim()) {
+        urls.push(item)
+      }
+    }
+    return urls
+  } catch {
+    return []
+  }
+}
+
+function InstructionImages({ urls }: { urls: string[] }) {
+  if (urls.length === 0) return null
+  return (
+    <div className='instructions mt-2 flex flex-col gap-2'>
+      {urls.map(url => (
+        <a key={url} href={url} target='_blank' rel='noopener noreferrer'>
+          <img src={url} alt='' className='rounded-md border border-black/10' />
+        </a>
+      ))}
+    </div>
+  )
+}
+
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   return (
     <div
@@ -184,7 +215,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             : 'bg-gray-200 text-gray-900'
         }`}
       >
-        <div>{message.content}</div>
+        {message.content ? <div>{message.content}</div> : null}
+        {message.images ? <InstructionImages urls={message.images} /> : null}
       </div>
     </div>
   )
@@ -231,7 +263,9 @@ export function Chat() {
   const inputRef = useRef<HTMLInputElement>(null)
   const sseRef = useRef<EventSource | null>(null)
   const answerRef = useRef('')
+  const streamingImagesRef = useRef<string[]>([])
   const responseFinishedRef = useRef(false)
+  const [streamingImages, setStreamingImages] = useState<string[]>([])
 
   anchorRef.current = anchor
   useCustomPositionRef.current = useCustomPosition
@@ -303,11 +337,21 @@ export function Chat() {
         sseRef.current = null
       }
       const content = answerRef.current
+      const images = streamingImagesRef.current
       answerRef.current = ''
+      streamingImagesRef.current = []
       setAnswer('')
+      setStreamingImages([])
       setIsThinking(false)
-      if (content.length > 0) {
-        setMessages(msgs => [...msgs, { role: 'assistant', content }])
+      if (content.length > 0 || images.length > 0) {
+        setMessages(msgs => [
+          ...msgs,
+          {
+            role: 'assistant',
+            content,
+            images: images.length > 0 ? images : undefined,
+          },
+        ])
       }
       focusInput()
     },
@@ -328,6 +372,8 @@ export function Chat() {
     const isNewChat = messages.length === 0
     responseFinishedRef.current = false
     answerRef.current = ''
+    streamingImagesRef.current = []
+    setStreamingImages([])
     setAnswer('')
     setIsThinking(true)
     setInput('')
@@ -338,6 +384,13 @@ export function Chat() {
       `/api/chat?query=${encodeURIComponent(query)}&isNew=${isNewChat}`,
     )
     sseRef.current = sse
+
+    sse.addEventListener('images', event => {
+      const urls = parseImageUrlsPayload(event.data)
+      if (urls.length === 0) return
+      streamingImagesRef.current = urls
+      setStreamingImages(urls)
+    })
 
     sse.addEventListener('message', event => {
       if (event.data === DONE_KEY) {
@@ -405,8 +458,15 @@ export function Chat() {
   }
 
   const displayMessages: Message[] =
-    isThinking && answer.length > 0
-      ? [...messages, { role: 'assistant', content: answer }]
+    isThinking && (answer.length > 0 || streamingImages.length > 0)
+      ? [
+          ...messages,
+          {
+            role: 'assistant',
+            content: answer,
+            images: streamingImages.length > 0 ? streamingImages : undefined,
+          },
+        ]
       : messages
 
   if (!ready) {

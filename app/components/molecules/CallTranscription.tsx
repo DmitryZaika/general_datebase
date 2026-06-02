@@ -71,11 +71,14 @@ function useCallTranscriptionLogic({
   const [activityCreated, setActivityCreated] = useState(false)
   const noteSubmitted = useRef(false)
   const activitySubmitted = useRef(false)
+  const transcribeRequestRef = useRef<Promise<string> | null>(null)
 
   const noteFetcher = useFetcher<ApiResponse>()
   const activityFetcher = useFetcher<ApiResponse>()
   const revalidator = useRevalidator()
   const token = useAuthenticityToken()
+  const csrfTokenRef = useRef(token)
+  csrfTokenRef.current = token
   const { toast } = useToast()
 
   useEffect(() => {
@@ -131,53 +134,75 @@ function useCallTranscriptionLogic({
   }, [activityFetcher.state, activityFetcher.data, revalidator, toast])
 
   const fetchTranscript = useCallback(
-    async (showText: boolean): Promise<string> => {
-      const response = await fetch(`/api/aiTranscribe/call/${callId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordingLink }),
-      })
-
-      const json: { text?: string; error?: string } = await response.json()
-      if (!response.ok) {
-        throw new Error(json.error ?? 'Failed to transcribe call')
+    async (showText: boolean, background = false): Promise<string> => {
+      if (transcribeRequestRef.current) {
+        return transcribeRequestRef.current
       }
 
-      const transcript = json.text?.trim()
-      if (!transcript) {
-        throw new Error('No transcription returned')
+      if (!background) {
+        setLoading(true)
+        setError(null)
       }
 
-      setText(transcript)
-      if (showText) {
-        setVisible(true)
+      const request = (async () => {
+        const response = await fetch(`/api/aiTranscribe/call/${callId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recordingLink }),
+        })
+
+        const json: { text?: string; error?: string } = await response.json()
+        if (!response.ok) {
+          throw new Error(json.error ?? 'Failed to transcribe call')
+        }
+
+        const transcript = json.text?.trim()
+        if (!transcript) {
+          throw new Error('No transcription returned')
+        }
+
+        setText(transcript)
+        if (showText) {
+          setVisible(true)
+        }
+        return transcript
+      })()
+
+      transcribeRequestRef.current = request
+
+      try {
+        return await request
+      } finally {
+        transcribeRequestRef.current = null
+        if (!background) {
+          setLoading(false)
+        }
       }
-      return transcript
     },
     [callId, recordingLink],
   )
 
+  useEffect(() => {
+    if (!dealId || !recordingLink || text) return
+    void fetchTranscript(false, true).catch(() => undefined)
+  }, [dealId, recordingLink, text, fetchTranscript])
+
   const ensureTranscript = useCallback(async (): Promise<string> => {
     if (text) return text
-    setLoading(true)
-    setError(null)
     try {
       return await fetchTranscript(false)
-    } finally {
-      setLoading(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to transcribe call')
+      throw err
     }
   }, [text, fetchTranscript])
 
   const handleTranscribe = useCallback(async () => {
     if (loading) return
-    setLoading(true)
-    setError(null)
     try {
       await fetchTranscript(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to transcribe call')
-    } finally {
-      setLoading(false)
     }
   }, [loading, fetchTranscript])
 
@@ -216,14 +241,14 @@ function useCallTranscriptionLogic({
 
       noteSubmitted.current = true
       noteFetcher.submit(
-        { intent: 'create', content, csrf: token },
+        { intent: 'create', content, csrf: csrfTokenRef.current },
         { method: 'POST', action: buildNoteApiAction(dealId) },
       )
     } catch (err) {
       setNoteLoading(false)
       setError(err instanceof Error ? err.message : 'Failed to add note')
     }
-  }, [dealId, noteLoading, noteCreated, ensureTranscript, noteFetcher, token])
+  }, [dealId, noteLoading, noteCreated, ensureTranscript, noteFetcher])
 
   const handleCreateActivity = useCallback(async () => {
     if (!dealId || activityLoading || activityCreated || activitySubmitted.current)
@@ -241,36 +266,84 @@ function useCallTranscriptionLogic({
         body: JSON.stringify({
           transcript,
           callStartedAt,
+          committedAt: new Date().toISOString(),
         }),
       })
 
-      const json: { name?: string; deadline?: string | null; error?: string } =
-        await response.json()
+      const json: {
+        activities?: Array<{ name?: string; deadline?: string | null }>
+        name?: string
+        deadline?: string | null
+        error?: string
+      } = await response.json()
       if (!response.ok) {
         throw new Error(json.error ?? 'Failed to extract activity')
       }
 
-      const name = json.name?.trim() || 'Follow-up'
+      const extracted: Array<{ name: string; deadline: string | null }> = []
 
-      const payload: Record<string, string> = {
-        intent: 'create',
-        name,
-        priority: ActivityPriority.Medium,
-        csrf: token,
+      if (json.activities && json.activities.length > 0) {
+        for (const item of json.activities) {
+          const name = item.name?.trim()
+          if (!name) continue
+          extracted.push({
+            name,
+            deadline: item.deadline?.trim() || null,
+          })
+        }
+      } else {
+        const name = json.name?.trim()
+        if (name) {
+          extracted.push({
+            name,
+            deadline: json.deadline?.trim() || null,
+          })
+        }
       }
 
-      if (json.deadline?.trim()) {
-        payload.deadline = json.deadline.trim()
+      if (extracted.length === 0) {
+        extracted.push({ name: 'Follow-up', deadline: null })
+      }
+
+      for (const activity of extracted) {
+        const formData = new FormData()
+        formData.append('intent', 'create')
+        formData.append('name', activity.name)
+        formData.append('priority', ActivityPriority.Medium)
+        formData.append('csrf', csrfTokenRef.current)
+        if (activity.deadline) {
+          formData.append('deadline', activity.deadline)
+        }
+
+        const createResponse = await fetch(buildActivityApiAction(dealId), {
+          method: 'POST',
+          body: formData,
+        })
+
+        const createJson: ApiResponse = await createResponse.json()
+        if (!createResponse.ok || !createJson.success) {
+          throw new Error(
+            createJson.success === false ? createJson.error : 'Failed to add activity',
+          )
+        }
       }
 
       activitySubmitted.current = true
-      activityFetcher.submit(payload, {
-        method: 'POST',
-        action: buildActivityApiAction(dealId),
+      setActivityCreated(true)
+      setVisible(false)
+      revalidator.revalidate()
+      toast({
+        title: extracted.length > 1 ? 'Activities added' : 'Activity added',
+        description:
+          extracted.length > 1
+            ? `${extracted.length} follow-up tasks saved to the deal`
+            : 'Follow-up action saved to the deal',
+        variant: 'success',
       })
     } catch (err) {
-      setActivityLoading(false)
       setError(err instanceof Error ? err.message : 'Failed to add activity')
+    } finally {
+      setActivityLoading(false)
     }
   }, [
     dealId,
@@ -278,8 +351,8 @@ function useCallTranscriptionLogic({
     activityCreated,
     ensureTranscript,
     callStartedAt,
-    activityFetcher,
-    token,
+    revalidator,
+    toast,
   ])
 
   return {
