@@ -4,12 +4,28 @@ import { eventStream } from 'remix-utils/sse/server'
 import { db } from '~/db.server'
 import { getSession } from '~/sessions.server'
 import type { InstructionSlim } from '~/types'
-import { answerHasUsableInfo } from '~/utils/chatAnswerHelpers'
+import {
+  answerHasUsableInfo,
+  shouldAttachInstructionLink,
+  stripChatResponseMarkersTrimmed,
+} from '~/utils/chatAnswerHelpers'
 import { DONE_KEY } from '~/utils/constants'
 import {
   collectRelatedInstructionImages,
   findBestMatchingInstruction,
 } from '~/utils/instructionImages'
+import {
+  appendSpecialOrderPrompt,
+  calculateSpecialOrder,
+  formatSpecialOrderResult,
+  inferSpecialOrderOfferFromAnswer,
+  isPriceRelatedQuery,
+  parseSlabsAndDelivery,
+  parseSpecialOrderMarker,
+  type SpecialOrderOffer,
+  shouldRebuildPriceListContext,
+  userDeclinedSpecialOrder,
+} from '~/utils/specialOrderCalculator'
 import { htmlToPlainText } from '~/utils/stringHelpers'
 import {
   buildSupplierPriceListContext,
@@ -72,11 +88,65 @@ const PRICE_LIST_RULES = `How to use this context:
 1. You are in Price lists mode. Use ONLY the supplier documents below.
 2. These documents come from supplier files on the Suppliers page. They may be PDFs or images.
 3. Only state a dollar price if an exact price appears in the documents. Never calculate, estimate, or invent a price.
-4. Many supplier documents show color groups or levels instead of prices. When a product is listed with a group or level and size but no dollar amount, say clearly that the price is not specified, then state the level or group and the size from the document.
-5. Example format when no price is listed: "The price is not specified. The level is Group 7. The size is 126x63."
-6. If the product is not in the documents at all, say you could not find it in the supplier price lists.
-7. Be brief and direct. Do not guess or use outside knowledge.
-8. Each document is labeled with a SOURCE number. After your answer, add a final line containing ONLY the marker in the exact form [[SOURCE:n]] (use a colon, no spaces), where n is the SOURCE number of the document you used. If you could not find the product, use [[SOURCE:none]]. Never describe or mention this marker in your prose.`
+4. Many supplier documents show color groups or levels instead of prices. When one SOURCE from a supplier lists the product with a group or level and size but no dollar amount, check every other SOURCE from that same supplier for the actual price before answering.
+5. Only if no SOURCE from that supplier contains a dollar price should you say the price is not specified and state the level or group and size. Example: "The price is not specified. The level is Group 7. The size is 126x63."
+6. When citing a dollar price, use the SOURCE that contains the price, not the color group document.
+7. If the requested color name is close but not exact (for example the user asks for "Adonia" and the document lists "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say clearly that the name was not an exact match, give the exact product name from the document, then state the price and slab size. Example: "There is no exact match for \"Adonia\", but Calacatta Adonia is listed at $21.47 per sqft for a 130×79 slab."
+8. Only say you could not find the product when there is no reasonable close match in the documents from that supplier.
+9. Be brief and direct. Do not guess or use outside knowledge.
+10. Each document is labeled with a SOURCE number. After your answer, add a final line containing ONLY the marker in the exact form [[SOURCE:n]] (use a colon, no spaces), where n is the SOURCE number of the document you used. If you could not find the product, use [[SOURCE:none]]. Never describe or mention this marker in your prose.
+11. Whenever you state an exact dollar price AND a slab size in inches (whether per sqft, per slab, or other wording), do NOT ask about special orders in your prose. Always add the marker [[SPECIAL_ORDER:price=X,length=Y,width=Z]] on its own line at the end, where X is the price per sqft (convert from slab price if the document lists per slab), Y is length in inches, Z is width in inches. The app adds the special order question automatically. Never describe or mention this marker in your prose.`
+
+const PRICE_LIST_SKILL_MESSAGE =
+  'Turn on the Price lists skill using the + button to search supplier price lists.'
+
+async function getCompanyTaxRate(companyId: number): Promise<number> {
+  const rows = await selectMany<{ state_taxes: number | string | null }>(
+    db,
+    'SELECT state_taxes FROM company WHERE id = ?',
+    [companyId],
+  )
+  const raw = rows[0]?.state_taxes
+  const rate = typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw)
+  return Number.isFinite(rate) && rate >= 0 ? rate : 0
+}
+
+function parseSpecialOrderParams(url: URLSearchParams): SpecialOrderOffer | null {
+  const pricePerSqft = Number.parseFloat(url.get('specialOrderPrice') ?? '')
+  const lengthInches = Number.parseFloat(url.get('specialOrderLength') ?? '')
+  const widthInches = Number.parseFloat(url.get('specialOrderWidth') ?? '')
+  if (
+    !Number.isFinite(pricePerSqft) ||
+    !Number.isFinite(lengthInches) ||
+    !Number.isFinite(widthInches) ||
+    pricePerSqft <= 0 ||
+    lengthInches <= 0 ||
+    widthInches <= 0
+  ) {
+    return null
+  }
+  return { pricePerSqft, lengthInches, widthInches }
+}
+
+async function respondWithFixedAnswer(
+  send: (payload: { data: string; event?: string }) => void,
+  userId: number,
+  isNew: boolean,
+  query: string,
+  answer: string,
+) {
+  send({ event: 'status', data: JSON.stringify({ state: 'answering' }) })
+  await streamTextAnswer(send, answer)
+  send({ data: DONE_KEY })
+
+  if (isNew) {
+    await insertContext(userId, [{ role: 'user', content: query }], answer)
+    return
+  }
+
+  const result = await getContext(userId, query)
+  await updateContext(userId, result.id, result.messages, answer)
+}
 
 async function newInstructionContext(
   company_id: number,
@@ -137,9 +207,6 @@ function withPriceListContext(messages: Message[], context: string): Message[] {
   return next
 }
 
-const SOURCE_MARKER_RE = /\s*\[+\s*SOURCE\s*[:#-]?\s*([^\]]*?)\s*\]+\s*$/i
-const SOURCE_HOLDBACK = 48
-
 function parseSourceId(answer: string): number | null {
   const match = answer.match(/\[+\s*SOURCE\s*[:#-]?\s*([^\]]*?)\s*\]+/i)
   if (!match) return null
@@ -147,8 +214,14 @@ function parseSourceId(answer: string): number | null {
   return Number.isNaN(id) ? null : id
 }
 
-function stripSourceMarker(text: string): string {
-  return text.replace(SOURCE_MARKER_RE, '')
+async function streamTextAnswer(
+  send: (payload: { data: string }) => void,
+  text: string,
+) {
+  const chunkSize = 24
+  for (let index = 0; index < text.length; index += chunkSize) {
+    send({ data: text.slice(index, index + chunkSize) })
+  }
 }
 
 async function loadInstructionMatchData(
@@ -211,6 +284,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const companyId = user.company_id
   const userId = user.id
+  const specialOrderOffer = parseSpecialOrderParams(url)
 
   return eventStream(
     request.signal,
@@ -227,14 +301,83 @@ export async function loader({ request }: LoaderFunctionArgs) {
         try {
           let messages: Message[] = []
           let chatHistoryId: number | undefined
-          let supplierImages: string[] = []
           let supplierSources: SupplierSource[] = []
+          let skipPriceListRebuild = false
 
           const emitProgress = (progress: PriceListProgress) => {
             send({ event: 'status', data: JSON.stringify(progress) })
           }
 
-          if (isNew) {
+          const taxRate = await getCompanyTaxRate(companyId)
+
+          if (mode === 'instructions' && isPriceRelatedQuery(query)) {
+            await respondWithFixedAnswer(
+              send,
+              userId,
+              isNew,
+              query,
+              PRICE_LIST_SKILL_MESSAGE,
+            )
+            return
+          }
+
+          let messagesPrepared = false
+
+          if (!isNew && specialOrderOffer && mode === 'priceLists') {
+            const result = await getContext(userId, query)
+            chatHistoryId = result.id
+            skipPriceListRebuild = true
+
+            if (userDeclinedSpecialOrder(query)) {
+              answer = 'No problem. Let me know if you need anything else.'
+              send({ event: 'status', data: JSON.stringify({ state: 'answering' }) })
+              await streamTextAnswer(send, answer)
+              send({ data: DONE_KEY })
+              if (chatHistoryId) {
+                updateContext(userId, chatHistoryId, result.messages, answer)
+              }
+              return
+            }
+
+            const { slabs, deliveryCost } = parseSlabsAndDelivery(query)
+
+            if (slabs !== undefined && deliveryCost !== undefined) {
+              const input = {
+                ...specialOrderOffer,
+                slabs,
+                deliveryCost,
+                taxRate,
+              }
+              const calcResult = calculateSpecialOrder(input)
+              answer = formatSpecialOrderResult(input, calcResult)
+              send({ event: 'status', data: JSON.stringify({ state: 'answering' }) })
+              await streamTextAnswer(send, answer)
+              send({ data: DONE_KEY })
+              if (chatHistoryId) {
+                updateContext(userId, chatHistoryId, result.messages, answer)
+              }
+              return
+            }
+
+            messages = result.messages
+            const historyBeforeQuery = result.messages.slice(0, -1)
+            if (
+              shouldRebuildPriceListContext(
+                historyBeforeQuery,
+                query,
+                specialOrderOffer,
+              )
+            ) {
+              const priceListData = await buildSupplierPriceListContext(
+                companyId,
+                query,
+                emitProgress,
+              )
+              messages = withPriceListContext(messages, priceListData.context)
+              supplierSources = priceListData.sources
+            }
+            messagesPrepared = true
+          } else if (isNew) {
             const chatHistory = await selectMany<{ id: number }>(
               db,
               'SELECT id from chat_history WHERE user_id = ?',
@@ -251,25 +394,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
                 emitProgress,
               )
               messages = buildPriceListHistory(query, priceListData.context)
-              supplierImages = priceListData.imageUrls
               supplierSources = priceListData.sources
             } else {
               const result = await newInstructionContext(companyId, query)
               messages = result.history
             }
-          } else {
+          } else if (!messagesPrepared) {
             const result = await getContext(userId, query)
             messages = result.messages
             chatHistoryId = result.id
             if (mode === 'priceLists') {
-              const priceListData = await buildSupplierPriceListContext(
-                companyId,
-                query,
-                emitProgress,
-              )
-              messages = withPriceListContext(messages, priceListData.context)
-              supplierImages = priceListData.imageUrls
-              supplierSources = priceListData.sources
+              const historyBeforeQuery = result.messages.slice(0, -1)
+              if (
+                shouldRebuildPriceListContext(
+                  historyBeforeQuery,
+                  query,
+                  specialOrderOffer,
+                )
+              ) {
+                const priceListData = await buildSupplierPriceListContext(
+                  companyId,
+                  query,
+                  emitProgress,
+                )
+                messages = withPriceListContext(messages, priceListData.context)
+                supplierSources = priceListData.sources
+              } else {
+                skipPriceListRebuild = true
+              }
             }
           }
 
@@ -289,36 +441,50 @@ export async function loader({ request }: LoaderFunctionArgs) {
           })
 
           let pending = ''
+          const streamHoldback = 64
           for await (const chunk of response) {
             const message = chunk.choices[0].delta.content
             if (message) {
               answer += message
               pending += message
-              if (pending.length > SOURCE_HOLDBACK) {
-                const flush = pending.slice(0, pending.length - SOURCE_HOLDBACK)
-                send({ data: flush })
-                pending = pending.slice(pending.length - SOURCE_HOLDBACK)
+              if (pending.length > streamHoldback) {
+                send({ data: pending.slice(0, pending.length - streamHoldback) })
+                pending = pending.slice(pending.length - streamHoldback)
               }
             }
           }
-          const tail = stripSourceMarker(pending)
-          if (tail) {
-            send({ data: tail })
+          if (pending) {
+            send({ data: pending })
           }
 
-          const cleanAnswer = stripSourceMarker(answer)
-          const hasInfo = answerHasUsableInfo(cleanAnswer)
-          const imagesToSend =
-            mode === 'priceLists' ? supplierImages : instructionMatch.images
+          let cleanAnswer = stripChatResponseMarkersTrimmed(answer)
+          const offerFromAnswer =
+            parseSpecialOrderMarker(answer) ?? inferSpecialOrderOfferFromAnswer(answer)
+          if (offerFromAnswer) {
+            cleanAnswer = appendSpecialOrderPrompt(cleanAnswer)
+            const strippedAnswer = stripChatResponseMarkersTrimmed(answer)
+            const promptTail = cleanAnswer.slice(strippedAnswer.length)
+            if (promptTail) {
+              send({ data: promptTail })
+            }
+          }
 
-          if (hasInfo && mode === 'instructions' && instructionMatch.instruction) {
+          const hasInfo = answerHasUsableInfo(cleanAnswer)
+          const imagesToSend = mode === 'instructions' ? instructionMatch.images : []
+
+          if (
+            hasInfo &&
+            mode === 'instructions' &&
+            instructionMatch.instruction &&
+            shouldAttachInstructionLink(query, isNew)
+          ) {
             send({
               event: 'instruction',
               data: JSON.stringify(instructionMatch.instruction),
             })
           }
 
-          if (hasInfo && mode === 'priceLists') {
+          if (hasInfo && mode === 'priceLists' && !skipPriceListRebuild) {
             const sourceId = parseSourceId(answer)
             const source =
               sourceId !== null
@@ -326,6 +492,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
                 : undefined
             if (source) {
               send({ event: 'source', data: JSON.stringify(source) })
+              if (source.fileType === 'image') {
+                send({ event: 'images', data: JSON.stringify([source.url]) })
+              }
+            }
+
+            if (offerFromAnswer) {
+              send({
+                event: 'specialOrderOffer',
+                data: JSON.stringify(offerFromAnswer),
+              })
             }
           }
 

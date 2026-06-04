@@ -39,6 +39,8 @@ const openai = new OpenAI({
 
 const MAX_FILE_CHARS = 6000
 const MAX_FILES = 6
+const MAX_TOTAL_FILES = 10
+const MAX_FALLBACK_FILES_PER_SUPPLIER = 5
 const MAX_CONTEXT_CHARS = 24000
 const MAX_VISION_FILES = 3
 
@@ -134,11 +136,11 @@ export interface SupplierSource {
   name: string
   supplierName: string
   url: string
+  fileType: 'pdf' | 'image' | 'file'
 }
 
 export interface SupplierPriceListResult {
   context: string
-  imageUrls: string[]
   sources: SupplierSource[]
 }
 
@@ -213,6 +215,41 @@ function findMatchingSuppliers(suppliers: SupplierRow[], query: string): Supplie
   return scored.filter(item => item.score === topScore).map(item => item.supplier)
 }
 
+function scoreFileForPriceQuery(file: SupplierFileRow): number {
+  const label = `${file.name} ${file.url}`.toLowerCase()
+  let score = 0
+  if (/\.pdf(?:\?|$)|\/pdf/i.test(label) || /\bpdf\b/.test(label)) score += 10
+  if (/price|pricing|list|rate|level|group/i.test(label)) score += 5
+  if (/\.(jpg|jpeg|png|webp|gif|bmp|tiff)(?:\?|$)/i.test(label)) score -= 3
+  return score
+}
+
+function prioritizeFilesForPriceQuery(files: SupplierFileRow[]): SupplierFileRow[] {
+  return [...files].sort(
+    (a, b) => scoreFileForPriceQuery(b) - scoreFileForPriceQuery(a),
+  )
+}
+
+function contentHasProductMatch(content: string, terms: string[]): boolean {
+  if (terms.length === 0) return false
+  const lower = content.toLowerCase()
+  const matched = terms.filter(term => lower.includes(term)).length
+  const required = Math.max(1, Math.ceil(terms.length * 0.5))
+  return matched >= required
+}
+
+function contentHasDollarPrice(content: string): boolean {
+  return /\$\s*[\d,]+(?:\.\d{2})?|[\d,]+(?:\.\d{2})?\s*(?:\/|per)\s*(?:sq\.?\s*ft|sf|square\s*foot)/i.test(
+    content,
+  )
+}
+
+function needsSupplierFallback(extracted: string, terms: string[]): boolean {
+  if (!extracted.trim()) return false
+  if (!contentHasProductMatch(extracted, terms)) return false
+  return !contentHasDollarPrice(extracted)
+}
+
 function findRelevantFiles(
   files: SupplierFileRow[],
   supplierIds: number[],
@@ -232,13 +269,16 @@ function findRelevantFiles(
       file,
       score: countMatchingTerms(terms, `${file.name} ${file.url}`),
     }))
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      return scoreFileForPriceQuery(b.file) - scoreFileForPriceQuery(a.file)
+    })
 
   const topScore = scored[0]?.score ?? 0
   const matched =
     topScore > 0
       ? scored.filter(item => item.score === topScore).map(item => item.file)
-      : pool
+      : prioritizeFilesForPriceQuery(pool)
 
   return matched.slice(0, MAX_FILES)
 }
@@ -445,7 +485,7 @@ export async function buildSupplierPriceListContext(
   )
 
   if (suppliers.length === 0) {
-    return { context: '', imageUrls: [], sources: [] }
+    return { context: '', sources: [] }
   }
 
   const supplierIds = suppliers.map(supplier => supplier.id)
@@ -458,7 +498,6 @@ export async function buildSupplierPriceListContext(
   if (files.length === 0) {
     return {
       context: 'SUPPLIER PRICE LISTS\nNo supplier files are uploaded for this company.',
-      imageUrls: [],
       sources: [],
     }
   }
@@ -467,21 +506,57 @@ export async function buildSupplierPriceListContext(
   const matchedSupplierIds = matchedSuppliers.map(supplier => supplier.id)
   const relevantFiles = findRelevantFiles(files, matchedSupplierIds, query)
 
+  const terms = queryTerms(query)
+
   const sections: string[] = [
     'SUPPLIER PRICE LISTS',
     'Answer using ONLY the supplier documents below. These are PDF files and images uploaded on the Suppliers page.',
     'Only report dollar prices that explicitly appear in the documents. Never invent or estimate prices.',
-    'When a document shows a color group or level and size but no dollar price, say the price is not specified and give the level or group and size.',
-    'If the product is not in these documents, say you could not find it in the supplier price lists.',
+    'When one document from a supplier shows a product with a color group or level and size but no dollar price, check every other SOURCE from that same supplier for the actual price before saying the price is not specified.',
+    'Only after checking all documents from that supplier should you say the price is not specified and give the level or group and size.',
+    'If the requested color name is close but not exact (for example "Adonia" vs "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say the name was not an exact match, give the exact document name, then state the price and size.',
+    'Only say the product could not be found when there is no reasonable close match in the documents from that supplier.',
     'Be brief. Include exact prices only when they are written in the document.',
     'Each readable document below is labeled with a SOURCE number. Track which document your answer comes from so it can be cited.',
   ]
 
-  const imageUrls: string[] = []
   const sources: SupplierSource[] = []
   let visionCalls = 0
+  const readFileIds = new Set<number>()
+  const fileQueue: SupplierFileRow[] = [...relevantFiles]
+  const queuedFileIds = new Set(relevantFiles.map(file => file.id))
+  const fallbackCounts = new Map<number, number>()
 
-  for (const file of relevantFiles) {
+  const enqueueSupplierFallback = (supplierId: number) => {
+    const added = fallbackCounts.get(supplierId) ?? 0
+    if (added >= MAX_FALLBACK_FILES_PER_SUPPLIER) return
+
+    const sameSupplierFiles = prioritizeFilesForPriceQuery(
+      files.filter(
+        file =>
+          file.supplier_id === supplierId &&
+          !readFileIds.has(file.id) &&
+          !queuedFileIds.has(file.id),
+      ),
+    )
+
+    let enqueued = 0
+    for (const file of sameSupplierFiles) {
+      if (added + enqueued >= MAX_FALLBACK_FILES_PER_SUPPLIER) break
+      fileQueue.push(file)
+      queuedFileIds.add(file.id)
+      enqueued += 1
+    }
+    if (enqueued > 0) {
+      fallbackCounts.set(supplierId, added + enqueued)
+    }
+  }
+
+  while (fileQueue.length > 0 && readFileIds.size < MAX_TOTAL_FILES) {
+    const file = fileQueue.shift()
+    if (!file || readFileIds.has(file.id)) continue
+    readFileIds.add(file.id)
+
     const supplier = suppliers.find(item => item.id === file.supplier_id)
     const supplierName = supplier?.supplier_name ?? 'Unknown supplier'
     const ext = fileExtension(file.name, file.url)
@@ -489,6 +564,11 @@ export async function buildSupplierPriceListContext(
       isImageExtension(ext) || file.url.match(/\.(jpg|jpeg|png|webp|gif)/i)
     const isPdf =
       ext === 'pdf' || /\.pdf(?:\?|$)/i.test(file.url) || /pdf/i.test(file.name)
+    const fileType: SupplierSource['fileType'] = isPdf
+      ? 'pdf'
+      : isImage
+        ? 'image'
+        : 'file'
 
     if (isImage && visionCalls >= MAX_VISION_FILES) {
       sections.push(`\nFILE: ${file.name} (${supplierName})`)
@@ -508,11 +588,18 @@ export async function buildSupplierPriceListContext(
     const extracted = await extractSupplierFileText(file, query)
     if (extracted) {
       const sourceId = sources.length + 1
-      sources.push({ id: sourceId, name: file.name, supplierName, url: file.url })
+      sources.push({
+        id: sourceId,
+        name: file.name,
+        supplierName,
+        url: file.url,
+        fileType,
+      })
       sections.push(`\nSOURCE ${sourceId} — FILE: ${file.name} (${supplierName})`)
       sections.push(`CONTENT:\n${extracted}`)
-      if (isImage) {
-        imageUrls.push(file.url)
+
+      if (needsSupplierFallback(extracted, terms)) {
+        enqueueSupplierFallback(file.supplier_id)
       }
     } else {
       sections.push(`\nFILE: ${file.name} (${supplierName})`)
@@ -528,7 +615,6 @@ export async function buildSupplierPriceListContext(
 
   return {
     context: truncateText(sections.join('\n'), MAX_CONTEXT_CHARS),
-    imageUrls,
     sources,
   }
 }
