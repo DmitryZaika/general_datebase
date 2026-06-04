@@ -28,6 +28,41 @@ function sqlIn(count: number): string {
   return Array(count).fill('?').join(', ')
 }
 
+export async function loadGroupIdsWithOverdueActivities(
+  db: Pool,
+  userId: number,
+  companyId: number,
+  groupIds: number[],
+  isWon: number | null,
+): Promise<number[]> {
+  if (groupIds.length === 0) return []
+
+  const groupIn = sqlIn(groupIds.length)
+  let isWonClause = 'AND d.is_won IS NULL'
+  if (isWon === 1) isWonClause = 'AND d.is_won = 1'
+  else if (isWon === 0) isWonClause = 'AND d.is_won = 0'
+
+  const rows = await selectMany<{ group_id: number }>(
+    db,
+    `SELECT DISTINCT dl.group_id
+     FROM deal_activities da
+     INNER JOIN deals d ON d.id = da.deal_id
+     INNER JOIN deals_list dl ON dl.id = d.list_id AND dl.deleted_at IS NULL
+     WHERE da.deleted_at IS NULL
+       AND da.is_completed = 0
+       AND da.company_id = ?
+       AND d.deleted_at IS NULL
+       AND d.user_id = ?
+       AND dl.group_id IN (${groupIn})
+       ${isWonClause}
+       AND da.deadline IS NOT NULL
+       AND DATE(da.deadline) < CURDATE()`,
+    [companyId, userId, ...groupIds],
+  )
+
+  return rows.map(row => row.group_id)
+}
+
 export async function loadDealsBoardMaps(
   db: Pool,
   dealIds: number[],

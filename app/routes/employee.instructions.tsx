@@ -1,5 +1,5 @@
 import DOMPurify from 'isomorphic-dompurify'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
   redirect,
@@ -263,7 +263,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Instructions() {
   const { instructions, mode } = useLoaderData<typeof loader>()
-  const [_, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const instructionIdParam = searchParams.get('instructionId')
   const finalInstructions = cleanData(instructions)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [expandedIds, setExpandedIds] = useState<number[]>([])
@@ -449,6 +450,16 @@ export default function Instructions() {
     },
     [selectedId, finalInstructions],
   )
+
+  const navigateToInstructionRef = useRef(navigateToInstruction)
+  navigateToInstructionRef.current = navigateToInstruction
+
+  useEffect(() => {
+    if (!instructionIdParam) return
+    const id = Number.parseInt(instructionIdParam, 10)
+    if (!Number.isFinite(id)) return
+    void navigateToInstructionRef.current(id)
+  }, [instructionIdParam])
 
   const [searchTerm, setSearchTerm] = useState('')
 

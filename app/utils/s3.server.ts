@@ -242,6 +242,39 @@ export const downloadPDF = async (url: string) => {
 }
 
 // Helper function to get PDF as a buffer directly
+export async function downloadFileAsBuffer(url: string) {
+  const finalKey = url.replace(
+    `https://${STORAGE_BUCKET}.s3.${STORAGE_REGION}.amazonaws.com/`,
+    '',
+  )
+  const client = getClient()
+  try {
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: STORAGE_BUCKET,
+        Key: finalKey,
+      }),
+    )
+
+    if (!(response.Body instanceof Readable)) {
+      return null
+    }
+
+    const chunks: Uint8Array[] = []
+    for await (const chunk of response.Body) {
+      chunks.push(chunk)
+    }
+
+    return {
+      buffer: Buffer.concat(chunks),
+      contentType: response.ContentType ?? 'application/octet-stream',
+      filename: finalKey.split('/').pop() ?? 'file',
+    }
+  } catch {
+    return null
+  }
+}
+
 export const downloadPDFAsBuffer = async (url: string) => {
   const pdfData = await downloadPDF(url)
   if (!pdfData?.stream) {

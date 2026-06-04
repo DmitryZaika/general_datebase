@@ -29,6 +29,7 @@ import {
 } from '~/components/organisms/EmailsPageSkeleton'
 import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
+import { emailSnippetFromBody } from '~/utils/gmailReactionEmail'
 import { parseEmailAddress } from '~/utils/stringHelpers'
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
@@ -1142,9 +1143,7 @@ export default function DealsEmailsView({
                         </div>
 
                         <div className='text-sm text-gray-500 truncate'>
-                          {email.body
-                            ? email.body.replace(/<[^>]*>?/gm, '').slice(0, 100)
-                            : ''}
+                          {email.body ? emailSnippetFromBody(email.body) : ''}
                         </div>
 
                         {/* Admin Mode Extra Info */}
@@ -1194,9 +1193,7 @@ export default function DealsEmailsView({
                           </span>
                           <span className='text-gray-400'>-</span>
                           <span className='text-gray-500 truncate'>
-                            {email.body
-                              ? email.body.replace(/<[^>]*>?/gm, '').slice(0, 100)
-                              : ''}
+                            {email.body ? emailSnippetFromBody(email.body) : ''}
                           </span>
                         </div>
 

@@ -83,6 +83,11 @@ import {
   hasAnyVariables,
   type TemplateVariableData,
 } from '~/utils/emailTemplateVariables'
+import {
+  filterVisibleEmailAttachments,
+  isGmailReactionEmailBody,
+  stripGmailReactionNoiseFromBody,
+} from '~/utils/gmailReactionEmail'
 import { htmlToPlainText } from '~/utils/stringHelpers'
 
 export interface EmailChatAttachment {
@@ -432,7 +437,10 @@ function sanitizeEmailBody(html: string): string {
 }
 
 function formatEmailBody(body: string, signature: string | null | undefined): string {
-  const displayBody = stripEmailCssNoise(getDisplayBody(body, signature))
+  let displayBody = stripEmailCssNoise(getDisplayBody(body, signature))
+  if (isGmailReactionEmailBody(displayBody)) {
+    displayBody = stripGmailReactionNoiseFromBody(displayBody)
+  }
   const html = EMAIL_HTML_TAG_REGEX.test(displayBody)
     ? displayBody
     : plainEmailToHtml(displayBody)
@@ -1362,195 +1370,206 @@ export function EmailChat(props: EmailChatProps) {
       </DialogHeader>
 
       <div ref={scrollContainerRef} className='flex-1 overflow-y-auto'>
-        {chatMessages.map((message, index) => (
-          <div key={message.id}>
-            {showDate(message, index) && (
-              <div className={dateClass}>
-                {format(new Date(message.sent_at), 'MMM d, yyyy')}
-              </div>
-            )}
-            <div
-              className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
-            >
+        {chatMessages.map((message, index) => {
+          const isGmailReaction = isGmailReactionEmailBody(message.body)
+          const visibleAttachments = message.attachments
+            ? filterVisibleEmailAttachments(message.attachments)
+            : []
+
+          return (
+            <div key={message.id}>
+              {showDate(message, index) && (
+                <div className={dateClass}>
+                  {format(new Date(message.sent_at), 'MMM d, yyyy')}
+                </div>
+              )}
               <div
-                ref={node => {
-                  if (node) {
-                    messageRefs.current.set(message.id, node)
-                  } else {
-                    messageRefs.current.delete(message.id)
-                  }
-                }}
-                className={cn(
-                  message.isFromCustomer
-                    ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words'
-                    : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words',
-                  'transition-all duration-300 ease-out will-change-transform',
-                  highlightedMessageId === message.id &&
-                    'ring-1 ring-white/40 shadow-[0_22px_60px_-18px_rgba(15,23,42,0.55),0_8px_24px_-12px_rgba(15,23,42,0.4)] scale-[1.020] z-10',
-                )}
+                className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
               >
                 <div
-                  className={cn(
-                    'email-message-body break-words text-base leading-[1.45] [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5',
-                    message.isFromCustomer
-                      ? '[&_a]:text-blue-700 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5'
-                      : 'text-white [&_*]:!text-white [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5',
-                  )}
-                  // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
-                  dangerouslySetInnerHTML={{
-                    __html: formatEmailBody(
-                      message.body,
-                      message.isFromCustomer ? null : message.signature,
-                    ),
+                  ref={node => {
+                    if (node) {
+                      messageRefs.current.set(message.id, node)
+                    } else {
+                      messageRefs.current.delete(message.id)
+                    }
                   }}
-                />
-                {message.isFromCustomer ? null : (
-                  <div className='absolute bottom-1 right-2 flex items-center gap-2'>
-                    {message.signature && message.signature.trim() !== '' ? (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
-                              <Pencil size={16} className='w-2 h-2 opacity-70' />
-                              Signature
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side='top'
-                            className='max-w-90 whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'
-                          >
-                            {message.signature}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ) : null}
-                  </div>
-                )}
-                <MessageDate
-                  message={message}
-                  className={`text-black absolute -bottom-3.5 ${message.isFromCustomer ? 'left-2' : 'right-2'}`}
-                />
-                {message.attachments && message.attachments.length > 0 ? (
-                  <div className='mt-3 flex flex-wrap gap-3'>
-                    {message.attachments.map(attachment => {
-                      const mime = `${attachment.content_type}/${attachment.content_subtype}`
-                      const label = attachment.filename || mime
-                      const contentType = attachment.content_type.toLowerCase()
-                      const isImage =
-                        contentType === 'image' || contentType.startsWith('image/')
-                      const isPdf =
-                        (contentType === 'application' &&
-                          attachment.content_subtype.toLowerCase() === 'pdf') ||
-                        mime.toLowerCase().includes('pdf')
-                      const href = attachment.signed_url || attachment.url
-                      const linkClass = message.isFromCustomer
-                        ? 'text-blue-700 underline'
-                        : 'text-white underline'
-                      const canAddToDeal =
-                        isEmployee && !!employeeProps && !!href && attachment.id > 0
-
-                      return (
-                        <div
-                          key={attachment.id}
-                          className='group relative space-y-2 max-w-[140px]'
-                        >
-                          {canAddToDeal ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger
-                                  type='button'
-                                  className='absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-1 ring-black/10 opacity-100 transition-opacity hover:bg-emerald-50 hover:text-emerald-700 md:opacity-0 md:group-hover:opacity-100'
-                                  onClick={e => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    handleAddAttachmentToDeal(attachment)
-                                  }}
-                                  disabled={isAddingAttachmentToDeal}
-                                  aria-label='Add the file to the deal'
-                                >
-                                  <Plus className='h-3.5 w-3.5' />
-                                </TooltipTrigger>
-                                <TooltipContent side='top'>
-                                  Add the file to the deal
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : null}
-                          {isPdf && href ? (
-                            <a
-                              href={href}
-                              target='_blank'
-                              rel='noreferrer'
-                              className='block'
-                            >
-                              <div
-                                className={`${fileSize} bg-zinc-600 rounded-md border border-zinc-800 flex flex-col items-center justify-center text-zinc-900 hover:bg-zinc-800 transition-colors p-2 shadow-md`}
-                              >
-                                <FileText className='h-10 w-10 mb-2 text-blue-600' />
-                                <span className='text-[10px] font-semibold text-center break-all line-clamp-2 leading-tight'>
-                                  {label}
-                                </span>
-                              </div>
-                            </a>
-                          ) : !isImage && href ? (
-                            <a
-                              href={href}
-                              target='_blank'
-                              rel='noreferrer'
-                              className={linkClass}
-                            >
-                              <span className='inline-flex items-center gap-1'>
-                                <FileText className='h-4 w-4' />
-                                <span>{label}</span>
+                  className={cn(
+                    message.isFromCustomer
+                      ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words'
+                      : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words',
+                    isGmailReaction &&
+                      message.isFromCustomer &&
+                      'bg-gray-100 text-gray-700 px-3 py-1.5',
+                    'transition-all duration-300 ease-out will-change-transform',
+                    highlightedMessageId === message.id &&
+                      'ring-1 ring-white/40 shadow-[0_22px_60px_-18px_rgba(15,23,42,0.55),0_8px_24px_-12px_rgba(15,23,42,0.4)] scale-[1.020] z-10',
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'email-message-body break-words text-base leading-[1.45] [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5',
+                      isGmailReaction && 'text-sm leading-snug',
+                      message.isFromCustomer
+                        ? '[&_a]:text-blue-700 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5'
+                        : 'text-white [&_*]:!text-white [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5',
+                    )}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
+                    dangerouslySetInnerHTML={{
+                      __html: formatEmailBody(
+                        message.body,
+                        message.isFromCustomer ? null : message.signature,
+                      ),
+                    }}
+                  />
+                  {message.isFromCustomer ? null : (
+                    <div className='absolute bottom-1 right-2 flex items-center gap-2'>
+                      {message.signature && message.signature.trim() !== '' ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
+                                <Pencil size={16} className='w-2 h-2 opacity-70' />
+                                Signature
                               </span>
-                            </a>
-                          ) : null}
-                          {isImage && href ? (
-                            <button
-                              type='button'
-                              className='block cursor-pointer'
-                              onClick={() => {
-                                const imgs =
-                                  message.attachments
-                                    ?.filter(
-                                      a =>
-                                        a.content_type.toLowerCase() === 'image' &&
-                                        (a.signed_url || a.url),
-                                    )
-                                    .map(img => ({
-                                      id: img.id,
-                                      url: img.signed_url || img.url,
-                                      name:
-                                        img.filename ||
-                                        `${img.content_type}/${img.content_subtype}`,
-                                      type: 'email',
-                                      available: null,
-                                    })) || []
-                                setCurrentImages(imgs)
-                                setCurrentImageId(attachment.id)
-                              }}
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side='top'
+                              className='max-w-90 whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'
                             >
-                              <img
-                                src={href}
-                                alt={label}
-                                className={`${fileSize} object-cover rounded-md border border-black/10`}
-                              />
-                            </button>
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : null}
-              </div>
-              <div className='flex items-center gap-2'>
-                {!message.isFromCustomer && message.id === lastReadMessageId && (
-                  <p className='text-xs text-gray-500'>Read</p>
-                )}
+                              {message.signature}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : null}
+                    </div>
+                  )}
+                  <MessageDate
+                    message={message}
+                    className={`text-black absolute -bottom-3.5 ${message.isFromCustomer ? 'left-2' : 'right-2'}`}
+                  />
+                  {visibleAttachments.length > 0 ? (
+                    <div className='mt-3 flex flex-wrap gap-3'>
+                      {visibleAttachments.map(attachment => {
+                        const mime = `${attachment.content_type}/${attachment.content_subtype}`
+                        const label = attachment.filename || mime
+                        const contentType = attachment.content_type.toLowerCase()
+                        const isImage =
+                          contentType === 'image' || contentType.startsWith('image/')
+                        const isPdf =
+                          (contentType === 'application' &&
+                            attachment.content_subtype.toLowerCase() === 'pdf') ||
+                          mime.toLowerCase().includes('pdf')
+                        const href = attachment.signed_url || attachment.url
+                        const linkClass = message.isFromCustomer
+                          ? 'text-blue-700 underline'
+                          : 'text-white underline'
+                        const canAddToDeal =
+                          isEmployee && !!employeeProps && !!href && attachment.id > 0
+
+                        return (
+                          <div
+                            key={attachment.id}
+                            className='group relative space-y-2 max-w-[140px]'
+                          >
+                            {canAddToDeal ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger
+                                    type='button'
+                                    className='absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-1 ring-black/10 opacity-100 transition-opacity hover:bg-emerald-50 hover:text-emerald-700 md:opacity-0 md:group-hover:opacity-100'
+                                    onClick={e => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleAddAttachmentToDeal(attachment)
+                                    }}
+                                    disabled={isAddingAttachmentToDeal}
+                                    aria-label='Add the file to the deal'
+                                  >
+                                    <Plus className='h-3.5 w-3.5' />
+                                  </TooltipTrigger>
+                                  <TooltipContent side='top'>
+                                    Add the file to the deal
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : null}
+                            {isPdf && href ? (
+                              <a
+                                href={href}
+                                target='_blank'
+                                rel='noreferrer'
+                                className='block'
+                              >
+                                <div
+                                  className={`${fileSize} bg-zinc-600 rounded-md border border-zinc-800 flex flex-col items-center justify-center text-zinc-900 hover:bg-zinc-800 transition-colors p-2 shadow-md`}
+                                >
+                                  <FileText className='h-10 w-10 mb-2 text-blue-600' />
+                                  <span className='text-[10px] font-semibold text-center break-all line-clamp-2 leading-tight'>
+                                    {label}
+                                  </span>
+                                </div>
+                              </a>
+                            ) : !isImage && href ? (
+                              <a
+                                href={href}
+                                target='_blank'
+                                rel='noreferrer'
+                                className={linkClass}
+                              >
+                                <span className='inline-flex items-center gap-1'>
+                                  <FileText className='h-4 w-4' />
+                                  <span>{label}</span>
+                                </span>
+                              </a>
+                            ) : null}
+                            {isImage && href ? (
+                              <button
+                                type='button'
+                                className='block cursor-pointer'
+                                onClick={() => {
+                                  const imgs =
+                                    visibleAttachments
+                                      .filter(
+                                        a =>
+                                          a.content_type.toLowerCase() === 'image' &&
+                                          (a.signed_url || a.url),
+                                      )
+                                      .map(img => ({
+                                        id: img.id,
+                                        url: img.signed_url || img.url,
+                                        name:
+                                          img.filename ||
+                                          `${img.content_type}/${img.content_subtype}`,
+                                        type: 'email',
+                                        available: null,
+                                      })) || []
+                                  setCurrentImages(imgs)
+                                  setCurrentImageId(attachment.id)
+                                }}
+                              >
+                                <img
+                                  src={href}
+                                  alt={label}
+                                  className={`${fileSize} object-cover rounded-md border border-black/10`}
+                                />
+                              </button>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+                <div className='flex items-center gap-2'>
+                  {!message.isFromCustomer && message.id === lastReadMessageId && (
+                    <p className='text-xs text-gray-500'>Read</p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
         <div ref={bottomRef} />
       </div>
 

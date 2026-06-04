@@ -1,16 +1,44 @@
+import { motion, type Variants } from 'framer-motion'
+import { Plus, X } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router'
+import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Dialog, DialogContent } from '~/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import { DONE_KEY } from '~/utils/constants'
+import type { MatchedInstruction } from '~/utils/instructionImages'
 import { DialogFullHeader } from '../molecules/DialogFullHeader'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import '~/styles/instructions.css'
 
+interface MessageSource {
+  id: number
+  name: string
+  supplierName: string
+  url: string
+}
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
   images?: string[]
+  instruction?: MatchedInstruction
+  source?: MessageSource
+}
+
+interface InstructionCarouselImage {
+  id: number
+  url: string
+  name: string
+  type: string
+  available: null
 }
 
 interface ChatAnchorPercent {
@@ -21,10 +49,15 @@ interface ChatAnchorPercent {
 interface ChatMessagesProps {
   messages: Message[]
   isThinking: boolean
+  onImageClick: (url: string, urls: string[]) => void
+  instructionsPath: string
+  status: PriceListStatus | null
 }
 
 interface MessageBubbleProps {
   message: Message
+  onImageClick: (url: string, urls: string[]) => void
+  instructionsPath: string
 }
 
 const CHAT_POSITION_KEY = 'floatingChatPosition'
@@ -35,6 +68,30 @@ const DEFAULT_OFFSET = 20
 const FIXED_BASE_CLASS = 'fixed z-50 touch-none'
 const DEFAULT_ANCHOR_CLASS = 'bottom-5 right-5'
 const APPEARANCE_CLASS = 'transition-opacity duration-300 ease-out'
+
+const IMAGE_LIST_VARIANTS: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.08,
+    },
+  },
+}
+
+const IMAGE_ITEM_VARIANTS: Variants = {
+  hidden: { opacity: 0, y: -24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 380,
+      damping: 28,
+      mass: 0.75,
+    },
+  },
+}
 
 function getViewportSize() {
   if (typeof window === 'undefined') {
@@ -190,20 +247,200 @@ function parseImageUrlsPayload(data: string): string[] {
   }
 }
 
-function InstructionImages({ urls }: { urls: string[] }) {
-  if (urls.length === 0) return null
+interface PriceListStatus {
+  state: 'searching' | 'reading' | 'answering'
+  fileType?: 'pdf' | 'image' | 'file'
+  name?: string
+}
+
+function parsePriceListStatus(data: string): PriceListStatus | null {
+  try {
+    const parsed: unknown = JSON.parse(data)
+    if (!parsed || typeof parsed !== 'object' || !('state' in parsed)) return null
+    const state = parsed.state
+    if (state !== 'searching' && state !== 'reading' && state !== 'answering') {
+      return null
+    }
+    const status: PriceListStatus = { state }
+    if ('fileType' in parsed && typeof parsed.fileType === 'string') {
+      if (
+        parsed.fileType === 'pdf' ||
+        parsed.fileType === 'image' ||
+        parsed.fileType === 'file'
+      ) {
+        status.fileType = parsed.fileType
+      }
+    }
+    if ('name' in parsed && typeof parsed.name === 'string') {
+      status.name = parsed.name
+    }
+    return status
+  } catch {
+    return null
+  }
+}
+
+function statusLabel(status: PriceListStatus): string {
+  if (status.state === 'searching') return 'Searching supplier files…'
+  if (status.state === 'reading') {
+    if (status.fileType === 'pdf') {
+      return `Downloading PDF${status.name ? `: ${status.name}` : ''}…`
+    }
+    if (status.fileType === 'image') {
+      return `Reading image${status.name ? `: ${status.name}` : ''}…`
+    }
+    return `Reading file${status.name ? `: ${status.name}` : ''}…`
+  }
+  return 'Reading documents…'
+}
+
+function DownloadingIndicator({ status }: { status: PriceListStatus }) {
+  const isPdf = status.fileType === 'pdf'
   return (
-    <div className='instructions mt-2 flex flex-col gap-2'>
-      {urls.map(url => (
-        <a key={url} href={url} target='_blank' rel='noopener noreferrer'>
-          <img src={url} alt='' className='rounded-md border border-black/10' />
-        </a>
-      ))}
+    <div className='flex items-center justify-start m-2'>
+      <div className='flex items-center gap-3 rounded-xl bg-gray-200 px-4 py-3 text-gray-900'>
+        <div className='relative size-7 shrink-0'>
+          <svg
+            viewBox='0 0 24 24'
+            fill='none'
+            stroke='currentColor'
+            strokeWidth={1.8}
+            className='size-7 text-blue-600'
+            aria-hidden='true'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              d='M14 3v4a1 1 0 0 0 1 1h4'
+            />
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              d='M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z'
+            />
+          </svg>
+          {isPdf ? (
+            <motion.span
+              className='absolute inset-x-0 -bottom-0.5 flex justify-center'
+              initial={{ y: -6, opacity: 0 }}
+              animate={{ y: [-6, 4, -6], opacity: [0, 1, 0] }}
+              transition={{ duration: 1.1, repeat: Number.POSITIVE_INFINITY }}
+            >
+              <svg
+                viewBox='0 0 24 24'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth={2.4}
+                className='size-3.5 text-blue-600'
+                aria-hidden='true'
+              >
+                <path strokeLinecap='round' strokeLinejoin='round' d='M12 5v9' />
+                <path strokeLinecap='round' strokeLinejoin='round' d='m8 11 4 4 4-4' />
+              </svg>
+            </motion.span>
+          ) : null}
+        </div>
+        <div className='flex flex-col gap-1'>
+          <span className='text-sm'>{statusLabel(status)}</span>
+          <span className='relative block h-1 w-32 overflow-hidden rounded-full bg-gray-300'>
+            <motion.span
+              className='absolute inset-y-0 left-0 w-1/3 rounded-full bg-blue-500'
+              animate={{ left: ['-33%', '100%'] }}
+              transition={{
+                duration: 1.1,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: 'easeInOut',
+              }}
+            />
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+function parseSourcePayload(data: string): MessageSource | null {
+  try {
+    const parsed: unknown = JSON.parse(data)
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'url' in parsed &&
+      typeof parsed.url === 'string' &&
+      'name' in parsed &&
+      typeof parsed.name === 'string'
+    ) {
+      const supplierName =
+        'supplierName' in parsed && typeof parsed.supplierName === 'string'
+          ? parsed.supplierName
+          : ''
+      const id = 'id' in parsed && typeof parsed.id === 'number' ? parsed.id : 0
+      return { id, name: parsed.name, supplierName, url: parsed.url }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function parseInstructionPayload(data: string): MatchedInstruction | null {
+  try {
+    const parsed: unknown = JSON.parse(data)
+    if (!parsed || typeof parsed !== 'object') return null
+    if (!('id' in parsed) || !('title' in parsed)) return null
+    if (typeof parsed.id !== 'number' || typeof parsed.title !== 'string') return null
+    if (!parsed.title.trim()) return null
+    return { id: parsed.id, title: parsed.title }
+  } catch {
+    return null
+  }
+}
+
+function buildCarouselImages(urls: string[]): InstructionCarouselImage[] {
+  return urls.map((url, index) => ({
+    id: index + 1,
+    url,
+    name: `Instruction ${index + 1}`,
+    type: 'instruction',
+    available: null,
+  }))
+}
+
+function InstructionImages({
+  urls,
+  onImageClick,
+}: {
+  urls: string[]
+  onImageClick: (url: string, urls: string[]) => void
+}) {
+  if (urls.length === 0) return null
+  return (
+    <motion.div
+      className='instructions mt-2 flex flex-col gap-2'
+      variants={IMAGE_LIST_VARIANTS}
+      initial='hidden'
+      animate='visible'
+    >
+      {urls.map(url => (
+        <motion.button
+          key={url}
+          type='button'
+          className='block cursor-pointer'
+          variants={IMAGE_ITEM_VARIANTS}
+          onClick={() => onImageClick(url, urls)}
+        >
+          <img src={url} alt='' className='rounded-md border border-black/10' />
+        </motion.button>
+      ))}
+    </motion.div>
+  )
+}
+
+const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  onImageClick,
+  instructionsPath,
+}) => {
   return (
     <div
       className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -216,24 +453,71 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         }`}
       >
         {message.content ? <div>{message.content}</div> : null}
-        {message.images ? <InstructionImages urls={message.images} /> : null}
+        {message.source ? (
+          <div className='mt-3 pt-2 border-t border-black/10 text-sm'>
+            <span className='text-gray-500'>Source: </span>
+            <a
+              href={message.source.url}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-blue-700 underline underline-offset-2 hover:text-blue-900'
+            >
+              {message.source.name}
+              {message.source.supplierName ? ` (${message.source.supplierName})` : ''}
+            </a>
+          </div>
+        ) : null}
+        {message.images ? (
+          <InstructionImages urls={message.images} onImageClick={onImageClick} />
+        ) : null}
+        {message.instruction ? (
+          <div
+            className={`mt-3 pt-2 border-t text-sm ${
+              message.role === 'user' ? 'border-white/30' : 'border-black/10'
+            }`}
+          >
+            <Link
+              to={`${instructionsPath}?instructionId=${message.instruction.id}`}
+              className={
+                message.role === 'user'
+                  ? 'text-white underline underline-offset-2 hover:text-white/90'
+                  : 'text-blue-700 underline underline-offset-2 hover:text-blue-900'
+              }
+            >
+              {message.instruction.title}
+            </Link>
+          </div>
+        ) : null}
       </div>
     </div>
   )
 }
 
-const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, isThinking }) => (
+const ChatMessages: React.FC<ChatMessagesProps> = ({
+  messages,
+  isThinking,
+  onImageClick,
+  instructionsPath,
+  status,
+}) => (
   <div className='flex flex-col p-4 overflow-y-auto h-full text-wrap whitespace-pre-wrap'>
     {messages.map((message, index) => (
-      <MessageBubble key={index} message={message} />
+      <MessageBubble
+        key={index}
+        message={message}
+        onImageClick={onImageClick}
+        instructionsPath={instructionsPath}
+      />
     ))}
-    {isThinking && (
+    {isThinking && status && status.state !== 'answering' ? (
+      <DownloadingIndicator status={status} />
+    ) : isThinking ? (
       <div className='flex items-center justify-start m-2'>
         <div className='animate-pulse bg-gray-200 text-gray-900 rounded-xl p-4'>
           Typing...
         </div>
       </div>
-    )}
+    ) : null}
   </div>
 )
 
@@ -247,6 +531,10 @@ interface DragState {
 }
 
 export function Chat() {
+  const location = useLocation()
+  const instructionsPath = location.pathname.startsWith('/admin')
+    ? '/admin/instructions'
+    : '/employee/instructions'
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState<string>('')
   const [answer, setAnswer] = useState<string>('')
@@ -264,8 +552,13 @@ export function Chat() {
   const sseRef = useRef<EventSource | null>(null)
   const answerRef = useRef('')
   const streamingImagesRef = useRef<string[]>([])
+  const streamingInstructionRef = useRef<MatchedInstruction | null>(null)
+  const streamingSourceRef = useRef<MessageSource | null>(null)
   const responseFinishedRef = useRef(false)
-  const [streamingImages, setStreamingImages] = useState<string[]>([])
+  const [carouselImages, setCarouselImages] = useState<InstructionCarouselImage[]>([])
+  const [currentImageId, setCurrentImageId] = useState<number | undefined>(undefined)
+  const [priceListMode, setPriceListMode] = useState(false)
+  const [priceListStatus, setPriceListStatus] = useState<PriceListStatus | null>(null)
 
   anchorRef.current = anchor
   useCustomPositionRef.current = useCustomPosition
@@ -311,6 +604,13 @@ export function Chat() {
   const addMessage = (message: Message) =>
     setMessages(prevMessages => [...prevMessages, message])
 
+  const openInstructionImage = useCallback((url: string, urls: string[]) => {
+    const images = buildCarouselImages(urls)
+    const clicked = images.find(image => image.url === url)
+    setCarouselImages(images)
+    setCurrentImageId(clicked?.id ?? images[0]?.id)
+  }, [])
+
   const focusInput = useCallback(() => {
     const focus = () => {
       inputRef.current?.focus()
@@ -338,18 +638,24 @@ export function Chat() {
       }
       const content = answerRef.current
       const images = streamingImagesRef.current
+      const instruction = streamingInstructionRef.current
+      const source = streamingSourceRef.current
       answerRef.current = ''
       streamingImagesRef.current = []
+      streamingInstructionRef.current = null
+      streamingSourceRef.current = null
       setAnswer('')
-      setStreamingImages([])
       setIsThinking(false)
-      if (content.length > 0 || images.length > 0) {
+      setPriceListStatus(null)
+      if (content.length > 0 || images.length > 0 || instruction || source) {
         setMessages(msgs => [
           ...msgs,
           {
             role: 'assistant',
             content,
             images: images.length > 0 ? images : undefined,
+            instruction: instruction ?? undefined,
+            source: source ?? undefined,
           },
         ])
       }
@@ -357,6 +663,12 @@ export function Chat() {
     },
     [focusInput],
   )
+
+  const stopResponse = useCallback(() => {
+    const sse = sseRef.current
+    if (!sse || responseFinishedRef.current) return
+    finishResponse(sse)
+  }, [finishResponse])
 
   useEffect(() => {
     return () => {
@@ -373,23 +685,42 @@ export function Chat() {
     responseFinishedRef.current = false
     answerRef.current = ''
     streamingImagesRef.current = []
-    setStreamingImages([])
+    streamingInstructionRef.current = null
+    streamingSourceRef.current = null
     setAnswer('')
     setIsThinking(true)
+    setPriceListStatus(priceListMode ? { state: 'searching' } : null)
     setInput('')
     addMessage({ role: 'user', content: query })
 
     sseRef.current?.close()
+    const chatMode = priceListMode ? 'priceLists' : 'instructions'
     const sse = new EventSource(
-      `/api/chat?query=${encodeURIComponent(query)}&isNew=${isNewChat}`,
+      `/api/chat?query=${encodeURIComponent(query)}&isNew=${isNewChat}&mode=${chatMode}`,
     )
     sseRef.current = sse
+
+    sse.addEventListener('status', event => {
+      const status = parsePriceListStatus(event.data)
+      if (status) setPriceListStatus(status)
+    })
+
+    sse.addEventListener('instruction', event => {
+      const instruction = parseInstructionPayload(event.data)
+      if (!instruction) return
+      streamingInstructionRef.current = instruction
+    })
 
     sse.addEventListener('images', event => {
       const urls = parseImageUrlsPayload(event.data)
       if (urls.length === 0) return
       streamingImagesRef.current = urls
-      setStreamingImages(urls)
+    })
+
+    sse.addEventListener('source', event => {
+      const source = parseSourcePayload(event.data)
+      if (!source) return
+      streamingSourceRef.current = source
     })
 
     sse.addEventListener('message', event => {
@@ -399,6 +730,7 @@ export function Chat() {
       }
       answerRef.current += event.data
       setAnswer(answerRef.current)
+      setPriceListStatus(null)
     })
 
     sse.addEventListener('error', () => {
@@ -458,13 +790,12 @@ export function Chat() {
   }
 
   const displayMessages: Message[] =
-    isThinking && (answer.length > 0 || streamingImages.length > 0)
+    isThinking && answer.length > 0
       ? [
           ...messages,
           {
             role: 'assistant',
             content: answer,
-            images: streamingImages.length > 0 ? streamingImages : undefined,
           },
         ]
       : messages
@@ -482,79 +813,138 @@ export function Chat() {
   const visibilityClass = visible ? 'opacity-100' : 'opacity-0'
 
   return (
-    <Dialog open={open} onOpenChange={setOpen} modal={false}>
-      <button
-        type='button'
-        aria-label='Open chat'
-        className={`${FIXED_BASE_CLASS} ${anchorClass} ${APPEARANCE_CLASS} ${visibilityClass} rounded-full bg-blue-500 hover:bg-blue-600 text-white size-14 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg`}
-        style={positionStyle}
-        onPointerDown={startDrag}
-        onPointerMove={moveDrag}
-        onPointerUp={endDrag}
-        onPointerCancel={e => {
-          if (dragStateRef.current?.didMove) persistAnchor()
-          dragStateRef.current = null
-          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-            e.currentTarget.releasePointerCapture(e.pointerId)
-          }
-        }}
-      >
-        <svg
-          xmlns='http://www.w3.org/2000/svg'
-          fill='none'
-          viewBox='0 0 24 24'
-          strokeWidth={2}
-          stroke='currentColor'
-          className='size-6 pointer-events-none'
+    <>
+      <Dialog open={open} onOpenChange={setOpen} modal={false}>
+        <button
+          type='button'
+          aria-label='Open chat'
+          className={`${FIXED_BASE_CLASS} ${anchorClass} ${APPEARANCE_CLASS} ${visibilityClass} rounded-full bg-blue-500 hover:bg-blue-600 text-white size-14 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg`}
+          style={positionStyle}
+          onPointerDown={startDrag}
+          onPointerMove={moveDrag}
+          onPointerUp={endDrag}
+          onPointerCancel={e => {
+            if (dragStateRef.current?.didMove) persistAnchor()
+            dragStateRef.current = null
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId)
+            }
+          }}
         >
-          <path
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            d='M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z'
-          />
-        </svg>
-      </button>
-      <DialogContent
-        hideClose
-        className='h-full p-0 gap-0'
-        position='br'
-        onOpenAutoFocus={e => {
-          e.preventDefault()
-          focusInput()
-        }}
-        onInteractOutside={e => {
-          e.preventDefault()
-        }}
-      >
-        <div className='h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto'>
-          <DialogFullHeader>
-            <span className='text-lg font-bold'>Chat</span>
-          </DialogFullHeader>
-          <ChatMessages messages={displayMessages} isThinking={isThinking && !answer} />
-          <form
-            onSubmit={handleFormSubmit}
-            className='p-4 bg-gray-100 border-t border-gray-300 flex items-center gap-2'
+          <svg
+            xmlns='http://www.w3.org/2000/svg'
+            fill='none'
+            viewBox='0 0 24 24'
+            strokeWidth={2}
+            stroke='currentColor'
+            className='size-6 pointer-events-none'
           >
-            <Input
-              ref={inputRef}
-              name='query'
-              value={input}
-              onChange={event => setInput(event.target.value)}
-              placeholder='Type your message...'
-              className='rounded-full'
-              enterKeyHint='send'
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              d='M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z'
             />
-            <Button
-              disabled={input.trim().length === 0 || isThinking}
-              variant='blue'
-              type='submit'
-              className='rounded-full'
-            >
-              Send
-            </Button>
-          </form>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </svg>
+        </button>
+        <DialogContent
+          hideClose
+          className='h-full p-0 gap-0'
+          position='br'
+          onOpenAutoFocus={e => {
+            e.preventDefault()
+            focusInput()
+          }}
+          onInteractOutside={e => {
+            e.preventDefault()
+          }}
+        >
+          <div className='h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto'>
+            <DialogFullHeader>
+              <span className='text-lg font-bold'>Chat</span>
+            </DialogFullHeader>
+            <ChatMessages
+              messages={displayMessages}
+              isThinking={isThinking && !answer}
+              onImageClick={openInstructionImage}
+              instructionsPath={instructionsPath}
+              status={priceListStatus}
+            />
+            <div className='border-t border-gray-300 bg-gray-100'>
+              {priceListMode ? (
+                <div className='px-4 pt-3'>
+                  <div className='inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800'>
+                    <span>Price lists</span>
+                    <button
+                      type='button'
+                      aria-label='Close price lists mode'
+                      className='rounded-full p-0.5 hover:bg-blue-200'
+                      onClick={() => setPriceListMode(false)}
+                    >
+                      <X className='size-3.5' />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <form onSubmit={handleFormSubmit} className='p-4 flex items-center gap-2'>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='icon'
+                      className='shrink-0 rounded-full'
+                      disabled={isThinking}
+                      aria-label='Open chat tools'
+                    >
+                      <Plus className='size-4' />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align='start' side='top'>
+                    <DropdownMenuItem onClick={() => setPriceListMode(true)}>
+                      Price lists
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Input
+                  ref={inputRef}
+                  name='query'
+                  value={input}
+                  onChange={event => setInput(event.target.value)}
+                  placeholder='Type your message...'
+                  className='rounded-full'
+                  enterKeyHint='send'
+                />
+                {isThinking ? (
+                  <Button
+                    type='button'
+                    variant='destructive'
+                    className='rounded-full shrink-0'
+                    onClick={stopResponse}
+                  >
+                    Stop
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={input.trim().length === 0}
+                    variant='blue'
+                    type='submit'
+                    className='rounded-full shrink-0'
+                  >
+                    Send
+                  </Button>
+                )}
+              </form>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <SuperCarousel
+        type='instruction'
+        currentId={currentImageId}
+        setCurrentId={setCurrentImageId}
+        images={carouselImages}
+        showInfo={false}
+      />
+    </>
   )
 }

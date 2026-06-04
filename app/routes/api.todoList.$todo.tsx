@@ -43,13 +43,46 @@ const updateDoneAction = async (
       [isDone, newPos, todoId, userId],
     )
   } else {
-    // Only toggle the flag; keep current ordering
+    const [completedRows] = await db.query<
+      (RowDataPacket & { minCompletedPos: number | null })[]
+    >(
+      `SELECT MIN(position) AS minCompletedPos
+       FROM todolist
+       WHERE user_id = ?
+         AND is_done = 1
+         AND id != ?`,
+      [userId, todoId],
+    )
+    const minCompletedPos =
+      Array.isArray(completedRows) && completedRows.length > 0
+        ? completedRows[0].minCompletedPos
+        : null
+
+    let newPos: number
+    if (minCompletedPos !== null && Number.isFinite(Number(minCompletedPos))) {
+      newPos = Number(minCompletedPos) - 1
+    } else {
+      const [activeRows] = await db.query<(RowDataPacket & { maxActivePos: number })[]>(
+        `SELECT COALESCE(MAX(position), -1) AS maxActivePos
+         FROM todolist
+         WHERE user_id = ?
+           AND is_done = 0
+           AND id != ?`,
+        [userId, todoId],
+      )
+      const maxActivePos =
+        Array.isArray(activeRows) && activeRows.length > 0
+          ? activeRows[0].maxActivePos
+          : -1
+      newPos = (Number.isFinite(maxActivePos) ? maxActivePos : -1) + 1
+    }
+
     await db.execute(
       `UPDATE todolist
-       SET is_done = ?
+       SET is_done = ?, position = ?
        WHERE id = ?
        AND user_id = ?;`,
-      [isDone, todoId, userId],
+      [isDone, newPos, todoId, userId],
     )
   }
 }

@@ -81,6 +81,164 @@ function stripNoteLines(content: string, linePattern: RegExp): string {
     .trim()
 }
 
+const UNKNOWN_BULLET_VALUE_PATTERN =
+  /^(?:not\s+specified|unknown|n\/a|na|none|not\s+discussed|no\s+details(?:\s+discussed)?|unspecified|—|-|\.)$/i
+
+function isUnknownOrEmptyBulletValue(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed) return true
+  return UNKNOWN_BULLET_VALUE_PATTERN.test(trimmed)
+}
+
+function stripUnknownNoteBullets(note: string): string {
+  return note
+    .split('\n')
+    .filter(line => {
+      const match = line.trim().match(BULLET_PARTS_PATTERN)
+      if (!match) return true
+      return !isUnknownOrEmptyBulletValue(match[2])
+    })
+    .join('\n')
+    .trim()
+}
+
+function transcriptShowsSalespersonMissedAppointment(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  return (
+    /\b(?:i|we)\s+(?:somehow\s+)?missed\b/.test(lower) ||
+    /\bmy\s+mistake\b/.test(lower) ||
+    /\bno\s+way\s+i\s+missed\b/.test(lower) ||
+    (/\b(?:i'?m|i am)\s+sorry\b/.test(lower) && /\bmissed\b/.test(lower))
+  )
+}
+
+function estimateBulletIsOnSiteScheduling(value: string): boolean {
+  const lower = value.toLowerCase()
+  return (
+    /\b(?:on[- ]?site|be here|stop by|come out|measurement visit|will be there|see you at)\b/.test(
+      lower,
+    ) ||
+    (/\b(?:appointment|missed|reschedul)\b/.test(lower) &&
+      /\b(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|at\s+\d|today|tomorrow)\b/.test(lower))
+  )
+}
+
+function estimateBulletIsPhoneCallbackScheduling(value: string): boolean {
+  const lower = value.toLowerCase()
+  if (estimateBulletIsOnSiteScheduling(lower)) return false
+  return (
+    /\b(?:call\s+me|call\s+back|callback|follow[- ]?up)\b/.test(lower) ||
+    /\bcustomer\s+will\s+call\b/.test(lower) ||
+    (/\b(?:quote|pricing)\b/.test(lower) &&
+      /\b(?:discuss|questions?|follow|check)\b/.test(lower) &&
+      /\b(?:friday|monday|tuesday|wednesday|thursday|saturday|sunday|next|weekend)\b/.test(
+        lower,
+      )) ||
+    (/\b(?:home depot|lowe)\b/.test(lower) &&
+      /\b(?:quote|compare|shopping|questions?)\b/.test(lower))
+  )
+}
+
+function transcriptShowsCustomerAskedRepToCall(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  return (
+    /\b(?:you\s+can\s+call\s+me|call\s+me)\b/.test(lower) ||
+    (/\b(?:would you like\s+(?:me\s+)?to\s+)?call\s+you\b/.test(lower) &&
+      /\b(?:yes|okay|good|will do|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|friday)\b/.test(
+        lower,
+      ))
+  )
+}
+
+function customerWillCallIsRepCallbackMisattribution(value: string): boolean {
+  if (/\bwhen\s+ready\b/i.test(value)) return false
+  if (/\bcontact(?:s)?\s+(?:the\s+)?(?:company|us)\s+when\b/i.test(value)) {
+    return false
+  }
+  return /\bcustomer\s+will\s+call\b/i.test(value)
+}
+
+function normalizeEstimateNoteBullets(note: string): string {
+  return note
+    .split('\n')
+    .filter(line => {
+      const match = line.trim().match(BULLET_PARTS_PATTERN)
+      if (!match) return true
+      const label = match[1].trim().toLowerCase()
+      const value = match[2].trim()
+      if (label !== 'estimate') return true
+      return !estimateBulletIsPhoneCallbackScheduling(value)
+    })
+    .map(line => {
+      const match = line.trim().match(BULLET_PARTS_PATTERN)
+      if (!match) return line
+      const label = match[1].trim().toLowerCase()
+      const value = match[2].trim()
+      if (label === 'site visit') {
+        return `- Estimate: ${value}`
+      }
+      if (label !== 'project timing') return line
+      if (estimateBulletIsPhoneCallbackScheduling(value)) return line
+      if (
+        !/\b(?:appointment|estimate|measurement|missed|reschedul|site\s+visit)\b/i.test(
+          value,
+        )
+      ) {
+        return line
+      }
+      return `- Estimate: ${value}`
+    })
+    .join('\n')
+}
+
+function correctRepCallBackAttribution(note: string, transcript: string): string {
+  if (!transcriptShowsCustomerAskedRepToCall(transcript)) return note
+
+  return note
+    .split('\n')
+    .map(line => {
+      const match = line.trim().match(BULLET_PARTS_PATTERN)
+      if (!match) return line
+      const label = match[1].trim()
+      let value = match[2].trim()
+      if (!customerWillCallIsRepCallbackMisattribution(value)) return line
+      value = value.replace(
+        /\bcustomer\s+will\s+call\b/gi,
+        'salesperson will call customer',
+      )
+      return `- ${label}: ${value}`
+    })
+    .join('\n')
+}
+
+function correctMissedAppointmentAttribution(note: string, transcript: string): string {
+  if (!transcriptShowsSalespersonMissedAppointment(transcript)) return note
+
+  return note
+    .split('\n')
+    .map(line => {
+      const match = line.trim().match(BULLET_PARTS_PATTERN)
+      if (!match) return line
+      const label = match[1].trim()
+      let value = match[2].trim()
+      if (!/\bmissed\b/i.test(value) && !/\bappointment\b/i.test(value)) {
+        return line
+      }
+      value = value.replace(/\bcustomer\s+missed\b/gi, 'salesperson missed')
+      if (
+        /\bmissed\b/i.test(value) &&
+        !/\b(?:salesperson|sales\s+rep|rep)\s+missed\b/i.test(value) &&
+        /\b(?:appointment|10:?\d{2}|estimate|measurement|saturday|sunday|monday|tuesday|wednesday|thursday|friday)\b/i.test(
+          value,
+        )
+      ) {
+        value = value.replace(/\bmissed\b/i, 'salesperson missed')
+      }
+      return `- ${label}: ${value}`
+    })
+    .join('\n')
+}
+
 export function withVoicemailCallType(content: string, isVoicemail: boolean): string {
   if (!isVoicemail) return content
   const body = stripVoicemailHeadingLines(
@@ -211,6 +369,14 @@ export function sanitizeCallNoteContent(
 
   let note = stripNoteLines(content.trim(), /^\s*-?\s*Customer\s*:/i)
   note = stripNoteLines(note, /^\s*-?\s*Next steps discussed\s*:/i)
+  note = stripUnknownNoteBullets(note)
+  if (!isVoicemail) {
+    note = normalizeEstimateNoteBullets(note)
+  }
+  if (transcript) {
+    note = correctRepCallBackAttribution(note, transcript)
+    note = correctMissedAppointmentAttribution(note, transcript)
+  }
   if (!isVoicemail) {
     note = stripNoteLines(note, /^\s*-?\s*Call type\s*:/i)
     return note

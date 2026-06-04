@@ -50,6 +50,8 @@ const STORE_BUSINESS_TIMEZONE = 'America/Indiana/Indianapolis'
 const STORE_CLOSE_HOUR = 18
 const DEADLINE_HOURS_BEFORE_STORE_CLOSE = 2
 const QUOTE_MINIMUM_LEAD_MINUTES = 60
+const ONSITE_ESTIMATE_LEAD_MINUTES = 30
+const CONFIRMED_ONSITE_ESTIMATE_NAME = 'Be on-site for estimate'
 const EXPLICIT_TIME_PATTERN = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i
 
 function parseIsoDate(value: string | undefined): Date {
@@ -172,6 +174,136 @@ function stripCalendarDatesFromActivityName(name: string): string {
     .trim()
 }
 
+const WEEKDAY_NAME_TO_INDEX: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+}
+
+function getStoreWeekdayIndex(committedAt: Date): number {
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    timeZone: STORE_BUSINESS_TIMEZONE,
+    weekday: 'long',
+  })
+    .format(committedAt)
+    .toLowerCase()
+  return WEEKDAY_NAME_TO_INDEX[weekday] ?? 0
+}
+
+function daysUntilWeekdayLabel(
+  committedAt: Date,
+  weekdayName: string,
+  useNextWeek: boolean,
+): number {
+  const target = WEEKDAY_NAME_TO_INDEX[weekdayName.toLowerCase()]
+  if (target === undefined) return 0
+  const current = getStoreWeekdayIndex(committedAt)
+  let diff = target - current
+  if (diff <= 0) diff += 7
+  if (useNextWeek) diff += 7
+  return diff
+}
+
+function isCallBackActivity(name: string): boolean {
+  return CALLBACK_ACTIVITY_NAME_PATTERN.test(name.toLowerCase())
+}
+
+function buildCallBackActivityName(transcript: string): string {
+  const lower = transcript.toLowerCase()
+  if (
+    /\bquote\b/.test(lower) &&
+    /\b(?:questions?|check|follow\s+up|saw the|sent you|home depot|lowe)/.test(lower)
+  ) {
+    return 'Call back, follow up on quote'
+  }
+  if (/\bconfirm\b/.test(lower) && /\binterest\b/.test(lower)) {
+    return 'Call back, confirm still interested'
+  }
+  if (/\bkitchen\b/.test(lower)) {
+    return 'Call back, follow up on kitchen project'
+  }
+  return 'Call back, follow up'
+}
+
+function inferAgreedCallBackDeadlineFromTranscript(
+  transcript: string,
+  committedAt: Date,
+): string | null {
+  const lower = transcript.toLowerCase()
+  if (!/\b(?:call\s+(?:you|me|back)|follow\s+up)\b/.test(lower)) return null
+
+  const customerNext = lower.match(
+    /\b(?:you\s+can\s+call\s+me|call\s+me)\s+next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )
+  if (customerNext?.[1]) {
+    return formatStoreDateOnlyPlusDays(
+      committedAt,
+      daysUntilWeekdayLabel(committedAt, customerNext[1], true),
+    )
+  }
+
+  const repNextCheck = lower.match(
+    /\b(?:would you like\s+(?:me\s+)?to\s+)?call\s+you\s+next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )
+  if (repNextCheck?.[1]) {
+    return formatStoreDateOnlyPlusDays(
+      committedAt,
+      daysUntilWeekdayLabel(committedAt, repNextCheck[1], true),
+    )
+  }
+
+  if (
+    /\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(
+      lower,
+    ) &&
+    /\b(?:call|check|quote|questions?|will do|okay|good)\b/.test(lower)
+  ) {
+    const match = lower.match(
+      /\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+    )
+    if (match?.[1]) {
+      return formatStoreDateOnlyPlusDays(
+        committedAt,
+        daysUntilWeekdayLabel(committedAt, match[1], true),
+      )
+    }
+  }
+
+  const plainWeekday = lower.match(
+    /\b(?:call\s+(?:you|me)\s+)?(?:on\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )
+  if (
+    plainWeekday?.[1] &&
+    !/\bnext\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(
+      lower,
+    )
+  ) {
+    return formatStoreDateOnlyPlusDays(
+      committedAt,
+      daysUntilWeekdayLabel(committedAt, plainWeekday[1], false),
+    )
+  }
+
+  return null
+}
+
+function applyAgreedCallBackActivity(
+  activity: ExtractedCallActivity,
+  committedAt: Date,
+  transcript: string,
+): ExtractedCallActivity {
+  if (!isCallBackActivity(activity.name)) return activity
+  const deadline = inferAgreedCallBackDeadlineFromTranscript(transcript, committedAt)
+  return {
+    name: buildCallBackActivityName(transcript),
+    deadline: deadline ?? activity.deadline,
+  }
+}
+
 function buildRepTwoThreeWeekCallBackName(transcript: string): string {
   const lower = transcript.toLowerCase()
   if (/\blitigation\b/.test(lower)) {
@@ -226,6 +358,112 @@ function applyRepTwoThreeWeekCallBackActivity(
   }
 }
 
+function isOnSiteEstimateActivity(name: string): boolean {
+  const lower = name.toLowerCase()
+  if (/\bsend\b/.test(lower) && /\b(?:quote|estimate|pricing)\b/.test(lower)) {
+    return false
+  }
+  if (
+    /\bschedule\b/.test(lower) &&
+    /\b(?:estimate|measurement|on[- ]?site|visit)\b/.test(lower)
+  ) {
+    return true
+  }
+  if (/\b(?:on[- ]?site|be on-site)\b/.test(lower) && /\bestimate\b/.test(lower)) {
+    return true
+  }
+  return (
+    /\b(?:estimate|measurement)\b/.test(lower) &&
+    /\b(?:visit|measure|appointment)\b/.test(lower)
+  )
+}
+
+function transcriptConfirmsOnsiteEstimateAtTime(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  const estimateContext =
+    /\b(?:estimate|measurement|measure|take some measurements)\b/.test(lower) ||
+    /\b(?:stop by|come over|be here)\b/.test(lower)
+  if (!estimateContext) return false
+  return (
+    /\b(?:see you|i(?:'ll| will) be there|be here|stop by)\b[^.]{0,60}\b(?:at\s+)?\d{1,2}/i.test(
+      transcript,
+    ) ||
+    /\bif you can be here at\s+\d/i.test(lower) ||
+    (/\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:pm|am)\b/.test(lower) &&
+      /\b(?:awesome|works|good|yes|today)\b/.test(lower))
+  )
+}
+
+function parseOnsiteEstimateAppointmentTime(
+  transcript: string,
+  committedAt: Date,
+): string | null {
+  const chunks = transcript
+    .split(/(?<=[.?!])\s+/)
+    .map(chunk => chunk.trim())
+    .filter(Boolean)
+
+  const timedChunks = chunks.filter(chunk => {
+    const lower = chunk.toLowerCase()
+    if (!EXPLICIT_TIME_PATTERN.test(lower)) return false
+    if (/\b(?:shop|store|business)\s+close/.test(lower)) return false
+    return /\b(?:estimate|measurement|measure|be here|stop by|see you|there at|come|5:?\d{2})\b/.test(
+      lower,
+    )
+  })
+
+  for (const chunk of timedChunks) {
+    const parsed = parseExplicitDeadlineFromText(chunk.toLowerCase(), committedAt)
+    if (parsed && isTimedDeadline(parsed)) return parsed
+  }
+
+  if (/\b(?:estimate|measurement|measure|take some measurements)\b/i.test(transcript)) {
+    const parsed = parseExplicitDeadlineFromText(transcript.toLowerCase(), committedAt)
+    if (parsed && isTimedDeadline(parsed)) return parsed
+  }
+
+  return null
+}
+
+function onsiteEstimateReminderDeadline(
+  appointmentIso: string,
+  committedAt: Date,
+): string {
+  const appointmentMs = new Date(appointmentIso).getTime()
+  const reminderMs = Math.max(
+    appointmentMs - ONSITE_ESTIMATE_LEAD_MINUTES * 60_000,
+    committedAt.getTime(),
+  )
+  return formatUtcIsoDateTime(new Date(reminderMs))
+}
+
+function inferOnsiteEstimateReminderDeadline(
+  activityName: string,
+  transcript: string,
+  committedAt: Date,
+): string | null {
+  if (!isOnSiteEstimateActivity(activityName)) return null
+  if (!transcriptConfirmsOnsiteEstimateAtTime(transcript)) return null
+  const appointment = parseOnsiteEstimateAppointmentTime(transcript, committedAt)
+  if (!appointment) return null
+  return onsiteEstimateReminderDeadline(appointment, committedAt)
+}
+
+function applyOnSiteEstimateActivity(
+  activity: ExtractedCallActivity,
+  committedAt: Date,
+  transcript: string,
+): ExtractedCallActivity {
+  if (!isOnSiteEstimateActivity(activity.name)) return activity
+  if (!transcriptConfirmsOnsiteEstimateAtTime(transcript)) return activity
+  const appointment = parseOnsiteEstimateAppointmentTime(transcript, committedAt)
+  if (!appointment) return activity
+  return {
+    name: CONFIRMED_ONSITE_ESTIMATE_NAME,
+    deadline: onsiteEstimateReminderDeadline(appointment, committedAt),
+  }
+}
+
 function isVoicemailFollowUpActivity(name: string): boolean {
   const lower = name.toLowerCase()
   return (
@@ -263,7 +501,15 @@ function applyVoicemailFollowUpDeadlineRules(
 }
 
 function isQuoteOrEstimateActivity(name: string): boolean {
-  return /\b(quote|estimate|pricing|bid)\b/.test(name)
+  const lower = name.toLowerCase()
+  if (isCallBackActivity(lower)) return false
+  if (/\bsend\b/.test(lower) && /\b(quote|estimate|pricing|bid)\b/.test(lower)) {
+    return true
+  }
+  return (
+    /\b(quote|estimate|pricing|bid)\b/.test(lower) &&
+    /\b(?:send|deliver|email)\b/.test(lower)
+  )
 }
 
 function isSendLinkStyleActivity(name: string): boolean {
@@ -392,8 +638,22 @@ function getActivityTranscriptWindows(
   if (isEdgePhotoSendActivityName(lower)) {
     terms.push('edge', 'picture', 'photo', 'pic')
   }
+  if (isCallBackActivity(lower)) {
+    terms.push('call', 'friday', 'monday', 'next', 'check', 'quote', 'questions')
+  }
   if (isQuoteOrEstimateActivity(lower)) {
     terms.push('quote', 'estimate', 'pricing', 'bid')
+  }
+  if (isOnSiteEstimateActivity(lower)) {
+    terms.push(
+      'estimate',
+      'measurement',
+      'measure',
+      'be here',
+      'stop by',
+      'see you',
+      'today',
+    )
   }
   if (isLongLeadRequestActivity(lower) || isCustomerPhotoRequestActivity(lower)) {
     terms.push('photo', 'picture', 'pic', 'kitchen', 'send', 'material', 'countertop')
@@ -413,10 +673,42 @@ function getActivityTranscriptWindows(
 }
 
 function parseExplicitDeadlineFromText(text: string, committedAt: Date): string | null {
+  const lower = text.toLowerCase()
+
+  const customerNextWeekday = lower.match(
+    /\b(?:you\s+can\s+call\s+me|call\s+me)\s+next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )
+  if (customerNextWeekday?.[1]) {
+    return formatStoreDateOnlyPlusDays(
+      committedAt,
+      daysUntilWeekdayLabel(committedAt, customerNextWeekday[1], true),
+    )
+  }
+
+  const nextWeekday = lower.match(
+    /\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )
+  if (nextWeekday?.[1]) {
+    return formatStoreDateOnlyPlusDays(
+      committedAt,
+      daysUntilWeekdayLabel(committedAt, nextWeekday[1], true),
+    )
+  }
+
+  const weekdayOnly = lower.match(
+    /\b(?:on\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )
+  if (weekdayOnly?.[1] && !nextWeekday) {
+    return formatStoreDateOnlyPlusDays(
+      committedAt,
+      daysUntilWeekdayLabel(committedAt, weekdayOnly[1], false),
+    )
+  }
+
   let dayOffset: number | null = null
-  if (/\btomorrow\b/.test(text)) dayOffset = 1
-  else if (/\btoday\b/.test(text)) dayOffset = 0
-  else if (/\b(?:this\s+afternoon|this\s+evening|tonight)\b/.test(text)) dayOffset = 0
+  if (/\btomorrow\b/.test(lower)) dayOffset = 1
+  else if (/\btoday\b/.test(lower)) dayOffset = 0
+  else if (/\b(?:this\s+afternoon|this\s+evening|tonight)\b/.test(lower)) dayOffset = 0
 
   const timePatterns = [
     /\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i,
@@ -675,6 +967,23 @@ function applyActivityDeadlineRules(
     return repTwoThreeWeekDeadline
   }
 
+  const estimateReminder = inferOnsiteEstimateReminderDeadline(
+    activityName,
+    transcript,
+    committedAt,
+  )
+  if (estimateReminder) {
+    return estimateReminder
+  }
+
+  if (isCallBackActivity(activityName)) {
+    const agreedCallBack = inferAgreedCallBackDeadlineFromTranscript(
+      transcript,
+      committedAt,
+    )
+    if (agreedCallBack) return agreedCallBack
+  }
+
   const nameHaystack = activityName.toLowerCase()
   const deadlineHaystack = (deadline ?? '').toLowerCase()
   const transcriptLower = transcript.toLowerCase()
@@ -895,7 +1204,15 @@ function finalizeExtractedActivities(
     committedAt,
   )
   return staggered.map(activity =>
-    applyRepTwoThreeWeekCallBackActivity(activity, committedAt, transcript),
+    applyAgreedCallBackActivity(
+      applyOnSiteEstimateActivity(
+        applyRepTwoThreeWeekCallBackActivity(activity, committedAt, transcript),
+        committedAt,
+        transcript,
+      ),
+      committedAt,
+      transcript,
+    ),
   )
 }
 
@@ -1044,7 +1361,8 @@ Include when stated:
 - Salesperson will send something (inventory link, website, granite/stone options, quote, edge photos, samples)
 - Customer will send something (kitchen photos, countertop photos, material photos)
 - Salesperson offers or agrees to call back (including "call you in two or three weeks")
-- Schedule visit or other follow-up the rep committed to
+- On-site estimate when the rep will go to the customer to measure or quote (not when only scheduling is still being negotiated)
+- Other follow-up the rep committed to
 - Do not create an outbound call-back activity when only the customer said they will call the company later
 - When edge style was discussed and the rep offers to send edge photos, add a separate edge-photo activity—do not merge with link or customer-photo tasks
 
@@ -1055,18 +1373,24 @@ Rules for name:
 - For "two or three weeks" call-back from the salesperson: set deadline null; use a descriptive name such as "Call back, check if litigation is finished" when litigation was discussed, or "Call back, follow up on kitchen project" for kitchen follow-ups
 - This company sells stone countertops. When sending stone options, samples, links, or pricing, include the stone type if specified (granite, quartz, marble, etc.)
 - Examples: "Send granite inventory link", "Request kitchen photos", "Send edge profile photos"
+- When the rep already agreed to be on-site at a specific time for an estimate, use name "Be on-site for estimate"—not "Schedule on-site measurement visit" or "Schedule on-site estimate visit"
+- Only use "Schedule ... estimate" when an estimate time is not yet agreed
 
 Rules for deadline (prefer setting a deadline when timing was discussed; null only when no timing was discussed for that task):
 - Always set a deadline when the call gives a date or time for that task—never omit timing that was stated
 - YYYY-MM-DD when only a calendar day was committed (no specific clock time)—use the resolved calendar day, not vague wording
 - ISO 8601 UTC datetime with Z suffix when a specific clock time was committed (e.g. at 3 pm, 6:00, this afternoon)
-- Resolve relative phrases using the call date below: today, tomorrow, next Monday, this afternoon, end of day
+- Resolve relative phrases using the call date below: today, tomorrow, next Monday, next Friday, this afternoon, end of day
+- When the customer or rep agrees to call back on a named day (especially "next Friday", "call me next Friday"), set deadline to that calendar day (YYYY-MM-DD)—never today or the activity creation time unless they explicitly said today
+- If the rep offers "Friday" and the customer says "next Friday", use the later Friday (the week after the nearest Friday), not today
 - Quote the call literally when choosing the day: if they said tomorrow, the deadline day must be tomorrow relative to the call date
 - "Right away", "now", "immediately", "ASAP", "shortly", "a little later", "a little bit later" when sending a link or options → omit deadline; server sets 30 minutes from activity creation
 - "I'll send the link today" (or similar send-today, no time) → YYYY-MM-DD for the call day only, never a datetime
 - "Tomorrow" for non-quote tasks (e.g. customer sends photos) → YYYY-MM-DD for the day after the call
 - Quote or estimate with "by tomorrow" or before the store closes → omit deadline; server sets due today at 4:00 PM store time (two hours before 6:00 PM close), but never earlier than one hour after activity creation
 - Salesperson: "Would you like me to call you in two or three weeks?" while customer is in litigation → {"name":"Call back, check if litigation is finished","deadline":null}
+- Rep and customer agree rep will be on-site today at 5:30 pm for an estimate → {"name":"Be on-site for estimate","deadline":null} (server sets due 30 minutes before the appointment time)
+- Rep offers to call Friday; customer says "call me next Friday" and rep agrees → {"name":"Call back, follow up on quote","deadline":"YYYY-MM-DD for next Friday after call date"}
 
 Examples:
 - Salesperson discusses square edges, then says "I can also send you pictures"

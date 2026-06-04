@@ -27,7 +27,14 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Link, useFetcher, useLocation, useNavigate, useParams } from 'react-router'
+import {
+  Link,
+  useFetcher,
+  useLocation,
+  useNavigate,
+  useParams,
+  useRevalidator,
+} from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
@@ -228,6 +235,25 @@ const INITIAL_FORM_STATE: FormState = {
   priority: ActivityPriority.Medium,
 }
 
+function useRevalidateAfterActivityFetcherSubmit(
+  fetcher: ReturnType<typeof useFetcher>,
+) {
+  const revalidator = useRevalidator()
+  const wasSubmittingRef = useRef(false)
+
+  useEffect(() => {
+    if (fetcher.state !== 'idle') {
+      wasSubmittingRef.current = true
+      return
+    }
+    if (!wasSubmittingRef.current) return
+    wasSubmittingRef.current = false
+    const action = fetcher.formAction ?? ''
+    if (!action.includes('/api/deal-activities/')) return
+    revalidator.revalidate()
+  }, [fetcher.state, fetcher.formAction, revalidator])
+}
+
 const formReducer = (state: FormState, action: FormAction): FormState => {
   switch (action.type) {
     case 'SET_NAME':
@@ -267,6 +293,7 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
   const fetcher = useFetcher()
   const token = useAuthenticityToken()
   const [form, dispatch] = useReducer(formReducer, INITIAL_FORM_STATE)
+  useRevalidateAfterActivityFetcherSubmit(fetcher)
 
   const isSubmitting = fetcher.state !== 'idle'
   const isValid = form.name.trim().length > 0
@@ -275,19 +302,18 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
   const submit = useCallback(() => {
     if (!isValid) return
 
-    const payload: Record<string, string> = {
-      intent: isEditing ? 'update' : 'create',
-      name: form.name.trim(),
-      deadline: buildDeadlinePayload(form.deadline),
-      priority: form.priority,
-      csrf: token,
-    }
+    const formData = new FormData()
+    formData.set('intent', isEditing ? 'update' : 'create')
+    formData.set('name', form.name.trim())
+    formData.set('deadline', buildDeadlinePayload(form.deadline))
+    formData.set('priority', form.priority)
+    formData.set('csrf', token)
 
     if (isEditing) {
-      payload.activityId = String(editingActivityId)
+      formData.set('activityId', String(editingActivityId))
     }
 
-    fetcher.submit(payload, {
+    fetcher.submit(formData, {
       method: 'POST',
       action: buildActivityApiAction(dealId),
     })
@@ -301,6 +327,8 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
 function useActivityAction(dealId: number) {
   const toggleFetcher = useFetcher()
   const deleteFetcher = useFetcher()
+  useRevalidateAfterActivityFetcherSubmit(toggleFetcher)
+  useRevalidateAfterActivityFetcherSubmit(deleteFetcher)
   const token = useAuthenticityToken()
   const { toast } = useToast()
 
@@ -980,15 +1008,20 @@ function ActivityForm({
     editingActivity?.id ?? null,
   )
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const loadedEditActivityIdRef = useRef<Nullable<number>>(null)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
   const [deadlineCalendarKey, setDeadlineCalendarKey] = useState(0)
   const { toast } = useToast()
 
   useEffect(() => {
-    if (editingActivity) {
-      dispatch({ type: 'SET_EDIT', payload: editingActivity })
-      requestAnimationFrame(() => inputRef.current?.focus())
+    if (!editingActivity) {
+      loadedEditActivityIdRef.current = null
+      return
     }
+    if (loadedEditActivityIdRef.current === editingActivity.id) return
+    loadedEditActivityIdRef.current = editingActivity.id
+    dispatch({ type: 'SET_EDIT', payload: editingActivity })
+    requestAnimationFrame(() => inputRef.current?.focus())
   }, [editingActivity])
 
   const handleCancel = () => {
@@ -1092,6 +1125,7 @@ function ActivityForm({
               }
               onClearDate={() => {
                 dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
+                setDeadlineCalendarKey(k => k + 1)
                 setDeadlineOpen(false)
               }}
             />
