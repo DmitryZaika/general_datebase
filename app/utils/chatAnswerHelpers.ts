@@ -17,14 +17,25 @@ const NO_INFO_PATTERNS = [
   'no pricing information',
   'not found in the supplier',
   'unable to find',
+  'did not take any',
+  "didn't take any",
+  'did not use any',
+  "didn't use any",
+  'no information was taken',
+  'i did not take',
+  'i did not use',
 ]
 
 function stripSourceMarker(text: string): string {
   return text.replace(/\[+\s*SOURCE\s*[:#-]?\s*[^\]]*?\s*\]+/gi, '')
 }
 
+function stripInstructionMarker(text: string): string {
+  return text.replace(/\[\[INSTRUCTION:[^\]]*\]\]/gi, '')
+}
+
 function stripChatResponseMarkers(text: string): string {
-  let result = stripSpecialOrderMarker(stripSourceMarker(text))
+  let result = stripSpecialOrderMarker(stripInstructionMarker(stripSourceMarker(text)))
   result = result.replace(
     /\*\*If yes, please provide a delivery cost and the amount of slabs\.\*\*/gi,
     '',
@@ -37,61 +48,26 @@ export function stripChatResponseMarkersTrimmed(text: string): string {
   return stripChatResponseMarkers(text).trim()
 }
 
-export function isInstructionFollowUp(query: string): boolean {
-  const lower = query.toLowerCase().trim()
-  return (
-    lower.includes('previous') ||
-    lower.includes('previos') ||
-    lower.includes('prior') ||
-    lower.includes('you said') ||
-    lower.includes('i mentioned') ||
-    lower.includes('i said') ||
-    lower.includes('did i') ||
-    lower.includes('how many') ||
-    lower.includes('what did') ||
-    lower.includes('can you see') ||
-    lower.includes('see the text') ||
-    lower.includes('see the chat') ||
-    lower.includes('in the chat') ||
-    lower.includes('above') ||
-    lower.includes('before') ||
-    lower.startsWith('yes') ||
-    lower.startsWith('no') ||
-    lower.includes('slabs') ||
-    lower.includes('delivery')
-  )
+export function parseInstructionIndex(answer: string): number | null | 'none' {
+  const indices = parseInstructionIndices(answer)
+  if (indices === 'none') return 'none'
+  if (indices === null || indices.length === 0) return null
+  return indices[0]
 }
 
-export function looksLikeInstructionQuery(query: string): boolean {
-  const lower = query.toLowerCase().trim()
-  return (
-    lower.includes('how do') ||
-    lower.includes('how to') ||
-    lower.includes('instruction') ||
-    lower.includes('tell me about') ||
-    lower.includes('explain') ||
-    lower.includes('what is the process') ||
-    lower.includes('what are the steps') ||
-    lower.includes('fill out') ||
-    lower.includes('handbook') ||
-    lower.includes('contract') ||
-    lower.includes('cabinet') ||
-    lower.includes('lead') ||
-    lower.includes('quote') ||
-    lower.includes('customer') ||
-    lower.includes('salesrep') ||
-    lower.includes('walk-in') ||
-    lower.includes('walk in')
-  )
-}
-
-export function shouldAttachInstructionLink(
-  query: string,
-  isNewChat: boolean,
-): boolean {
-  if (isNewChat) return true
-  if (isInstructionFollowUp(query)) return false
-  return looksLikeInstructionQuery(query)
+export function parseInstructionIndices(answer: string): number[] | 'none' | null {
+  const match = answer.match(/\[\[INSTRUCTION:\s*([^\]]+)\]\]/i)
+  if (!match) return null
+  const raw = match[1].trim()
+  if (raw.toLowerCase() === 'none') return 'none'
+  const indices: number[] = []
+  for (const part of raw.split(',')) {
+    const index = Number.parseInt(part.trim(), 10)
+    if (Number.isFinite(index) && index > 0 && !indices.includes(index)) {
+      indices.push(index)
+    }
+  }
+  return indices.length > 0 ? indices : null
 }
 
 export function answerHasUsableInfo(answer: string): boolean {

@@ -1,25 +1,24 @@
+import { randomUUID } from 'node:crypto'
 import OpenAI from 'openai'
-import type { LoaderFunctionArgs } from 'react-router'
+import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { eventStream } from 'remix-utils/sse/server'
 import { db } from '~/db.server'
 import { getSession } from '~/sessions.server'
 import type { InstructionSlim } from '~/types'
 import {
   answerHasUsableInfo,
-  shouldAttachInstructionLink,
   stripChatResponseMarkersTrimmed,
 } from '~/utils/chatAnswerHelpers'
 import { DONE_KEY } from '~/utils/constants'
 import {
   collectRelatedInstructionImages,
-  findBestMatchingInstruction,
+  resolveInstructionsUsedForReply,
 } from '~/utils/instructionImages'
 import {
   appendSpecialOrderPrompt,
   calculateSpecialOrder,
   formatSpecialOrderResult,
   inferSpecialOrderOfferFromAnswer,
-  isPriceRelatedQuery,
   parseSlabsAndDelivery,
   parseSpecialOrderMarker,
   type SpecialOrderOffer,
@@ -44,7 +43,68 @@ interface Message {
   content: string
 }
 
+type RequestMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam
+type RequestContentPart = OpenAI.Chat.Completions.ChatCompletionContentPart
+
 type ChatMode = 'instructions' | 'priceLists'
+
+interface PendingChatImage {
+  dataUrl: string
+  expiresAt: number
+}
+
+const CHAT_IMAGE_TTL_MS = 5 * 60 * 1000
+const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
+const pendingChatImages = new Map<string, PendingChatImage>()
+
+function prunePendingChatImages() {
+  const now = Date.now()
+  for (const [id, image] of pendingChatImages) {
+    if (image.expiresAt <= now) {
+      pendingChatImages.delete(id)
+    }
+  }
+}
+
+function consumePendingChatImage(imageId: string | null): string | null {
+  if (!imageId) return null
+  prunePendingChatImages()
+  const stored = pendingChatImages.get(imageId)
+  if (!stored) return null
+  pendingChatImages.delete(imageId)
+  return stored.dataUrl
+}
+
+function buildRequestMessages(
+  messages: Message[],
+  imageDataUrl: string | null,
+): RequestMessage[] {
+  if (!imageDataUrl) return messages
+
+  let lastUserIndex = -1
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index].role === 'user') {
+      lastUserIndex = index
+      break
+    }
+  }
+  if (lastUserIndex === -1) return messages
+
+  const lastUser = messages[lastUserIndex]
+  const parts: RequestContentPart[] = [
+    {
+      type: 'text',
+      text: lastUser.content.trim() || 'Please look at this image.',
+    },
+    { type: 'image_url', image_url: { url: imageDataUrl } },
+  ]
+  const result: RequestMessage[] = [
+    ...messages.slice(0, lastUserIndex),
+    { role: 'user', content: parts },
+    ...messages.slice(lastUserIndex + 1),
+  ]
+  return result
+}
 
 async function getContext(
   user_id: number,
@@ -77,12 +137,17 @@ ${entries.join('\n\n')}`
 
 const INSTRUCTION_RULES = `How to use this context:
 1. Each entry above is one instruction with a clear TITLE and the BODY that belongs to that exact title.
-2. When the user asks about a topic, FIRST find the single instruction whose TITLE best matches the topic (for example, a question about the contract must be answered from the "Contract" title's BODY).
+2. When the user asks about a topic, FIRST find the instruction whose TITLE best matches the topic (for example, a question about fabrication must be answered from a Fabrication title's BODY, not Quotes or unrelated titles).
 3. Answer using ONLY that matching title's BODY. Do not mix in content from other titles unless the user explicitly asks about them.
 4. If no title matches the topic, say that you do not have an instruction for it instead of guessing.
 5. Be brief and direct. Do NOT copy the instruction text word-for-word. Summarize the main idea in your own words using short paragraphs or bullet points.
 6. Include every important fact, step, requirement, and exception from the matching BODY. Do not leave out actionable information, but skip filler and repetition.
-7. Do NOT add unnecessary assumptions or commentary beyond what the matching instruction requires.`
+7. Do NOT add unnecessary assumptions or commentary beyond what the matching instruction requires.
+8. Each instruction above is labeled with an instruction number (Instruction 1, Instruction 2, etc.). After your answer, add a final line containing ONLY the marker in the exact form [[INSTRUCTION:n]]. If your answer draws on more than one instruction BODY, list every instruction number you actually used, comma-separated, like [[INSTRUCTION:2,5]].
+9. Be VERY STRICT about citations. Cite an instruction ONLY when the facts in your answer came from that instruction's BODY. Do NOT cite an instruction just because a word from the user's message also appears in its TITLE (for example, do not cite a "Template" instruction merely because the user's text contains the word "template").
+10. If the user gives you their own text and asks you to continue, complete, finish, rewrite, rephrase, translate, summarize, fix, or reformat it, that text is the user's own. Use [[INSTRUCTION:none]] unless an instruction BODY genuinely supplied additional facts that you actually used.
+11. If the user asks a meta question about your previous answer or about which sources/instructions you used (for example "which information did you take from X?"), you are explaining your earlier answer, not providing new facts from an instruction BODY. Use [[INSTRUCTION:none]].
+12. Never invent or guess a number. When unsure, use [[INSTRUCTION:none]]. Never describe or mention this marker in your prose.`
 
 const PRICE_LIST_RULES = `How to use this context:
 1. You are in Price lists mode. Use ONLY the supplier documents below.
@@ -91,14 +156,11 @@ const PRICE_LIST_RULES = `How to use this context:
 4. Many supplier documents show color groups or levels instead of prices. When one SOURCE from a supplier lists the product with a group or level and size but no dollar amount, check every other SOURCE from that same supplier for the actual price before answering.
 5. Only if no SOURCE from that supplier contains a dollar price should you say the price is not specified and state the level or group and size. Example: "The price is not specified. The level is Group 7. The size is 126x63."
 6. When citing a dollar price, use the SOURCE that contains the price, not the color group document.
-7. If the requested color name is close but not exact (for example the user asks for "Adonia" and the document lists "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say clearly that the name was not an exact match, give the exact product name from the document, then state the price and slab size. Example: "There is no exact match for \"Adonia\", but Calacatta Adonia is listed at $21.47 per sqft for a 130×79 slab."
+7. If the requested color name is close but not exact (for example the user asks for "Adonia" and the document lists "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say clearly that the name was not an exact match, give the exact product name from the document, then state the price and slab size. Example: "There is no exact match for "Adonia", but Calacatta Adonia is listed at $21.47 per sqft for a 130×79 slab."
 8. Only say you could not find the product when there is no reasonable close match in the documents from that supplier.
 9. Be brief and direct. Do not guess or use outside knowledge.
-10. Each document is labeled with a SOURCE number. After your answer, add a final line containing ONLY the marker in the exact form [[SOURCE:n]] (use a colon, no spaces), where n is the SOURCE number of the document you used. If you could not find the product, use [[SOURCE:none]]. Never describe or mention this marker in your prose.
+10. Each document is labeled with a SOURCE number. After your answer, add a final line containing ONLY the marker in the exact form [[SOURCE:n]] or [[SOURCE:n,m]] when multiple documents were used (use a colon, no spaces), where n is the SOURCE number of the document you used. If you could not find the product, use [[SOURCE:none]]. Never describe or mention this marker in your prose.
 11. Whenever you state an exact dollar price AND a slab size in inches (whether per sqft, per slab, or other wording), do NOT ask about special orders in your prose. Always add the marker [[SPECIAL_ORDER:price=X,length=Y,width=Z]] on its own line at the end, where X is the price per sqft (convert from slab price if the document lists per slab), Y is length in inches, Z is width in inches. The app adds the special order question automatically. Never describe or mention this marker in your prose.`
-
-const PRICE_LIST_SKILL_MESSAGE =
-  'Turn on the Price lists skill using the + button to search supplier price lists.'
 
 async function getCompanyTaxRate(companyId: number): Promise<number> {
   const rows = await selectMany<{ state_taxes: number | string | null }>(
@@ -126,26 +188,6 @@ function parseSpecialOrderParams(url: URLSearchParams): SpecialOrderOffer | null
     return null
   }
   return { pricePerSqft, lengthInches, widthInches }
-}
-
-async function respondWithFixedAnswer(
-  send: (payload: { data: string; event?: string }) => void,
-  userId: number,
-  isNew: boolean,
-  query: string,
-  answer: string,
-) {
-  send({ event: 'status', data: JSON.stringify({ state: 'answering' }) })
-  await streamTextAnswer(send, answer)
-  send({ data: DONE_KEY })
-
-  if (isNew) {
-    await insertContext(userId, [{ role: 'user', content: query }], answer)
-    return
-  }
-
-  const result = await getContext(userId, query)
-  await updateContext(userId, result.id, result.messages, answer)
 }
 
 async function newInstructionContext(
@@ -207,11 +249,19 @@ function withPriceListContext(messages: Message[], context: string): Message[] {
   return next
 }
 
-function parseSourceId(answer: string): number | null {
+function parseSourceIds(answer: string): number[] {
   const match = answer.match(/\[+\s*SOURCE\s*[:#-]?\s*([^\]]*?)\s*\]+/i)
-  if (!match) return null
-  const id = Number.parseInt(match[1], 10)
-  return Number.isNaN(id) ? null : id
+  if (!match) return []
+  const raw = match[1].trim()
+  if (raw.toLowerCase() === 'none') return []
+  const ids: number[] = []
+  for (const part of raw.split(',')) {
+    const id = Number.parseInt(part.trim(), 10)
+    if (Number.isFinite(id) && id > 0 && !ids.includes(id)) {
+      ids.push(id)
+    }
+  }
+  return ids
 }
 
 async function streamTextAnswer(
@@ -229,7 +279,7 @@ async function loadInstructionMatchData(
   query: string,
 ): Promise<{
   images: string[]
-  instruction: ReturnType<typeof findBestMatchingInstruction>
+  instructions: InstructionSlim[]
 }> {
   const instructions = await selectMany<InstructionSlim>(
     db,
@@ -238,7 +288,7 @@ async function loadInstructionMatchData(
   )
   return {
     images: collectRelatedInstructionImages(instructions, query),
-    instruction: findBestMatchingInstruction(instructions, query),
+    instructions,
   }
 }
 
@@ -263,11 +313,46 @@ async function updateContext(
   )
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  const session = await getSession(request.headers.get('Cookie'))
+  const activeSession = session.data.sessionId || null
+  if (!activeSession) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const user = (await getUserBySessionId(activeSession)) || null
+  if (!user) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const formData = await request.formData()
+  const file = formData.get('image')
+  if (!(file instanceof File)) {
+    return Response.json({ error: 'No image provided.' }, { status: 400 })
+  }
+  if (!file.type.startsWith('image/')) {
+    return Response.json({ error: 'Only image files are allowed.' }, { status: 400 })
+  }
+  if (file.size > MAX_CHAT_IMAGE_BYTES) {
+    return Response.json({ error: 'Image is too large (max 10MB).' }, { status: 400 })
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const dataUrl = `data:${file.type};base64,${buffer.toString('base64')}`
+
+  prunePendingChatImages()
+  const id = randomUUID()
+  pendingChatImages.set(id, { dataUrl, expiresAt: Date.now() + CHAT_IMAGE_TTL_MS })
+
+  return Response.json({ id })
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getSession(request.headers.get('Cookie'))
   const activeSession = session.data.sessionId || null
   const url = new URL(request.url).searchParams
   const query = url.get('query') || ''
+  const imageDataUrl = consumePendingChatImage(url.get('imageId'))
   const isNew = url.get('isNew') === 'true'
   const mode: ChatMode =
     url.get('mode') === 'priceLists' ? 'priceLists' : 'instructions'
@@ -309,17 +394,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
           }
 
           const taxRate = await getCompanyTaxRate(companyId)
-
-          if (mode === 'instructions' && isPriceRelatedQuery(query)) {
-            await respondWithFixedAnswer(
-              send,
-              userId,
-              isNew,
-              query,
-              PRICE_LIST_SKILL_MESSAGE,
-            )
-            return
-          }
 
           let messagesPrepared = false
 
@@ -428,13 +502,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
           const instructionMatch =
             mode === 'instructions'
               ? await loadInstructionMatchData(companyId, query)
-              : { images: [] as string[], instruction: null }
+              : {
+                  images: [] as string[],
+                  instructions: [] as InstructionSlim[],
+                }
 
           send({ event: 'status', data: JSON.stringify({ state: 'answering' }) })
 
           const response = await openai.chat.completions.create({
             model: 'gpt-4.1-mini-2025-04-14',
-            messages: messages,
+            messages: buildRequestMessages(messages, imageDataUrl),
             temperature: 0,
             max_tokens: 1024,
             stream: true,
@@ -472,29 +549,52 @@ export async function loader({ request }: LoaderFunctionArgs) {
           const hasInfo = answerHasUsableInfo(cleanAnswer)
           const imagesToSend = mode === 'instructions' ? instructionMatch.images : []
 
-          if (
-            hasInfo &&
-            mode === 'instructions' &&
-            instructionMatch.instruction &&
-            shouldAttachInstructionLink(query, isNew)
-          ) {
-            send({
-              event: 'instruction',
-              data: JSON.stringify(instructionMatch.instruction),
-            })
+          if (hasInfo && mode === 'instructions') {
+            const instructionsUsed = resolveInstructionsUsedForReply(
+              instructionMatch.instructions,
+              answer,
+              query,
+            )
+            if (instructionsUsed.length > 0) {
+              send({
+                event: 'instructions',
+                data: JSON.stringify(instructionsUsed),
+              })
+            }
           }
 
           if (hasInfo && mode === 'priceLists' && !skipPriceListRebuild) {
-            const sourceId = parseSourceId(answer)
-            const source =
-              sourceId !== null
-                ? supplierSources.find(item => item.id === sourceId)
-                : undefined
-            if (source) {
-              send({ event: 'source', data: JSON.stringify(source) })
-              if (source.fileType === 'image') {
-                send({ event: 'images', data: JSON.stringify([source.url]) })
-              }
+            const citedSourceIds = parseSourceIds(answer)
+            const citedSources = citedSourceIds
+              .map(sourceId => supplierSources.find(item => item.id === sourceId))
+              .filter((item): item is SupplierSource => item !== undefined)
+            const searchedSources =
+              citedSources.length > 0
+                ? [
+                    ...citedSources,
+                    ...supplierSources.filter(
+                      source => !citedSources.some(cited => cited.id === source.id),
+                    ),
+                  ]
+                : supplierSources
+
+            if (searchedSources.length > 0) {
+              send({
+                event: 'sources',
+                data: JSON.stringify(
+                  searchedSources.map(source => ({
+                    id: source.id,
+                    name: source.name,
+                    supplierName: source.supplierName,
+                    url: source.url,
+                  })),
+                ),
+              })
+            }
+
+            const primarySource = citedSources[0]
+            if (primarySource?.fileType === 'image') {
+              send({ event: 'images', data: JSON.stringify([primarySource.url]) })
             }
 
             if (offerFromAnswer) {

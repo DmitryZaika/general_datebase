@@ -1,4 +1,8 @@
 import type { InstructionSlim } from '~/types'
+import {
+  parseInstructionIndices,
+  stripChatResponseMarkersTrimmed,
+} from '~/utils/chatAnswerHelpers'
 import { htmlToPlainText } from '~/utils/stringHelpers'
 
 const IMG_SRC_PATTERN = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi
@@ -165,6 +169,75 @@ function pickBestMatches(scored: ScoredInstruction[]): InstructionSlim[] {
   return scored
     .filter(item => item.bodyScore === maxBodyScore)
     .map(item => item.instruction)
+}
+
+export function findInstructionsMatchingQueryTitle(
+  instructions: InstructionSlim[],
+  query: string,
+): MatchedInstruction[] {
+  const scored = scoreInstructions(instructions, query)
+  const maxTitleScore = scored.reduce((max, item) => Math.max(max, item.titleScore), 0)
+  if (maxTitleScore === 0) return []
+
+  return scored
+    .filter(item => item.titleScore === maxTitleScore)
+    .map(item => ({
+      id: item.instruction.id,
+      title: item.instruction.title?.trim() || `Instruction #${item.instruction.id}`,
+    }))
+}
+
+function toMatchedInstruction(instruction: InstructionSlim): MatchedInstruction {
+  return {
+    id: instruction.id,
+    title: instruction.title?.trim() || `Instruction #${instruction.id}`,
+  }
+}
+
+export function resolveInstructionsUsedForReply(
+  instructions: InstructionSlim[],
+  answer: string,
+  query: string,
+): MatchedInstruction[] {
+  const parsed = parseInstructionIndices(answer)
+  if (parsed === 'none' || parsed === null || parsed.length === 0) return []
+
+  const cleanAnswer = stripChatResponseMarkersTrimmed(answer)
+  const scoreText = cleanAnswer.length > 0 ? `${query}\n${cleanAnswer}` : query
+  const scored = scoreInstructions(instructions, scoreText)
+  const byInstruction = new Map(scored.map(item => [item.instruction, item]))
+
+  const maxTitleScore = scored.reduce((max, item) => Math.max(max, item.titleScore), 0)
+  const maxBodyScore = scored.reduce((max, item) => Math.max(max, item.bodyScore), 0)
+  const hasBodyEvidence = maxBodyScore >= 3
+
+  const isTitleStrong = (item: ScoredInstruction): boolean =>
+    maxTitleScore > 0 && item.titleScore === maxTitleScore
+
+  const isBodyStrong = (item: ScoredInstruction): boolean =>
+    hasBodyEvidence && item.bodyScore >= Math.max(3, Math.ceil(maxBodyScore * 0.6))
+
+  const result: MatchedInstruction[] = []
+  const seen = new Set<number>()
+  const add = (instruction: InstructionSlim) => {
+    if (seen.has(instruction.id)) return
+    seen.add(instruction.id)
+    result.push(toMatchedInstruction(instruction))
+  }
+
+  for (const index of parsed) {
+    const instruction = instructions[index - 1]
+    if (!instruction) continue
+    const item = byInstruction.get(instruction)
+    if (!item) continue
+    const acceptable = hasBodyEvidence
+      ? isBodyStrong(item)
+      : isTitleStrong(item) || item.bodyScore >= 2
+    if (!acceptable) continue
+    add(instruction)
+  }
+
+  return result
 }
 
 export function findBestMatchingInstruction(
