@@ -151,10 +151,10 @@ function storeCloseDeadlineOnCallDay(committedAt: Date, dayOffset: number): stri
 }
 
 const REP_TWO_THREE_WEEK_CALLBACK_PATTERN =
-  /\b(?:would you like (?:me|us) to )?call(?: you| back)?\b[^.]{0,120}\b(?:in\s+)?(?:about\s+)?(?:two|2)\s*(?:or|to|-)\s*(?:three|3)\s*weeks?\b|\b(?:i(?:'ll| will)|we will)\s+call(?: you| back)?\b[^.]{0,80}\b(?:in\s+)?(?:two|2)\s*(?:or|to|-)\s*(?:three|3)\s*weeks?\b/i
+  /\b(?:would you like (?:me|us) to )?call(?: you| back)?\b[^.]{0,120}\b(?:in\s+)?(?:about\s+)?(?:(?:two|2)\s*(?:or|to|-)\s*(?:three|3)|(?:one|two|three|four|five|six|\d{1,2}))\s*weeks?\b|\b(?:i(?:'ll| will)|we will)\s+call(?: you| back)?\b[^.]{0,80}\b(?:in\s+)?(?:(?:two|2)\s*(?:or|to|-)\s*(?:three|3)|(?:one|two|three|four|five|six|\d{1,2}))\s*weeks?\b/i
 
 const TWO_THREE_WEEKS_MENTION_PATTERN =
-  /\b(?:two|2)\s*(?:or|to|-)\s*(?:three|3)\s*weeks?\b/i
+  /\b(?:(?:two|2)\s*(?:or|to|-)\s*(?:three|3)|(?:one|two|three|four|five|six|\d{1,2}))\s*weeks?\b/i
 
 const CALLBACK_ACTIVITY_NAME_PATTERN = /\b(?:call\s+back|follow[- ]?up|callback)\b/i
 
@@ -212,7 +212,72 @@ function isCallBackActivity(name: string): boolean {
   return CALLBACK_ACTIVITY_NAME_PATTERN.test(name.toLowerCase())
 }
 
-function buildCallBackActivityName(transcript: string): string {
+function capitalizeWord(word: string): string {
+  if (!word) return word
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+}
+
+function cleanPlaceName(raw: string): string {
+  return raw
+    .trim()
+    .replace(/\s+(before|when|after|and|or|so|we|they|the|from)\s*$/i, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map(capitalizeWord)
+    .join(' ')
+}
+
+function inferCallBackContextDetail(transcript: string): string | null {
+  const lower = transcript.toLowerCase()
+
+  if (/\blitigation\b/.test(lower)) return null
+  if (/\bmove forward\b/.test(lower)) return null
+
+  const backFrom = lower.match(
+    /\b(?:get|got|come|coming)\s+back\s+from\s+([a-z][a-z\s'-]{1,40}?)(?:\s+before|\s+when|\s+to|\s+and|\.|,|\?|!|$)/,
+  )
+  const vacationDestination = lower.match(
+    /\bvacation(?:\s+on\s+\w+)?\s+to\s+([a-z][a-z\s'-]{1,30}?)(?:\s+|\.|,|$)/,
+  )
+  const tripTo = lower.match(/\btrip\s+to\s+([a-z][a-z\s'-]{1,30}?)(?:\s+|\.|,|$)/)
+
+  const destinationRaw = vacationDestination?.[1] ?? tripTo?.[1] ?? backFrom?.[1] ?? ''
+  const destination = cleanPlaceName(destinationRaw)
+
+  if (/\bvacation\b/.test(lower)) {
+    if (destination.length > 1) {
+      return `after vacation to ${destination}`
+    }
+    return 'after vacation'
+  }
+
+  if (
+    backFrom?.[1] &&
+    /\b(?:trip|travel|decision|check back|make a final)\b/.test(lower)
+  ) {
+    const place = cleanPlaceName(backFrom[1])
+    if (place.length > 1) return `after trip to ${place}`
+  }
+
+  if (
+    /\b(?:holiday|holidays)\b/.test(lower) &&
+    /\b(?:get back|when|after|before|decision)\b/.test(lower)
+  ) {
+    return 'after holiday'
+  }
+
+  if (
+    /\b(?:make a final decision|final decision|not ready yet)\b/.test(lower) &&
+    /\b(?:vacation|trip|travel|get back|few weeks)\b/.test(lower)
+  ) {
+    return 'after they decide'
+  }
+
+  return null
+}
+
+function buildCallBackActivityBaseName(transcript: string): string {
   const lower = transcript.toLowerCase()
   if (
     /\bquote\b/.test(lower) &&
@@ -220,13 +285,106 @@ function buildCallBackActivityName(transcript: string): string {
   ) {
     return 'Call back, follow up on quote'
   }
+  if (/\blitigation\b/.test(lower)) {
+    return 'Call back, check if litigation is finished'
+  }
+  if (/\bmove forward\b/.test(lower)) {
+    return 'Call back, check if ready to move forward'
+  }
   if (/\bconfirm\b/.test(lower) && /\binterest\b/.test(lower)) {
     return 'Call back, confirm still interested'
   }
   if (/\bkitchen\b/.test(lower)) {
     return 'Call back, follow up on kitchen project'
   }
+  if (/\b(?:countertop|counter top|counter)\b/.test(lower)) {
+    return 'Call back, follow up on countertop project'
+  }
   return 'Call back, follow up'
+}
+
+function buildCallBackActivityName(transcript: string): string {
+  const base = buildCallBackActivityBaseName(transcript)
+  const detail = inferCallBackContextDetail(transcript)
+  if (!detail) return base
+  const detailCore = detail.replace(/^after /, '')
+  if (base.toLowerCase().includes(detailCore)) return base
+  return `${base} ${detail}`
+}
+
+const AGREED_WEEK_COUNT_TOKEN =
+  '(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\\d{1,2})'
+
+const AGREED_WEEKS_IN_TEXT_PATTERN = new RegExp(
+  `\\b(?:about\\s+)?(?:in\\s+)?(${AGREED_WEEK_COUNT_TOKEN})\\s*weeks?\\b`,
+  'i',
+)
+
+const CALL_BACK_TIMING_CONTEXT_PATTERN =
+  /\b(?:would you like (?:me|us) to )?(?:call|follow\s+(?:you\s+)?up)\b|\bfollow\s+(?:you\s+)?up\b|\bcall\s+you\b|\bfollow\s+up\b|\bcall\s+(?:you|me|back)\b|\bwould you like\b/
+
+function parseWeekCount(raw: string): number | null {
+  const lower = raw.toLowerCase().trim()
+  if (lower === 'a' || lower === 'an') return 1
+  const digit = Number.parseInt(lower, 10)
+  if (Number.isFinite(digit) && digit >= 1 && digit <= 52) return digit
+  const words: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+  }
+  return words[lower] ?? null
+}
+
+function inferAgreedCallBackWeeksFromTranscript(transcript: string): number | null {
+  const lower = transcript.toLowerCase()
+  if (!CALL_BACK_TIMING_CONTEXT_PATTERN.test(lower)) {
+    return null
+  }
+
+  const weekPattern = new RegExp(AGREED_WEEKS_IN_TEXT_PATTERN.source, 'gi')
+  const sentences = lower
+    .split(/(?<=[.?!])\s+/)
+    .map(sentence => sentence.trim())
+    .filter(Boolean)
+
+  let callBackContext = false
+  let lastWeeks: number | null = null
+
+  for (const sentence of sentences) {
+    if (CALL_BACK_TIMING_CONTEXT_PATTERN.test(sentence)) {
+      callBackContext = true
+    }
+
+    const isAmbiguousRange = /\b(?:two|2)\s*(?:or|to|-)\s*(?:three|3)\s*weeks?\b/.test(
+      sentence,
+    )
+    const customerConfirmed = /\b(?:yeah|yes|yep|sure|ok|good|will do)\b/.test(sentence)
+
+    if (isAmbiguousRange && !customerConfirmed) {
+      lastWeeks = null
+      continue
+    }
+
+    weekPattern.lastIndex = 0
+    let match = weekPattern.exec(sentence)
+    while (match) {
+      if (callBackContext || /\bcall\b/.test(sentence)) {
+        const parsed = parseWeekCount(match[1])
+        if (parsed !== null) lastWeeks = parsed
+      }
+      match = weekPattern.exec(sentence)
+    }
+  }
+
+  return lastWeeks
 }
 
 function inferAgreedCallBackDeadlineFromTranscript(
@@ -234,7 +392,12 @@ function inferAgreedCallBackDeadlineFromTranscript(
   committedAt: Date,
 ): string | null {
   const lower = transcript.toLowerCase()
-  if (!/\b(?:call\s+(?:you|me|back)|follow\s+up)\b/.test(lower)) return null
+  if (!CALL_BACK_TIMING_CONTEXT_PATTERN.test(lower)) return null
+
+  const agreedWeeks = inferAgreedCallBackWeeksFromTranscript(transcript)
+  if (agreedWeeks !== null) {
+    return formatStoreDateOnlyPlusDays(committedAt, agreedWeeks * 7)
+  }
 
   const customerNext = lower.match(
     /\b(?:you\s+can\s+call\s+me|call\s+me)\s+next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
@@ -305,20 +468,7 @@ function applyAgreedCallBackActivity(
 }
 
 function buildRepTwoThreeWeekCallBackName(transcript: string): string {
-  const lower = transcript.toLowerCase()
-  if (/\blitigation\b/.test(lower)) {
-    return 'Call back, check if litigation is finished'
-  }
-  if (/\bmove forward\b/.test(lower)) {
-    return 'Call back, check if ready to move forward'
-  }
-  if (/\bconfirm\b/.test(lower) && /\binterest\b/.test(lower)) {
-    return 'Call back, confirm still interested'
-  }
-  if (/\bkitchen\b/.test(lower)) {
-    return 'Call back, follow up on kitchen project'
-  }
-  return 'Call back, follow up'
+  return buildCallBackActivityName(transcript)
 }
 
 function isRepTwoThreeWeekCallBackTask(
@@ -340,6 +490,10 @@ function inferRepTwoThreeWeekCallbackDeadline(
   committedAt: Date,
 ): string | null {
   if (!isRepTwoThreeWeekCallBackTask(activityName, transcript)) return null
+  const agreedWeeks = inferAgreedCallBackWeeksFromTranscript(transcript)
+  if (agreedWeeks !== null) {
+    return formatStoreDateOnlyPlusDays(committedAt, agreedWeeks * 7)
+  }
   return formatStoreDateOnlyPlusDays(committedAt, REP_TWO_THREE_WEEK_CALLBACK_DAYS)
 }
 
@@ -349,12 +503,11 @@ function applyRepTwoThreeWeekCallBackActivity(
   transcript: string,
 ): ExtractedCallActivity {
   if (!isRepTwoThreeWeekCallBackTask(activity.name, transcript)) return activity
+  const agreedWeeks = inferAgreedCallBackWeeksFromTranscript(transcript)
+  const days = agreedWeeks !== null ? agreedWeeks * 7 : REP_TWO_THREE_WEEK_CALLBACK_DAYS
   return {
     name: buildRepTwoThreeWeekCallBackName(transcript),
-    deadline: formatStoreDateOnlyPlusDays(
-      committedAt,
-      REP_TWO_THREE_WEEK_CALLBACK_DAYS,
-    ),
+    deadline: formatStoreDateOnlyPlusDays(committedAt, days),
   }
 }
 
@@ -639,7 +792,17 @@ function getActivityTranscriptWindows(
     terms.push('edge', 'picture', 'photo', 'pic')
   }
   if (isCallBackActivity(lower)) {
-    terms.push('call', 'friday', 'monday', 'next', 'check', 'quote', 'questions')
+    terms.push(
+      'call',
+      'follow',
+      'week',
+      'friday',
+      'monday',
+      'next',
+      'check',
+      'quote',
+      'questions',
+    )
   }
   if (isQuoteOrEstimateActivity(lower)) {
     terms.push('quote', 'estimate', 'pricing', 'bid')
@@ -1367,12 +1530,14 @@ Include when stated:
 - When edge style was discussed and the rep offers to send edge photos, add a separate edge-photo activity—do not merge with link or customer-photo tasks
 
 Rules for name:
-- Clear imperative title, usually 4-12 words with brief context (why you are calling back)
+- Clear imperative title, usually 4-14 words with brief context (why you are calling back, e.g. after vacation, after trip)
 - Never include customer or caller names
 - Never include calendar dates in the name—use deadline only for when the task is due
-- For "two or three weeks" call-back from the salesperson: set deadline null; use a descriptive name such as "Call back, check if litigation is finished" when litigation was discussed, or "Call back, follow up on kitchen project" for kitchen follow-ups
+- When the rep offers "call you in two weeks" and the customer confirms a different number (e.g. "in three weeks, yeah"), use the customer's confirmed number of weeks for the deadline
+- For "two or three weeks" call-back from the salesperson with no customer pick: set deadline null; server uses about two weeks
+- For an agreed call-back in N weeks (a week, in a week, about a week, one week, two weeks, three weeks, etc.): set deadline null; server computes the date from the transcript
 - This company sells stone countertops. When sending stone options, samples, links, or pricing, include the stone type if specified (granite, quartz, marble, etc.)
-- Examples: "Send granite inventory link", "Request kitchen photos", "Send edge profile photos"
+- Examples: "Send granite inventory link", "Request kitchen photos", "Send edge profile photos", "Call back, follow up after vacation", "Call back, follow up on countertop project after vacation to Colombia"
 - When the rep already agreed to be on-site at a specific time for an estimate, use name "Be on-site for estimate"—not "Schedule on-site measurement visit" or "Schedule on-site estimate visit"
 - Only use "Schedule ... estimate" when an estimate time is not yet agreed
 
