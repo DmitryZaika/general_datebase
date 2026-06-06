@@ -263,6 +263,48 @@ describe('getThreadForUser', () => {
     })
     expect(result.messages).toEqual([])
   })
+
+  test('excludes outbound pending/failed rows (handled optimistically client-side)', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: '3173161456',
+      text: 'in',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: admin.id,
+      text: 'sent ok',
+      status: 'sent',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: admin.id,
+      text: 'still sending',
+      status: 'pending',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: admin.id,
+      text: 'failed one',
+      status: 'failed',
+    })
+
+    const result = await getThreadForUser({
+      user: admin,
+      phoneDigits: '3173161456',
+      limit: 30,
+    })
+    const texts = result.messages.map(m => m.text)
+    expect(texts).toContain('in')
+    expect(texts).toContain('sent ok')
+    expect(texts).not.toContain('still sending')
+    expect(texts).not.toContain('failed one')
+  })
 })
 
 describe('markThreadReadForUser', () => {

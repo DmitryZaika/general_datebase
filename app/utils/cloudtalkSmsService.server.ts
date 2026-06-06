@@ -370,6 +370,7 @@ export async function getThreadForUser(
       FROM cloudtalk_sms s
      WHERE s.company_id = ?
        AND (s.sender IN (${placeholders}) OR s.recipient IN (${placeholders}))
+       AND NOT (s.direction = 'outbound' AND s.status IN ('pending', 'failed'))
        ${visibility.sql}${beforeClause}
      ORDER BY s.created_date DESC, s.id DESC
      LIMIT ?

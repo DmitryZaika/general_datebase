@@ -1,7 +1,10 @@
-import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
-import { CloudTalkApiError, cloudtalkRequest } from './cloudtalk.server'
-import { selectId } from './queryHelpers'
+import {
+  type Agent,
+  CloudTalkApiError,
+  cloudtalkRequest,
+  fetchValue,
+} from './cloudtalk.server'
 
 export interface SendSmsParams {
   companyId: number
@@ -66,16 +69,22 @@ function extractSendError(json: SendSmsResponse): Nullable<string> {
   return null
 }
 
-// The company's CloudTalk SMS-capable sender number (E.164), or null if not configured.
-export async function getCompanySmsSender(
+// Resolve the SMS sender from the agent's own CloudTalk number, looked up by agent id —
+// CloudTalk owns each agent's number(s), so nothing is stored on our side. Prefers the
+// agent's default outbound number, falling back to the first assigned number. Returns
+// null when the agent has no number configured in CloudTalk. CloudTalk's agents/index.json
+// nests each row under an `Agent` key, so we unwrap it and match by id defensively (in
+// case the `id` filter is ignored and all agents are returned).
+export async function getAgentSmsSender(
   companyId: number,
+  agentId: string,
 ): Promise<Nullable<string>> {
-  const row = await selectId<{ cloudtalk_sms_sender: Nullable<string> }>(
-    db,
-    'SELECT cloudtalk_sms_sender FROM company WHERE id = ?',
-    companyId,
-  )
-  const sender = row?.cloudtalk_sms_sender?.trim()
+  const { items } = await fetchValue<{ Agent: Agent }>('agents/index.json', companyId, {
+    id: agentId,
+  })
+  const agent = items.find(item => String(item.Agent?.id) === agentId)?.Agent
+  if (!agent) return null
+  const sender = agent.default_number?.trim() || agent.associated_numbers?.[0]?.trim()
   return sender && sender.length > 0 ? sender : null
 }
 

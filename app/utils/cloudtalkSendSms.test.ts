@@ -1,21 +1,97 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-const { cloudtalkRequestMock } = vi.hoisted(() => ({
+const { cloudtalkRequestMock, fetchValueMock } = vi.hoisted(() => ({
   cloudtalkRequestMock: vi.fn(),
+  fetchValueMock: vi.fn(),
 }))
 
 vi.mock('./cloudtalk.server', async orig => {
   const actual = await orig<typeof import('./cloudtalk.server')>()
-  return { ...actual, cloudtalkRequest: cloudtalkRequestMock }
+  return {
+    ...actual,
+    cloudtalkRequest: cloudtalkRequestMock,
+    fetchValue: fetchValueMock,
+  }
 })
 
 import { CloudTalkApiError } from './cloudtalk.server'
-import { mapCloudTalkSendError, sendSmsViaCloudTalk } from './cloudtalkSendSms.server'
+import {
+  getAgentSmsSender,
+  mapCloudTalkSendError,
+  sendSmsViaCloudTalk,
+} from './cloudtalkSendSms.server'
 
 const FAKE_KEY = '00000000-0000-0000-0000-000000000001'
 
 beforeEach(() => {
   cloudtalkRequestMock.mockReset()
+  fetchValueMock.mockReset()
+})
+
+describe('getAgentSmsSender', () => {
+  // CloudTalk's agents/index.json nests each agent under an `Agent` key.
+  test('returns the agent default_number', async () => {
+    fetchValueMock.mockResolvedValueOnce({
+      items: [
+        {
+          Agent: {
+            id: '540273',
+            default_number: '+13175551234',
+            associated_numbers: [],
+          },
+        },
+      ],
+    })
+    expect(await getAgentSmsSender(1, '540273')).toBe('+13175551234')
+    expect(fetchValueMock).toHaveBeenCalledWith('agents/index.json', 1, {
+      id: '540273',
+    })
+  })
+
+  test('falls back to the first associated number', async () => {
+    fetchValueMock.mockResolvedValueOnce({
+      items: [
+        {
+          Agent: {
+            id: '540273',
+            default_number: '',
+            associated_numbers: ['+13175559999'],
+          },
+        },
+      ],
+    })
+    expect(await getAgentSmsSender(1, '540273')).toBe('+13175559999')
+  })
+
+  test('matches the right agent when the id filter is ignored', async () => {
+    fetchValueMock.mockResolvedValueOnce({
+      items: [
+        {
+          Agent: { id: '111', default_number: '+13170000001', associated_numbers: [] },
+        },
+        {
+          Agent: {
+            id: '540273',
+            default_number: '+13176767938',
+            associated_numbers: [],
+          },
+        },
+      ],
+    })
+    expect(await getAgentSmsSender(1, '540273')).toBe('+13176767938')
+  })
+
+  test('returns null when the agent has no number', async () => {
+    fetchValueMock.mockResolvedValueOnce({
+      items: [{ Agent: { id: '540273', default_number: '', associated_numbers: [] } }],
+    })
+    expect(await getAgentSmsSender(1, '540273')).toBeNull()
+  })
+
+  test('returns null when the agent is not found', async () => {
+    fetchValueMock.mockResolvedValueOnce({ items: [] })
+    expect(await getAgentSmsSender(1, '999')).toBeNull()
+  })
 })
 
 describe('sendSmsViaCloudTalk', () => {

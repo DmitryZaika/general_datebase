@@ -7,7 +7,7 @@ import {
   requireEmployeeWithCsrf,
 } from '~/utils/apiResponse.server'
 import {
-  getCompanySmsSender,
+  getAgentSmsSender,
   mapCloudTalkSendError,
   sendSmsViaCloudTalk,
 } from '~/utils/cloudtalkSendSms.server'
@@ -34,12 +34,13 @@ export async function action({ request }: ActionFunctionArgs) {
     const phoneDigits = String(form.get('phoneDigits') ?? '')
     const text = String(form.get('text') ?? '').trim()
 
-    if (!canUserSendSms(user)) {
+    if (!canUserSendSms(user) || !user.cloudtalk_agent_id) {
       return data(
         { success: false, error: 'agent_not_linked' },
         { status: HttpStatus.Forbidden },
       )
     }
+    const agentId = user.cloudtalk_agent_id
 
     if (!PHONE_DIGITS_REGEX.test(phoneDigits)) return badRequest('invalid_phone')
     if (text.length === 0) return badRequest('empty_text')
@@ -48,8 +49,8 @@ export async function action({ request }: ActionFunctionArgs) {
     const e164 = normalizeToE164(phoneDigits)
     if (!e164) return badRequest('invalid_phone')
 
-    const senderE164 = await getCompanySmsSender(user.company_id)
-    if (!senderE164) return badRequest('sms_sender_not_configured')
+    const senderE164 = await getAgentSmsSender(user.company_id, agentId)
+    if (!senderE164) return badRequest('agent_no_number')
 
     // Rate-limit after validation so config errors don't burn slots / mask the failure.
     if (

@@ -285,7 +285,7 @@ interface SmsOutboundOverrides {
   text?: string
   agent?: Nullable<string>
   cloudtalk_id?: Nullable<number>
-  status?: 'sent' | 'failed'
+  status?: 'sent' | 'failed' | 'pending'
   error_message?: Nullable<string>
   created_date?: Date
 }

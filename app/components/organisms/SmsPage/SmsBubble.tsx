@@ -49,14 +49,9 @@ export function SmsBubble({ message, onRetry }: SmsBubbleProps) {
             </button>
           )}
           {message.status === 'sent' && (
-            <>
-              {!isOutbound && (
-                <time dateTime={message.createdAt}>
-                  {format(new Date(message.createdAt), 'h:mm a')}
-                </time>
-              )}
-              {isOutbound && message.agent ? message.agent : null}
-            </>
+            <time dateTime={message.createdAt}>
+              {format(new Date(message.createdAt), 'h:mm a')}
+            </time>
           )}
         </div>
       </div>

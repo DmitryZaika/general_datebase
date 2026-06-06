@@ -1,6 +1,4 @@
-import { Settings } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Link as RouterLink } from 'react-router'
 import { SearchInput } from '~/components/molecules/SearchInput'
 import { Skeleton } from '~/components/ui/skeleton'
 import { NoThreadsEmpty, SearchNoMatch, ThreadListLoading } from './SmsPageEmptyStates'
@@ -17,8 +15,6 @@ export interface SmsThreadListProps {
   onSearchChange: (q: string) => void
   onSelect: (phoneDigits: string) => void
   onLoadMore: () => void
-  // When set (admin only), shows a settings gear linking to the SMS settings page.
-  settingsHref?: string
 }
 
 export function SmsThreadList(props: SmsThreadListProps) {
@@ -90,19 +86,7 @@ export function SmsThreadList(props: SmsThreadListProps) {
       aria-label='SMS conversations'
     >
       <div className='px-4 py-3 border-b border-slate-200'>
-        <div className='flex items-center justify-between mb-3'>
-          <h2 className='text-base font-semibold text-slate-900'>CloudTalk SMS</h2>
-          {props.settingsHref && (
-            <RouterLink
-              to={props.settingsHref}
-              aria-label='CloudTalk SMS settings'
-              title='SMS settings'
-              className='inline-flex size-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-            >
-              <Settings size={16} />
-            </RouterLink>
-          )}
-        </div>
+        <h2 className='text-base font-semibold text-slate-900 mb-3'>CloudTalk SMS</h2>
         <SearchInput
           value={draftSearch}
           onChange={setDraftSearch}
