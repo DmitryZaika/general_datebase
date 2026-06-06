@@ -109,20 +109,13 @@ export interface FinalizeOutboundParams {
   errorMessage: Nullable<string>
 }
 
-interface VisibilityClause {
-  sql: string
-  params: (string | number)[]
-}
-
 const PENDING_TIMEOUT_MINUTES = 5
 const CLEANUP_INTERVAL_MS = 60_000
 
 const lastCleanupAt = new Map<number, number>()
 
-// Outbound rows are inserted as 'pending' and finalized after the CloudTalk
-// call returns. If the action crashes between insert and finalize, the row
-// would stay pending forever — sweep stale ones to 'failed' on read. Throttle
-// per-company so active polling doesn't issue an UPDATE on every poll.
+// Sweep outbound rows stuck in 'pending' (action crashed between insert and finalize)
+// to 'failed' on read. Throttled per-company so polling doesn't UPDATE every time.
 async function expireStalePendingOutbound(companyId: number): Promise<void> {
   const now = Date.now()
   const last = lastCleanupAt.get(companyId) ?? 0
@@ -144,27 +137,9 @@ export function __resetPendingCleanupThrottle(): void {
   lastCleanupAt.clear()
 }
 
-// Admins/superusers see every row in their company; employees only see rows
-// they participated in (matched by agent id, falling back to sender_user_id).
 // Any user with a linked CloudTalk agent may send; without one it's read-only.
 export function canUserSendSms(user: SessionUser): boolean {
   return Boolean(user.cloudtalk_agent_id)
-}
-
-function buildVisibilityClause(user: SessionUser, alias: string): VisibilityClause {
-  if (user.is_admin || user.is_superuser) {
-    return { sql: '', params: [] }
-  }
-  if (user.cloudtalk_agent_id) {
-    return {
-      sql: ` AND (${alias}.agent = ? OR ${alias}.sender_user_id = ?)`,
-      params: [user.cloudtalk_agent_id, user.id],
-    }
-  }
-  return {
-    sql: ` AND ${alias}.sender_user_id = ?`,
-    params: [user.id],
-  }
 }
 
 function toIsoString(value: unknown): string {
@@ -199,7 +174,6 @@ export async function listThreadsForUser(
 ): Promise<ListThreadsResult> {
   const { user, search, limit, offset } = params
   await expireStalePendingOutbound(user.company_id)
-  const visibility = buildVisibilityClause(user, 's')
 
   const searchTrimmed = search.trim()
   const searchDigits = searchTrimmed.replace(/\D+/g, '')
@@ -218,12 +192,8 @@ export async function listThreadsForUser(
   }
   const searchClause = hasSearch ? ` AND (${searchClauseParts.join(' OR ')})` : ''
 
-  const baseWhere = `s.company_id = ?${visibility.sql}${searchClause}`
-  const baseParams: (string | number)[] = [
-    user.company_id,
-    ...visibility.params,
-    ...searchParams,
-  ]
+  const baseWhere = `s.company_id = ?${searchClause}`
+  const baseParams: (string | number)[] = [user.company_id, ...searchParams]
 
   const sql = `
     WITH scoped AS (
@@ -358,7 +328,8 @@ export async function getThreadForUser(
     return { messages: [], hasOlder: false }
   }
 
-  const visibility = buildVisibilityClause(user, 's')
+  // Shared company SMS inbox: the full conversation is visible to anyone in the company
+  // (both directions, every agent), scoped only by company_id.
   const placeholders = variants.map(() => '?').join(',')
   const beforeClause = beforeId ? ' AND s.id < ?' : ''
   const sql = `
@@ -371,16 +342,11 @@ export async function getThreadForUser(
      WHERE s.company_id = ?
        AND (s.sender IN (${placeholders}) OR s.recipient IN (${placeholders}))
        AND NOT (s.direction = 'outbound' AND s.status IN ('pending', 'failed'))
-       ${visibility.sql}${beforeClause}
+       ${beforeClause}
      ORDER BY s.created_date DESC, s.id DESC
      LIMIT ?
   `
-  const queryParams: (string | number)[] = [
-    user.company_id,
-    ...variants,
-    ...variants,
-    ...visibility.params,
-  ]
+  const queryParams: (string | number)[] = [user.company_id, ...variants, ...variants]
   if (beforeId) queryParams.push(Number(beforeId))
   // LIMIT N+1: fetch one extra row so we know whether older history exists
   // without issuing a second COUNT query.
@@ -411,7 +377,6 @@ export async function markThreadReadForUser(
 }
 
 export async function getUnreadThreadCountForUser(user: SessionUser): Promise<number> {
-  const visibility = buildVisibilityClause(user, 's')
   const sql = `
     SELECT COUNT(DISTINCT CONVERT(CAST(s.sender AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci) AS unread_count
       FROM cloudtalk_sms s
@@ -422,13 +387,8 @@ export async function getUnreadThreadCountForUser(user: SessionUser): Promise<nu
      WHERE s.company_id = ?
        AND s.direction = 'inbound'
        AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)
-       ${visibility.sql}
   `
-  const queryParams: (string | number)[] = [
-    user.id,
-    user.company_id,
-    ...visibility.params,
-  ]
+  const queryParams: (string | number)[] = [user.id, user.company_id]
   const rows = await selectMany<UnreadCountRow>(db, sql, queryParams)
   return Number(rows[0]?.unread_count ?? 0)
 }
@@ -440,7 +400,6 @@ export async function getThreadUnreadCountForUser(
 ): Promise<number> {
   const digits = canonicalPhone10(phoneDigits)
   if (digits.length === 0) return 0
-  const visibility = buildVisibilityClause(user, 's')
   const variants = phoneVariants(digits)
   const placeholders = variants.map(() => '?').join(',')
   const rows = await selectMany<UnreadCountRow>(
@@ -454,9 +413,8 @@ export async function getThreadUnreadCountForUser(
       WHERE s.company_id = ?
         AND s.direction = 'inbound'
         AND s.sender IN (${placeholders})
-        AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)
-        ${visibility.sql}`,
-    [user.id, digits, user.company_id, ...variants, ...visibility.params],
+        AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)`,
+    [user.id, digits, user.company_id, ...variants],
   )
   return Number(rows[0]?.unread_count ?? 0)
 }
@@ -554,17 +512,16 @@ export async function userHasMessagesForPhone(
   user: SessionUser,
   phoneDigits: string,
 ): Promise<boolean> {
-  const visibility = buildVisibilityClause(user, 's')
   const variants = phoneVariants(phoneDigits)
   if (variants.length === 0) return false
   const placeholders = variants.map(() => '?').join(',')
   const rows = await selectMany<{ found: number }>(
     db,
     `SELECT 1 AS found FROM cloudtalk_sms s
-      WHERE s.company_id = ?${visibility.sql}
+      WHERE s.company_id = ?
         AND (s.sender IN (${placeholders}) OR s.recipient IN (${placeholders}))
       LIMIT 1`,
-    [user.company_id, ...visibility.params, ...variants, ...variants],
+    [user.company_id, ...variants, ...variants],
   )
   return rows.length > 0
 }

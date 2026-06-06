@@ -91,12 +91,15 @@ conversation pane: a customer/phone header **and** an enabled composer (subject 
 permissions), so the employee can type and send the **first** message. The first send is
 a real CloudTalk outbound send (existing send path) and creates the thread.
 
-### FR-6 — Role-aware permissions (D3)
-- Employee with a linked `cloudtalk_agent_id` → can **read and send**.
-- Admin / superuser → **read-only** (composer disabled), even if they have an agent id.
+### FR-6 — Send permission (final, per D3)
+- **Any** user with a linked `cloudtalk_agent_id` can **read and send**, regardless of
+  role/view; without an agent id the conversation is **read-only** (composer disabled).
 - Enforced **server-side** on both the thread loader (`canSend`) and the send action
-  (reject with `agent_not_linked`/forbidden), via a single shared helper so the rule
-  cannot drift between read and write paths.
+  via a single shared helper (`canUserSendSms`) so the rule cannot drift between read
+  and write paths.
+- (Supersedes the original "admin/superuser read-only" idea — see D3 in §3. The earlier
+  role-column and view-aware variants were dropped because the only agent-linked user in
+  practice is a superuser, and linkage is the real gate.)
 
 ### FR-7 — Existing conversation opens normally
 If the customer already has a thread, the same navigation opens it with full history

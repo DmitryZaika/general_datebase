@@ -141,8 +141,9 @@ describe('listThreadsForUser', () => {
     ])
   })
 
-  test('employee sees only threads their agent participated in', async () => {
+  test('employee sees every thread in the company (shared inbox), not just their own agent', async () => {
     const company = await factory.company()
+    const otherCompany = await factory.company()
     const user = await factory.user({
       company_id: company.id,
       is_employee: true,
@@ -159,6 +160,11 @@ describe('listThreadsForUser', () => {
       sender: '5125559090',
       agent: 'agent-B',
     })
+    // Another company's thread must never leak.
+    await factory.smsInbound({
+      company_id: otherCompany.id,
+      sender: '9999999999',
+    })
 
     const result = await listThreadsForUser({
       user,
@@ -167,7 +173,10 @@ describe('listThreadsForUser', () => {
       offset: 0,
     })
 
-    expect(result.threads.map(t => t.phoneDigits)).toEqual(['3173161456'])
+    expect(result.threads.map(t => t.phoneDigits).sort()).toEqual([
+      '3173161456',
+      '5125559090',
+    ])
   })
 
   test('employee sees their own outbound threads even without inbound match', async () => {
@@ -244,24 +253,45 @@ describe('getThreadForUser', () => {
     expect(result.hasOlder).toBe(false)
   })
 
-  test('returns empty when phone not visible to employee', async () => {
+  test('shows the full conversation to any employee (company-shared), incl. replies from other agents', async () => {
     const company = await factory.company()
+    const otherCompany = await factory.company()
     const user = await factory.user({
       company_id: company.id,
       is_employee: true,
       cloudtalk_agent_id: 'agent-A',
     })
+    // The employee texted the customer...
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: user.id,
+      agent: 'agent-A',
+      text: 'hi from rep',
+    })
+    // ...the customer replied (inbound carries a different agent, no sender_user_id)...
     await factory.smsInbound({
       company_id: company.id,
       sender: '3173161456',
       agent: 'agent-B',
+      text: 'customer reply',
     })
+    // ...and another company's thread on the same number must not leak.
+    await factory.smsInbound({
+      company_id: otherCompany.id,
+      sender: '3173161456',
+      text: 'other company',
+    })
+
     const result = await getThreadForUser({
       user,
       phoneDigits: '3173161456',
       limit: 30,
     })
-    expect(result.messages).toEqual([])
+    const texts = result.messages.map(m => m.text)
+    expect(texts).toContain('hi from rep')
+    expect(texts).toContain('customer reply')
+    expect(texts).not.toContain('other company')
   })
 
   test('excludes outbound pending/failed rows (handled optimistically client-side)', async () => {
@@ -618,7 +648,7 @@ describe('userHasMessagesForPhone', () => {
     expect(result).toBe(false)
   })
 
-  test('returns false when the row exists but is not visible to the employee', async () => {
+  test('returns true for any message in the company (shared inbox), regardless of agent', async () => {
     const company = await factory.company()
     const user = await factory.user({
       company_id: company.id,
@@ -629,6 +659,23 @@ describe('userHasMessagesForPhone', () => {
       company_id: company.id,
       sender: '3173161456',
       agent: 'agent-B',
+    })
+    const result = await userHasMessagesForPhone(user, '3173161456')
+    expect(result).toBe(true)
+  })
+
+  test('does not leak another company’s messages', async () => {
+    const company = await factory.company()
+    const otherCompany = await factory.company()
+    const user = await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      cloudtalk_agent_id: 'agent-A',
+    })
+    await factory.smsInbound({
+      company_id: otherCompany.id,
+      sender: '3173161456',
+      agent: 'agent-A',
     })
     const result = await userHasMessagesForPhone(user, '3173161456')
     expect(result).toBe(false)

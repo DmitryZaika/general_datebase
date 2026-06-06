@@ -18,7 +18,7 @@ import {
   linkExistingCustomer,
   searchCustomers,
 } from './service'
-import type { MockCustomer } from './types'
+import type { CustomerSearchResult } from './types'
 
 export interface SmsLinkCustomerDialogProps {
   open: boolean
@@ -34,7 +34,7 @@ export function SmsLinkCustomerDialog(props: SmsLinkCustomerDialogProps) {
   const csrfToken = useAuthenticityToken()
   const [tab, setTab] = useState<Tab>('existing')
   const [searchTerm, setSearchTerm] = useState('')
-  const [results, setResults] = useState<MockCustomer[]>([])
+  const [results, setResults] = useState<CustomerSearchResult[]>([])
   const [searchInFlight, setSearchInFlight] = useState(false)
   const [newName, setNewName] = useState('')
   const [submitting, setSubmitting] = useState(false)

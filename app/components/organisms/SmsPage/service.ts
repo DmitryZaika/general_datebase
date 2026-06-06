@@ -1,5 +1,10 @@
 import type { Nullable } from '~/types/utils'
-import type { MockCustomer, SmsMessage, SmsThread, ThreadSummary } from './types'
+import type {
+  CustomerSearchResult,
+  SmsMessage,
+  SmsThread,
+  ThreadSummary,
+} from './types'
 
 export interface FetchThreadsParams {
   scope: 'mine' | 'all'
@@ -112,14 +117,14 @@ export async function sendSms(params: {
   return (await res.json()) as { message: SmsMessage }
 }
 
-export async function searchCustomers(term: string): Promise<MockCustomer[]> {
+export async function searchCustomers(term: string): Promise<CustomerSearchResult[]> {
   const qs = new URLSearchParams({ term })
   const res = await fetch(`/api/customers/sms-search?${qs}`, {
     credentials: 'include',
     headers: { Accept: 'application/json' },
   })
   if (!res.ok) throw new Error(`search_customers_failed:${res.status}`)
-  const body = (await res.json()) as { customers: MockCustomer[] }
+  const body = (await res.json()) as { customers: CustomerSearchResult[] }
   return body.customers
 }
 

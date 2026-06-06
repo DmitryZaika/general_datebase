@@ -63,11 +63,8 @@ export async function action({ request }: ActionFunctionArgs) {
       return data({ success: false, error: 'rate_limited' }, { status: 429 })
     }
 
-    // Idempotency-Key: the pending row's UUID protects against accidental
-    // immediate double-sends (e.g. a double-clicked Send) and lets ops trace
-    // the SMS across our logs and CloudTalk's dashboard. It does NOT yet cover
-    // user-initiated Retry flows — a future enhancement would forward the
-    // original key when retrying a failed send.
+    // Idempotency-Key (the pending row's UUID) guards against accidental double-sends
+    // and traces the SMS in logs/CloudTalk. Retry flows don't reuse it yet.
     const pending = await insertPendingOutboundSms({ user, phoneDigits, text })
     try {
       const sendResult = await sendSmsViaCloudTalk({

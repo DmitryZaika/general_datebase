@@ -36,17 +36,8 @@ export interface ThreadSummary {
   unreadCount: number
 }
 
-export interface MockCustomer {
+export interface CustomerSearchResult {
   id: number
   name: string
   phone: string
-}
-
-export type ScopeFilter = 'mine' | 'all'
-
-export interface SessionContext {
-  userId: number
-  isAdmin: boolean
-  isAgentLinked: boolean
-  displayName: string
 }

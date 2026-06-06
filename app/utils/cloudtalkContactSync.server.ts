@@ -1,7 +1,15 @@
 import type { ResultSetHeader } from 'mysql2'
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
-import { CloudTalkApiError, deleteCloudTalkContact } from '~/utils/cloudtalk.server'
+import {
+  CloudTalkApiError,
+  type ContactPayload,
+  createCloudTalkContact,
+  deleteCloudTalkContact,
+  findCloudTalkContactByPhone,
+  updateCloudTalkContact,
+} from '~/utils/cloudtalk.server'
+import { normalizeToE164 } from '~/utils/phone'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
 
@@ -71,6 +79,66 @@ async function reportFailure(
   console.error(event, { customerId, error })
   posthogClient.captureException(error, event, { customerId })
   await recordError(customerId, error)
+}
+
+interface CustomerSyncRow {
+  company_id: number
+  name: Nullable<string>
+  phone: Nullable<string>
+  phone_2: Nullable<string>
+  email: Nullable<string>
+}
+
+// Create/update the customer's CloudTalk contact and upsert the cloudtalk_contacts
+// mapping. Best-effort: callers fire-and-forget; failures are logged on the row.
+export async function syncCustomerToCloudTalk(customerId: number): Promise<void> {
+  try {
+    const customer = await selectId<CustomerSyncRow>(
+      db,
+      'SELECT company_id, name, phone, phone_2, email FROM customers WHERE id = ?',
+      customerId,
+    )
+    if (!customer) return
+    if (!(await companyHasCloudTalk(customer.company_id))) return
+
+    const e164_1 = normalizeToE164(customer.phone)
+    const e164_2 = normalizeToE164(customer.phone_2)
+    const phones = [e164_1, e164_2].filter((p): p is string => Boolean(p))
+    if (phones.length === 0) return
+
+    const payload: ContactPayload = {
+      name: customer.name ?? '',
+      ContactNumber: phones.map(public_number => ({ public_number })),
+      ContactEmail: customer.email ? [{ email: customer.email }] : [],
+    }
+
+    const mapping = await loadMapping(customerId)
+    let cloudtalkId: number
+    if (mapping) {
+      await updateCloudTalkContact(customer.company_id, mapping.cloudtalk_id, payload)
+      cloudtalkId = mapping.cloudtalk_id
+    } else {
+      const existing = await findCloudTalkContactByPhone(customer.company_id, phones)
+      cloudtalkId =
+        existing ?? (await createCloudTalkContact(customer.company_id, payload))
+    }
+
+    await db.execute<ResultSetHeader>(
+      `INSERT INTO cloudtalk_contacts
+         (customer_id, company_id, cloudtalk_id, phone_e164_1, phone_e164_2, last_error)
+       VALUES (?, ?, ?, ?, ?, NULL)
+       ON DUPLICATE KEY UPDATE
+         company_id = VALUES(company_id),
+         cloudtalk_id = VALUES(cloudtalk_id),
+         phone_e164_1 = VALUES(phone_e164_1),
+         phone_e164_2 = VALUES(phone_e164_2),
+         last_error = NULL`,
+      [customerId, customer.company_id, cloudtalkId, e164_1, e164_2],
+    )
+  } catch (error) {
+    await reportFailure('cloudtalk_sync_customer_failed', customerId, error)
+    throw error
+  }
 }
 
 export async function deleteCustomerFromCloudTalk(customerId: number): Promise<void> {

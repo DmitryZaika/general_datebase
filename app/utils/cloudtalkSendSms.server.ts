@@ -69,12 +69,9 @@ function extractSendError(json: SendSmsResponse): Nullable<string> {
   return null
 }
 
-// Resolve the SMS sender from the agent's own CloudTalk number, looked up by agent id —
-// CloudTalk owns each agent's number(s), so nothing is stored on our side. Prefers the
-// agent's default outbound number, falling back to the first assigned number. Returns
-// null when the agent has no number configured in CloudTalk. CloudTalk's agents/index.json
-// nests each row under an `Agent` key, so we unwrap it and match by id defensively (in
-// case the `id` filter is ignored and all agents are returned).
+// The agent's own CloudTalk number (default, else first assigned), looked up by agent id
+// — nothing stored on our side. agents/index.json nests each row under `Agent`; we match
+// by id since the `id` filter may be ignored. Returns null when the agent has no number.
 export async function getAgentSmsSender(
   companyId: number,
   agentId: string,
@@ -108,7 +105,6 @@ export async function sendSmsViaCloudTalk(
   return { cloudtalkId: extractCloudtalkId(json) }
 }
 
-// Map CloudTalk errors to stable client-facing tokens.
 export function mapCloudTalkSendError(err: unknown): string {
   if (!(err instanceof CloudTalkApiError)) return 'send_failed'
   const msg = err.apiMessage?.toLowerCase() ?? ''
