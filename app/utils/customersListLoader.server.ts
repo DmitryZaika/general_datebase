@@ -21,56 +21,15 @@ export type CustomersListCustomer = {
   company_name?: string | null
 }
 
-export type WalkInSalesRepCount = {
-  salesRepId: number | null
-  salesRepName: string
-  count: number
-}
-
 export type CustomersListLoaderData = {
   customers: CustomersListCustomer[]
   isAdmin: boolean
   isSalesManager: boolean
-  walkInsBySalesRep?: WalkInSalesRepCount[]
-}
-
-async function loadWalkInsBySalesRep(
-  companyId: number,
-): Promise<WalkInSalesRepCount[]> {
-  const counts = await selectMany<{
-    sales_rep: number | null
-    sales_rep_name: string | null
-    count: number
-  }>(
-    db,
-    `SELECT c.sales_rep, u.name AS sales_rep_name, COUNT(*) AS count
-       FROM customers c
-       LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
-      WHERE c.deleted_at IS NULL
-        AND c.company_id = ?
-        AND c.source = 'check-in'
-        AND c.sales_rep IS NOT NULL
-        AND (c.invalid_lead IS NULL OR c.invalid_lead = '')
-        AND YEAR(c.created_date) = YEAR(CURRENT_DATE())
-        AND MONTH(c.created_date) = MONTH(CURRENT_DATE())
-      GROUP BY c.sales_rep, u.name
-      HAVING COUNT(*) > 0`,
-    [companyId],
-  )
-
-  return counts
-    .map(row => ({
-      salesRepId: row.sales_rep,
-      salesRepName: row.sales_rep_name ?? 'Unknown',
-      count: row.count,
-    }))
-    .sort((a, b) => b.count - a.count || a.salesRepName.localeCompare(b.salesRepName))
 }
 
 export async function loadCustomersListPage(
   request: Request,
   user: { id: number; company_id: number; is_admin: boolean },
-  options?: { includeWalkInsBySalesRep?: boolean },
 ): Promise<CustomersListLoaderData> {
   const url = new URL(request.url)
   const salesRepFilter = url.searchParams.get('sales_rep')
@@ -146,14 +105,9 @@ export async function loadCustomersListPage(
           : 'bg-red-200'
         : undefined,
   }))
-  const walkInsBySalesRep = options?.includeWalkInsBySalesRep
-    ? await loadWalkInsBySalesRep(user.company_id)
-    : undefined
-
   return {
     customers: processed,
     isAdmin: user.is_admin,
     isSalesManager,
-    walkInsBySalesRep,
   }
 }

@@ -36,10 +36,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import type {
-  CustomersListCustomer,
-  WalkInSalesRepCount,
-} from '~/utils/customersListLoader.server'
+import type { CustomersListCustomer } from '~/utils/customersListLoader.server'
+import {
+  computeMonthlyCountsBySalesRep,
+  getMonthlyCountLabel,
+} from '~/utils/customersMonthlyCounts'
 
 function SalesRepCell({ customer }: { customer: CustomersListCustomer }) {
   const { data: reps = [] } = useQuery<{ id: number; name: string }[]>({
@@ -261,9 +262,8 @@ function isSameCustomerActionNavigation(from: string, to: string) {
 }
 
 export function CustomersListPage() {
-  const { customers, walkInsBySalesRep = [] } = useLoaderData<{
+  const { customers } = useLoaderData<{
     customers: CustomersListCustomer[]
-    walkInsBySalesRep?: WalkInSalesRepCount[]
   }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -342,6 +342,12 @@ export function CustomersListPage() {
     Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : 20
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
   const viewParam = searchParams.get('view') || 'customers'
+
+  const monthlyCountsBySalesRep = useMemo(
+    () => computeMonthlyCountsBySalesRep(customers, tabParam),
+    [customers, tabParam],
+  )
+  const monthlyCountLabel = getMonthlyCountLabel(tabParam)
 
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams(searchParams)
@@ -567,12 +573,14 @@ export function CustomersListPage() {
             </LoadingButton>
           </Link>
         )}
-        {walkInsBySalesRep.length > 0 ? (
+        {viewParam === 'customers' &&
+        monthlyCountLabel &&
+        monthlyCountsBySalesRep.length > 0 ? (
           <div className='flex flex-wrap items-center gap-2'>
-            <span className='text-sm text-slate-500'>Walk-ins this month:</span>
-            {walkInsBySalesRep.map(item => (
+            <span className='text-sm text-slate-500'>{monthlyCountLabel}</span>
+            {monthlyCountsBySalesRep.map(item => (
               <span
-                key={item.salesRepId ?? 'unassigned'}
+                key={item.salesRepId}
                 className='inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700'
               >
                 {item.salesRepName}:{' '}
