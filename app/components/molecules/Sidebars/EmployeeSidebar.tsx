@@ -83,6 +83,7 @@ const getItems = (
   sinkSuppliers?: ISupplier[] | undefined,
   faucetSuppliers?: ISupplier[] | undefined,
   companyId?: number | string,
+  hasCloudtalkApi = false,
 ) => {
   if (base === 'shop') {
     return [
@@ -273,7 +274,7 @@ const getItems = (
       },
     )
   }
-  if (['admin', 'employee'].includes(base)) {
+  if (hasCloudtalkApi && ['admin', 'employee'].includes(base)) {
     finalList.push({
       title: 'CloudTalk SMS',
       url: `/${base}/cloudtalk`,
@@ -305,6 +306,7 @@ export function EmployeeSidebar({
     superadminCompanies?: { id: number; name: string }[]
     activeCompanyId?: number
     userIsSuperAdmin?: boolean
+    hasCloudtalkApi?: boolean
     token: string
   }>()
 
@@ -370,6 +372,8 @@ export function EmployeeSidebar({
       ? base
       : null) || 'employee'
 
+  const hasCloudtalkApi = Boolean(data?.hasCloudtalkApi)
+
   const items = getItems(
     isCustomerRoute ? 'customer' : isContractorsRoute ? 'contractors' : itemsBase,
     suppliers,
@@ -377,6 +381,7 @@ export function EmployeeSidebar({
     sinkSuppliers,
     faucetSuppliers,
     companyId,
+    hasCloudtalkApi,
   )
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']

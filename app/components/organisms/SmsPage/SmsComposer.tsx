@@ -1,5 +1,6 @@
-import { Send } from 'lucide-react'
+import { SendIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Textarea } from '~/components/ui/textarea'
 import { cn } from '~/lib/utils'
@@ -9,11 +10,12 @@ import { SmsEmojiPicker } from './SmsEmojiPicker'
 export interface SmsComposerProps {
   phoneDigits: string
   canSend: boolean
+  readOnly?: boolean
   isSending: boolean
   onSubmit: (text: string) => void
 }
 
-const MIN_HEIGHT = 44 // ~1 line, matches the Send button height
+const MIN_HEIGHT = 40 // ~1 line, matches the Send button height
 const MAX_HEIGHT = 180
 
 export function SmsComposer(props: SmsComposerProps) {
@@ -96,11 +98,19 @@ export function SmsComposer(props: SmsComposerProps) {
     }
   }
 
-  // Read-only: a wrapping notice instead of a disabled textarea (whose long
-  // placeholder overflowed on mobile).
-  if (!props.canSend) {
+  if (props.readOnly) {
     return (
       <div className='border-t border-slate-200 bg-white px-4 py-3'>
+        <p className='text-center text-xs leading-snug text-slate-400'>
+          View only — use employee CloudTalk SMS to reply
+        </p>
+      </div>
+    )
+  }
+
+  if (!props.canSend) {
+    return (
+      <div className='border-t border-slate-200 bg-white'>
         <p className='text-center text-xs leading-snug text-slate-400'>
           Sending disabled — no CloudTalk agent linked
         </p>
@@ -109,14 +119,14 @@ export function SmsComposer(props: SmsComposerProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className='border-t border-slate-200 bg-white p-3'>
+    <form
+      onSubmit={handleSubmit}
+      className='border-t border-slate-200 bg-white pb-3 px-3'
+    >
       {/* Always-rendered row reserves space so the textarea doesn't shift up/down
        *  as the counter appears/disappears. */}
       <div
-        className={cn(
-          'flex items-center justify-end mb-1.5 h-[14px] text-[11px]',
-          counterColor,
-        )}
+        className={cn('flex items-center justify-end mb-1 text-xs', counterColor)}
         aria-hidden={!counterVisible}
       >
         {counterVisible && (
@@ -133,21 +143,27 @@ export function SmsComposer(props: SmsComposerProps) {
           onKeyDown={handleKeyDown}
           placeholder='Type a reply…'
           rows={1}
-          className='flex-1 resize-none text-sm overflow-y-auto py-2.5'
+          className='flex-1 resize-none text-sm overflow-y-auto'
           style={{
             minHeight: `${MIN_HEIGHT}px`,
             maxHeight: `${MAX_HEIGHT}px`,
           }}
         />
+
+        <AiImproveButton
+          getText={() => text}
+          setText={value => {
+            setText(value)
+            requestAnimationFrame(() => {
+              if (textareaRef.current) resizeTextarea(textareaRef.current)
+            })
+          }}
+          buttonSize='icon'
+          iconClassName='text-lg'
+        />
         <SmsEmojiPicker onPick={handleEmojiPick} />
-        <LoadingButton
-          type='submit'
-          variant='blue'
-          loading={props.isSending}
-          disabled={isDisabled}
-          className='shrink-0 h-11'
-        >
-          <Send size={14} className='mr-1' /> Send
+        <LoadingButton type='submit' loading={props.isSending} disabled={isDisabled}>
+          <SendIcon /> Send
         </LoadingButton>
       </div>
     </form>

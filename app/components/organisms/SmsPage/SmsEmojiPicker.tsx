@@ -383,6 +383,7 @@ const EMOJIS = [
 export interface SmsEmojiPickerProps {
   onPick: (emoji: string) => void
   disabled?: boolean
+  closeOnPick?: boolean
 }
 
 export function SmsEmojiPicker(props: SmsEmojiPickerProps) {
@@ -409,7 +410,7 @@ export function SmsEmojiPicker(props: SmsEmojiPickerProps) {
                 type='button'
                 onClick={() => {
                   props.onPick(e)
-                  setOpen(false)
+                  if (props.closeOnPick) setOpen(false)
                 }}
                 className='h-8 w-8 flex items-center justify-center text-lg rounded hover:bg-slate-100 transition-colors'
                 aria-label={`Insert ${e}`}

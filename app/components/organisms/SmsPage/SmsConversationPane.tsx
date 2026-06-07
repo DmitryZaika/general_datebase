@@ -8,7 +8,8 @@ import { formatPhoneForDisplay } from '~/utils/phone'
 import { formatDayLabel } from './dayLabel'
 import { SmsBubble } from './SmsBubble'
 import { SmsComposer } from './SmsComposer'
-import { ThreadLoading } from './SmsPageEmptyStates'
+import { ConversationMessagesSkeleton } from './SmsPageEmptyStates'
+import { buildSmsReactionMessage } from './smsReactionText'
 import type { SmsMessage, SmsThread } from './types'
 
 export interface SmsConversationPaneProps {
@@ -24,6 +25,7 @@ export interface SmsConversationPaneProps {
   onRetry: (messageId: string) => void
   onLinkCustomer: () => void
   onLoadOlder: () => void
+  readOnly?: boolean
 }
 
 interface DayGroup {
@@ -55,6 +57,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [newSinceScroll, setNewSinceScroll] = useState(0)
   const messageCountRef = useRef(0)
+  const wasLoadingRef = useRef(false)
   const location = useLocation()
   // Mobile-only "back to list" target; on desktop the list stays visible beside us.
   const backHref = location.pathname.startsWith('/admin')
@@ -77,7 +80,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
     if (near) setNewSinceScroll(0)
   }, [])
 
-  useEffect(() => {
+  const scrollToLatest = useCallback(() => {
     requestAnimationFrame(() => {
       if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -86,6 +89,17 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
       }
     })
   }, [])
+
+  useEffect(() => {
+    scrollToLatest()
+  }, [props.phoneDigits, scrollToLatest])
+
+  useEffect(() => {
+    if (wasLoadingRef.current && !props.isLoading && props.thread) {
+      scrollToLatest()
+    }
+    wasLoadingRef.current = props.isLoading
+  }, [props.isLoading, props.thread, scrollToLatest])
 
   useEffect(() => {
     const prev = messageCountRef.current
@@ -115,10 +129,15 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
     setNewSinceScroll(0)
   }, [])
 
-  if (props.isLoading && !props.thread) {
+  const readOnly = Boolean(props.readOnly)
+  const canInteract = props.canSend && !readOnly
+
+  const showMessagesSkeleton = props.isLoading
+
+  if (showMessagesSkeleton) {
     return (
-      <div className='flex flex-col h-full bg-white'>
-        <div className='border-b border-slate-200 px-4 py-3 flex items-center gap-2'>
+      <div className='flex flex-col h-full min-h-0 bg-white'>
+        <div className='border-b border-slate-200 px-4 py-3 flex items-center gap-2 shrink-0'>
           <RouterLink
             to={backHref}
             aria-label='Back to SMS conversations'
@@ -126,16 +145,22 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
           >
             <ArrowLeft size={20} />
           </RouterLink>
-          <div className='flex flex-col gap-1.5'>
-            <Skeleton className='h-3.5 w-32 rounded' />
-            <Skeleton className='h-2.5 w-24 rounded' />
+          <div className='flex flex-col gap-1.5 min-w-0'>
+            <Skeleton className='h-4 w-36 rounded' />
+            <Skeleton className='h-3 w-28 rounded' />
           </div>
         </div>
-        <ThreadLoading />
-        <div className='border-t border-slate-200 p-3 flex items-center gap-2'>
-          <Skeleton className='h-11 flex-1 rounded-full' />
-          <Skeleton className='size-11 rounded-full shrink-0' />
-        </div>
+        <ConversationMessagesSkeleton />
+        {readOnly ? (
+          <div className='border-t border-slate-200 bg-white px-4 py-3 shrink-0'>
+            <Skeleton className='h-3 w-56 mx-auto rounded' />
+          </div>
+        ) : (
+          <div className='border-t border-slate-200 p-3 flex items-center gap-2 shrink-0'>
+            <Skeleton className='h-11 flex-1 rounded-full' />
+            <Skeleton className='size-11 rounded-full shrink-0' />
+          </div>
+        )}
       </div>
     )
   }
@@ -181,7 +206,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
             )}
           </div>
         </div>
-        {isUnlinked && (
+        {isUnlinked && !readOnly && (
           <button
             type='button'
             onClick={props.onLinkCustomer}
@@ -225,6 +250,14 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
                 onRetry={
                   msg.status === 'failed' ? () => props.onRetry(msg.id) : undefined
                 }
+                canReact={canInteract}
+                isReacting={props.isSending}
+                onReact={
+                  canInteract
+                    ? (emoji, reactedToText) =>
+                        props.onSend(buildSmsReactionMessage(emoji, reactedToText))
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -247,7 +280,8 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
         )}
         <SmsComposer
           phoneDigits={props.phoneDigits}
-          canSend={props.canSend}
+          canSend={canInteract}
+          readOnly={readOnly}
           isSending={props.isSending}
           onSubmit={props.onSend}
         />

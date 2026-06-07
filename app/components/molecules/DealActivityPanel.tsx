@@ -65,6 +65,7 @@ import { Skeleton } from '~/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Textarea } from '~/components/ui/textarea'
 import { useToast } from '~/hooks/use-toast'
+import { useHasCloudtalkApi } from '~/hooks/useHasCloudtalkApi'
 import { useNoteAction } from '~/hooks/useNoteAction'
 import {
   buildDeadlinePayload,
@@ -1337,6 +1338,7 @@ function HistoryTabButtons({
   actionsCount,
   smsCount,
   emailsCount,
+  showSms,
 }: {
   activeTab: HistoryTab
   onTabChange: (tab: HistoryTab) => void
@@ -1345,13 +1347,14 @@ function HistoryTabButtons({
   actionsCount: number
   smsCount: number
   emailsCount: number
+  showSms: boolean
 }) {
   const tabs: { key: HistoryTab; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'activities', label: `Activities (${activitiesCount})` },
     { key: 'notes', label: `Notes (${notesCount})` },
     { key: 'actions', label: `Actions (${actionsCount})` },
-    { key: 'sms', label: `SMS (${smsCount})` },
+    ...(showSms ? [{ key: 'sms' as const, label: `SMS (${smsCount})` }] : []),
     { key: 'emails', label: `Emails (${emailsCount})` },
   ]
 
@@ -1412,6 +1415,7 @@ function ActivityList({
   isActionsPending,
   isSmsPending,
   readOnly = false,
+  showSms,
 }: {
   dealId: number
   activities: DealActivity[]
@@ -1427,6 +1431,7 @@ function ActivityList({
   isActionsPending: boolean
   isSmsPending: boolean
   readOnly?: boolean
+  showSms: boolean
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
   const toggleHistoryOpen = useCallback(() => setIsHistoryOpen(prev => !prev), [])
@@ -1501,15 +1506,17 @@ function ActivityList({
             isPinned: false,
           }) satisfies HistoryItem,
       ),
-      ...smsMessages.map(
-        message =>
-          ({
-            type: 'sms',
-            data: message,
-            date: message.createdDate,
-            isPinned: false,
-          }) satisfies HistoryItem,
-      ),
+      ...(showSms
+        ? smsMessages.map(
+            message =>
+              ({
+                type: 'sms',
+                data: message,
+                date: message.createdDate,
+                isPinned: false,
+              }) satisfies HistoryItem,
+          )
+        : []),
       ...displayedEmails.map(
         e =>
           ({
@@ -1528,13 +1535,13 @@ function ActivityList({
     })
 
     return items
-  }, [activitiesForHistoryTabs, notes, actions, smsMessages, displayedEmails])
+  }, [activitiesForHistoryTabs, notes, actions, smsMessages, displayedEmails, showSms])
 
   const historyCount =
     activitiesForHistoryTabs.length +
     notes.length +
     actions.length +
-    smsMessages.length +
+    (showSms ? smsMessages.length : 0) +
     displayedEmails.length
 
   const renderHistoryItem = useCallback(
@@ -1849,6 +1856,7 @@ function ActivityList({
               actionsCount={actions.length}
               smsCount={smsMessages.length}
               emailsCount={displayedEmails.length}
+              showSms={showSms}
             />
             {customerEmails.length > 0 ? (
               <div className='flex justify-center mb-2'>
@@ -1883,6 +1891,7 @@ export function DealActivityPanel({
   readOnly = false,
   customerPhones,
 }: DealActivityPanelProps) {
+  const hasCloudtalkApi = useHasCloudtalkApi()
   const location = useLocation()
   const navigate = useNavigate()
   const [editingActivity, setEditingActivity] = useState<Nullable<DealActivity>>(null)
@@ -1952,7 +1961,7 @@ export function DealActivityPanel({
         customerPhoneDigits: string[]
       }
     },
-    enabled: !readOnly && !!dealId,
+    enabled: hasCloudtalkApi && !readOnly && !!dealId,
     staleTime: 60_000,
   })
 
@@ -1975,7 +1984,7 @@ export function DealActivityPanel({
         customerPhoneDigits: string[]
       }
     },
-    enabled: readOnly && hasCustomerPhones,
+    enabled: hasCloudtalkApi && readOnly && hasCustomerPhones,
     staleTime: 60_000,
   })
 
@@ -2096,6 +2105,7 @@ export function DealActivityPanel({
           isActionsPending={isCallsPendingResolved}
           isSmsPending={isSmsPendingResolved}
           readOnly={readOnly}
+          showSms={hasCloudtalkApi}
         />
       </div>
     </div>

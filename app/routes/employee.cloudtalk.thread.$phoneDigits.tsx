@@ -10,6 +10,7 @@ import {
   sendSms,
 } from '~/components/organisms/SmsPage/service'
 import type { SmsMessage, SmsThread } from '~/components/organisms/SmsPage/types'
+import { useCloudtalkReadOnly } from '~/hooks/useCloudtalkReadOnly'
 import type { Nullable } from '~/types/utils'
 import { PHONE_DIGITS_REGEX } from '~/utils/phone'
 
@@ -35,6 +36,7 @@ interface ThreadResponse {
 export default function CloudTalkThread() {
   const params = useParams()
   const phoneDigits = params.phoneDigits ?? ''
+  const readOnly = useCloudtalkReadOnly()
   const queryClient = useQueryClient()
   const csrfToken = useAuthenticityToken()
 
@@ -43,11 +45,13 @@ export default function CloudTalkThread() {
   const [isSending, setIsSending] = useState(false)
   const [messageLimit, setMessageLimit] = useState(INITIAL_MESSAGE_PAGE)
   const [isFetchingOlder, setIsFetchingOlder] = useState(false)
+  const [switchingPhone, setSwitchingPhone] = useState<Nullable<string>>(null)
   const lastMarkedPhoneRef = useRef<Nullable<string>>(null)
 
   useEffect(() => {
     setMessageLimit(INITIAL_MESSAGE_PAGE)
     setPending([])
+    setSwitchingPhone(phoneDigits)
   }, [phoneDigits])
 
   const threadQuery = useQuery<ThreadResponse>({
@@ -60,6 +64,7 @@ export default function CloudTalkThread() {
   // Fire mark-read at most once per phone, only when there's actually
   // something unread — guards against React-Router re-firing on every render.
   useEffect(() => {
+    if (readOnly) return
     if (!phoneDigits) return
     if (lastMarkedPhoneRef.current === phoneDigits) return
     const t = threadQuery.data?.thread
@@ -69,7 +74,7 @@ export default function CloudTalkThread() {
       queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
       queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-unread-count'] })
     })
-  }, [phoneDigits, threadQuery.data, queryClient, csrfToken])
+  }, [readOnly, phoneDigits, threadQuery.data, queryClient, csrfToken])
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -141,14 +146,28 @@ export default function CloudTalkThread() {
     }
   }, [])
 
+  const thread = threadQuery.data?.thread ?? null
+  const threadReady =
+    thread !== null && thread.phoneDigits === phoneDigits && !threadQuery.isPending
+
+  useEffect(() => {
+    if (threadReady && switchingPhone === phoneDigits) {
+      setSwitchingPhone(null)
+    }
+  }, [threadReady, switchingPhone, phoneDigits])
+
+  const isLoadingConversation =
+    switchingPhone !== null || (Boolean(phoneDigits) && !threadReady)
+
   return (
     <>
       <SmsConversationPane
         phoneDigits={phoneDigits}
-        thread={threadQuery.data?.thread ?? null}
+        thread={thread}
         pendingMessages={pending}
-        canSend={Boolean(threadQuery.data?.canSend)}
-        isLoading={threadQuery.isLoading}
+        canSend={!readOnly && Boolean(threadQuery.data?.canSend)}
+        readOnly={readOnly}
+        isLoading={isLoadingConversation}
         isSending={isSending}
         hasOlder={Boolean(threadQuery.data?.hasOlder)}
         isFetchingOlder={isFetchingOlder}
@@ -157,18 +176,20 @@ export default function CloudTalkThread() {
         onLinkCustomer={() => setLinkOpen(true)}
         onLoadOlder={handleLoadOlder}
       />
-      <SmsLinkCustomerDialog
-        open={linkOpen}
-        phoneDigits={phoneDigits}
-        onClose={() => setLinkOpen(false)}
-        onLinked={() => {
-          setLinkOpen(false)
-          queryClient.invalidateQueries({
-            queryKey: ['cloudtalk-sms-thread', phoneDigits],
-          })
-          queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
-        }}
-      />
+      {!readOnly && (
+        <SmsLinkCustomerDialog
+          open={linkOpen}
+          phoneDigits={phoneDigits}
+          onClose={() => setLinkOpen(false)}
+          onLinked={() => {
+            setLinkOpen(false)
+            queryClient.invalidateQueries({
+              queryKey: ['cloudtalk-sms-thread', phoneDigits],
+            })
+            queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
+          }}
+        />
+      )}
     </>
   )
 }

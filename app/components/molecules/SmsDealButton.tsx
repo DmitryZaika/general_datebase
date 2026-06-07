@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { useIsMobile } from '~/hooks/use-mobile'
+import { useHasCloudtalkApi } from '~/hooks/useHasCloudtalkApi'
 import type { Nullable } from '~/types/utils'
 import { canonicalPhone10 } from '~/utils/phone'
 import { cloudtalkBasePath } from '~/utils/urlHelpers'
@@ -15,6 +16,9 @@ export function SmsDealButton({ phone }: SmsDealButtonProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = useIsMobile()
+  const hasCloudtalkApi = useHasCloudtalkApi()
+
+  if (!hasCloudtalkApi) return null
 
   const digits = canonicalPhone10(String(phone ?? ''))
   const isValid = digits.length === 10

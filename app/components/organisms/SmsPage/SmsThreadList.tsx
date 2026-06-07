@@ -1,3 +1,4 @@
+import { SquarePen } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { SearchInput } from '~/components/molecules/SearchInput'
 import { Skeleton } from '~/components/ui/skeleton'
@@ -15,6 +16,8 @@ export interface SmsThreadListProps {
   onSearchChange: (q: string) => void
   onSelect: (phoneDigits: string) => void
   onLoadMore: () => void
+  readOnly?: boolean
+  onNewConversation?: () => void
 }
 
 export function SmsThreadList(props: SmsThreadListProps) {
@@ -86,7 +89,19 @@ export function SmsThreadList(props: SmsThreadListProps) {
       aria-label='SMS conversations'
     >
       <div className='px-4 py-3 border-b border-slate-200'>
-        <h2 className='text-base font-semibold text-slate-900 mb-3'>CloudTalk SMS</h2>
+        <div className='flex items-center justify-between gap-2 mb-3'>
+          <h2 className='text-base font-semibold text-slate-900'>CloudTalk SMS</h2>
+          {!props.readOnly && props.onNewConversation ? (
+            <button
+              type='button'
+              onClick={props.onNewConversation}
+              aria-label='New conversation'
+              className='inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm hover:bg-blue-600 transition-colors'
+            >
+              <SquarePen size={18} strokeWidth={2} />
+            </button>
+          ) : null}
+        </div>
         <SearchInput
           value={draftSearch}
           onChange={setDraftSearch}

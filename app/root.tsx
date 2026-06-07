@@ -28,6 +28,7 @@ import {
 import type { ISupplier } from '~/schemas/suppliers'
 import { queryClient } from '~/utils/api'
 import { renderAppNavigationSkeleton } from '~/utils/appNavigationSkeleton'
+import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import { csrf } from '~/utils/csrf.server'
 import {
   getSidebarSection,
@@ -223,14 +224,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
         )
       : Promise.resolve(undefined)
 
-  const [colors, stoneSuppliers, sinkSuppliers, faucetSuppliers, positionResult] =
-    await Promise.all([
-      colorsPromise,
-      stoneSuppliersPromise,
-      sinkSuppliersPromise,
-      faucetSuppliersPromise,
-      positionPromise,
-    ])
+  const hasCloudtalkApiPromise =
+    companyId !== undefined ? companyHasCloudTalk(companyId) : Promise.resolve(false)
+
+  const [
+    colors,
+    stoneSuppliers,
+    sinkSuppliers,
+    faucetSuppliers,
+    positionResult,
+    hasCloudtalkApi,
+  ] = await Promise.all([
+    colorsPromise,
+    stoneSuppliersPromise,
+    sinkSuppliersPromise,
+    faucetSuppliersPromise,
+    positionPromise,
+    hasCloudtalkApiPromise,
+  ])
 
   if (user && positionResult) {
     const [rows] = positionResult
@@ -295,6 +306,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       superadminCompanies,
       activeCompanyId,
       userIsSuperAdmin,
+      hasCloudtalkApi,
     },
 
     {

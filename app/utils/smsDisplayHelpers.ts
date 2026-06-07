@@ -30,16 +30,23 @@ export type SmsThread = {
   count: number
 }
 
+export function inferSmsDirection(
+  sender: Nullable<string>,
+  customerPhoneDigits: readonly string[],
+): SmsDirection {
+  if (sender !== null && customerPhoneDigits.includes(sender)) {
+    return 'inbound'
+  }
+  return 'outbound'
+}
+
 export function mapRowToSmsEntry(
   row: SmsRow,
   customerPhoneDigits: readonly string[],
 ): SmsEntry {
-  const direction: SmsDirection =
-    row.sender != null && customerPhoneDigits.includes(row.sender)
-      ? 'inbound'
-      : 'outbound'
+  const direction = inferSmsDirection(row.sender, customerPhoneDigits)
   const customerPhone =
-    direction === 'inbound' && row.sender != null ? row.sender : row.recipient
+    direction === 'inbound' && row.sender !== null ? row.sender : row.recipient
   return {
     id: row.id,
     direction,

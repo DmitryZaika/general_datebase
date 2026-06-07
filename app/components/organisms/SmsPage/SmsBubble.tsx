@@ -1,13 +1,23 @@
 import { format } from 'date-fns'
 import { cn } from '~/lib/utils'
+import { SmsMessageReactions } from './SmsMessageReactions'
 import type { SmsMessage } from './types'
 
 export interface SmsBubbleProps {
   message: SmsMessage
   onRetry?: () => void
+  onReact?: (emoji: string, reactedToText: string) => void
+  canReact?: boolean
+  isReacting?: boolean
 }
 
-export function SmsBubble({ message, onRetry }: SmsBubbleProps) {
+export function SmsBubble({
+  message,
+  onRetry,
+  onReact,
+  canReact = false,
+  isReacting = false,
+}: SmsBubbleProps) {
   const isOutbound = message.direction === 'outbound'
   const isPending = message.status === 'sending'
   const isFailed = message.status === 'failed'
@@ -20,8 +30,15 @@ export function SmsBubble({ message, onRetry }: SmsBubbleProps) {
         : 'bg-blue-500 text-white'
     : 'bg-slate-100 text-slate-800'
 
+  const showReactions = !isOutbound && canReact && onReact && message.status === 'sent'
+
   return (
-    <div className={cn('flex', isOutbound ? 'justify-end' : 'justify-start')}>
+    <div
+      className={cn(
+        'group flex items-end gap-1',
+        isOutbound ? 'justify-end' : 'justify-start',
+      )}
+    >
       <div className='max-w-[85%]'>
         <div
           className={cn(
@@ -55,6 +72,12 @@ export function SmsBubble({ message, onRetry }: SmsBubbleProps) {
           )}
         </div>
       </div>
+      {showReactions ? (
+        <SmsMessageReactions
+          onPick={emoji => onReact(emoji, message.text)}
+          disabled={isReacting}
+        />
+      ) : null}
     </div>
   )
 }

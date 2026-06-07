@@ -84,17 +84,38 @@ const LIST_SKELETON_ROWS = [
   { id: 'l6', title: 'w-1/2', preview: 'w-2/3' },
 ] as const
 
-export function ThreadLoading() {
+export function ConversationMessagesSkeleton() {
   return (
-    <div className='flex-1 px-4 py-4 space-y-2.5'>
-      {THREAD_SKELETON_BUBBLES.map(b => (
+    <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3'>
+      <div className='flex justify-center py-1'>
+        <Skeleton className='h-2.5 w-20 rounded' />
+      </div>
+      {THREAD_SKELETON_BUBBLES.slice(0, 4).map(b => (
         <div
           key={b.id}
           className={cn('flex', b.side === 'out' ? 'justify-end' : 'justify-start')}
         >
           <Skeleton
             className={cn(
-              'rounded-2xl',
+              'rounded-2xl max-w-[85%]',
+              b.width,
+              b.height,
+              b.side === 'out' && 'bg-blue-100',
+            )}
+          />
+        </div>
+      ))}
+      <div className='flex justify-center py-1'>
+        <Skeleton className='h-2.5 w-16 rounded' />
+      </div>
+      {THREAD_SKELETON_BUBBLES.slice(4).map(b => (
+        <div
+          key={b.id}
+          className={cn('flex', b.side === 'out' ? 'justify-end' : 'justify-start')}
+        >
+          <Skeleton
+            className={cn(
+              'rounded-2xl max-w-[85%]',
               b.width,
               b.height,
               b.side === 'out' && 'bg-blue-100',
@@ -104,6 +125,10 @@ export function ThreadLoading() {
       ))}
     </div>
   )
+}
+
+export function ThreadLoading() {
+  return <ConversationMessagesSkeleton />
 }
 
 export function ThreadListLoading() {
@@ -116,7 +141,7 @@ export function ThreadListLoading() {
         >
           <div className='flex items-center justify-between gap-2'>
             <Skeleton className={cn('h-3.5 rounded', row.title)} />
-            <Skeleton className='h-2.5 w-12 rounded shrink-0' />
+            <Skeleton className='h-2.5 w-20 rounded shrink-0' />
           </div>
           <div className='flex items-center gap-1.5'>
             <Skeleton className='size-3 rounded-full shrink-0' />

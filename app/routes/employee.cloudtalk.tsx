@@ -1,4 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
 import { useCallback, useMemo, useState } from 'react'
 import {
   type LoaderFunctionArgs,
@@ -9,6 +10,8 @@ import {
   useNavigate,
   useParams,
 } from 'react-router'
+import { CloudTalkPageSkeleton } from '~/components/organisms/SmsPage/CloudTalkPageSkeleton'
+import { SmsNewConversationDialog } from '~/components/organisms/SmsPage/SmsNewConversationDialog'
 import {
   AgentNotLinkedBanner,
   NoThreadSelected,
@@ -17,6 +20,8 @@ import { SmsThreadList } from '~/components/organisms/SmsPage/SmsThreadList'
 import { fetchThreads } from '~/components/organisms/SmsPage/service'
 import type { ThreadSummary } from '~/components/organisms/SmsPage/types'
 import type { Nullable } from '~/types/utils'
+import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'
+import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
 import { getEmployeeUser } from '~/utils/session.server'
 import { cloudtalkBasePath } from '~/utils/urlHelpers'
 
@@ -25,12 +30,17 @@ const PAGE_SIZE = 20
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const user = await getEmployeeUser(request)
+    if (!(await companyHasCloudTalk(user.company_id))) {
+      throw redirect('/employee/deals')
+    }
     return {
       userId: user.id,
       hasCloudtalkAgent: Boolean(user.cloudtalk_agent_id),
       isAdmin: Boolean(user.is_admin || user.is_superuser),
+      readOnly: false,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Response) throw error
     throw redirect('/login')
   }
 }
@@ -52,6 +62,7 @@ export default function CloudTalkPage() {
   const cloudtalkBase = cloudtalkBasePath(location.pathname)
   const activePhone = (params.phoneDigits ?? null) as Nullable<string>
   const [search, setSearch] = useState('')
+  const [newConversationOpen, setNewConversationOpen] = useState(false)
 
   const threadsQuery = useInfiniteQuery<ThreadsPage>({
     queryKey: ['cloudtalk-sms-threads', search],
@@ -88,14 +99,44 @@ export default function CloudTalkPage() {
     [navigate, cloudtalkBase],
   )
 
+  const handleStartConversation = useCallback(
+    (phoneDigits: string) => {
+      setNewConversationOpen(false)
+      navigate(`${cloudtalkBase}/thread/${phoneDigits}`)
+    },
+    [navigate, cloudtalkBase],
+  )
+
   const handleLoadMore = useCallback(() => {
     if (threadsQuery.hasNextPage && !threadsQuery.isFetchingNextPage) {
       threadsQuery.fetchNextPage()
     }
   }, [threadsQuery])
 
-  return (
+  const showPageSkeleton = threadsQuery.isPending && threads.length === 0
+
+  if (showPageSkeleton) {
+    const skeleton = (
+      <CloudTalkPageSkeleton
+        readOnly={data.readOnly}
+        showConversationOnMobile={Boolean(activePhone)}
+      />
+    )
+    if (data.readOnly) return skeleton
+    return (
+      <motion.div className='w-full h-full' {...EMPLOYEE_VIEW_ENTER}>
+        {skeleton}
+      </motion.div>
+    )
+  }
+
+  const page = (
     <div className='flex flex-col h-[calc(100vh-100px)] w-full bg-slate-50'>
+      {data.readOnly ? (
+        <div className='bg-slate-100 border-b border-slate-200 text-slate-600 px-4 py-2 text-xs text-center'>
+          View only — open employee CloudTalk SMS to send messages
+        </div>
+      ) : null}
       {!data.hasCloudtalkAgent && !data.isAdmin && <AgentNotLinkedBanner />}
       <div className='flex flex-1 min-h-0 w-full'>
         <SmsThreadList
@@ -108,6 +149,10 @@ export default function CloudTalkPage() {
           onSearchChange={setSearch}
           onSelect={handleSelect}
           onLoadMore={handleLoadMore}
+          readOnly={data.readOnly}
+          onNewConversation={
+            data.readOnly ? undefined : () => setNewConversationOpen(true)
+          }
         />
         <main
           className={`${
@@ -119,6 +164,21 @@ export default function CloudTalkPage() {
           </div>
         </main>
       </div>
+      {!data.readOnly && (
+        <SmsNewConversationDialog
+          open={newConversationOpen}
+          onClose={() => setNewConversationOpen(false)}
+          onStart={handleStartConversation}
+        />
+      )}
     </div>
+  )
+
+  if (data.readOnly) return page
+
+  return (
+    <motion.div className='w-full h-full' {...EMPLOYEE_VIEW_ENTER}>
+      {page}
+    </motion.div>
   )
 }

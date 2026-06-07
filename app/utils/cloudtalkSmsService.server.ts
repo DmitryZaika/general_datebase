@@ -4,6 +4,7 @@ import type { Nullable } from '~/types/utils'
 import { canonicalPhone10, phoneVariants } from '~/utils/phone'
 import { selectMany } from '~/utils/queryHelpers'
 import type { SessionUser } from '~/utils/session.server'
+import { inferSmsDirection } from '~/utils/smsDisplayHelpers'
 
 export type SmsDirection = 'inbound' | 'outbound'
 export type SmsStatus = 'received' | 'sent' | 'failed' | 'pending'
@@ -153,13 +154,53 @@ interface ThreadRow {
   phone_digits: string
   last_message_text: string
   last_message_at: Date | string
-  last_direction: SmsDirection
+  last_sender: Nullable<string>
   last_agent: Nullable<string>
   message_count: number
   unread_count: number
   customer_id: Nullable<number>
   customer_name: Nullable<string>
 }
+
+const COMPANY_SENDER_SUBQUERY = `(
+  SELECT DISTINCT CAST(s2.sender AS CHAR) AS phone
+  FROM cloudtalk_sms s2
+  WHERE s2.company_id = s.company_id
+    AND s2.agent IS NOT NULL
+    AND TRIM(s2.agent) != ''
+    AND s2.sender IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM cloudtalk_sms c
+      WHERE c.company_id = s2.company_id
+        AND c.direction = 'inbound'
+        AND (c.agent IS NULL OR TRIM(c.agent) = '')
+        AND CAST(c.recipient AS CHAR) = CAST(s2.sender AS CHAR)
+    )
+)`
+
+const CUSTOMER_PHONE_SQL = `CONVERT(CAST(
+  CASE
+    WHEN s.direction = 'outbound' THEN s.recipient
+    WHEN s.sender IN ${COMPANY_SENDER_SUBQUERY} THEN s.recipient
+    ELSE s.sender
+  END
+AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci`
+
+const COMPANY_LINE_EXCLUSION = `${CUSTOMER_PHONE_SQL} NOT IN ${COMPANY_SENDER_SUBQUERY}`
+
+const OUTBOUND_ECHO_EXCLUSION = `NOT (
+  s.direction = 'inbound'
+  AND (s.agent IS NULL OR TRIM(s.agent) = '')
+  AND EXISTS (
+    SELECT 1 FROM cloudtalk_sms o
+    WHERE o.company_id = s.company_id
+      AND o.direction = 'outbound'
+      AND o.status = 'sent'
+      AND o.text = s.text
+      AND CAST(o.recipient AS CHAR) = CAST(s.recipient AS CHAR)
+      AND ABS(TIMESTAMPDIFF(SECOND, o.created_date, s.created_date)) <= 300
+  )
+)`
 
 interface TotalCountRow {
   total_count: number
@@ -182,9 +223,7 @@ export async function listThreadsForUser(
   const searchParams: string[] = []
   if (hasSearch) {
     if (searchDigits.length > 0) {
-      searchClauseParts.push(
-        "CONVERT(CAST(CASE WHEN s.direction='inbound' THEN s.sender ELSE s.recipient END AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci LIKE ?",
-      )
+      searchClauseParts.push(`${CUSTOMER_PHONE_SQL} LIKE ?`)
       searchParams.push(`%${searchDigits}%`)
     }
     searchClauseParts.push('LOWER(s.text) LIKE ?')
@@ -192,13 +231,13 @@ export async function listThreadsForUser(
   }
   const searchClause = hasSearch ? ` AND (${searchClauseParts.join(' OR ')})` : ''
 
-  const baseWhere = `s.company_id = ?${searchClause}`
+  const baseWhere = `s.company_id = ?${searchClause} AND ${OUTBOUND_ECHO_EXCLUSION} AND ${COMPANY_LINE_EXCLUSION}`
   const baseParams: (string | number)[] = [user.company_id, ...searchParams]
 
   const sql = `
     WITH scoped AS (
       SELECT s.*,
-        CONVERT(CAST(CASE WHEN s.direction='inbound' THEN s.sender ELSE s.recipient END AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci AS phone_digits
+        ${CUSTOMER_PHONE_SQL} AS phone_digits
       FROM cloudtalk_sms s
       WHERE ${baseWhere}
     ),
@@ -219,7 +258,7 @@ export async function listThreadsForUser(
              COUNT(*) AS message_count,
              SUM(
                CASE
-                 WHEN direction = 'inbound'
+                 WHEN CAST(sender AS CHAR) = phone_digits
                   AND (last_read_at IS NULL OR created_date > last_read_at)
                    THEN 1
                  ELSE 0
@@ -232,7 +271,7 @@ export async function listThreadsForUser(
       l.phone_digits AS phone_digits,
       l.text AS last_message_text,
       l.created_date AS last_message_at,
-      l.direction AS last_direction,
+      CAST(l.sender AS CHAR) AS last_sender,
       l.agent AS last_agent,
       a.message_count AS message_count,
       a.unread_count AS unread_count,
@@ -275,7 +314,7 @@ export async function listThreadsForUser(
 
   const totalCountRows = await selectMany<TotalCountRow>(
     db,
-    `SELECT COUNT(DISTINCT CONVERT(CAST(CASE WHEN s.direction='inbound' THEN s.sender ELSE s.recipient END AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci) AS total_count
+    `SELECT COUNT(DISTINCT ${CUSTOMER_PHONE_SQL}) AS total_count
        FROM cloudtalk_sms s
       WHERE ${baseWhere}`,
     baseParams,
@@ -284,17 +323,20 @@ export async function listThreadsForUser(
 
   const unreadCount = await getUnreadThreadCountForUser(user)
 
-  const threads: ThreadSummaryRow[] = dedupedRows.map(r => ({
-    phoneDigits: String(r.phone_digits),
-    customerId: r.customer_id ?? null,
-    customerName: r.customer_name ?? null,
-    lastMessageText: r.last_message_text,
-    lastMessageAt: toIsoString(r.last_message_at),
-    lastDirection: r.last_direction,
-    lastAgent: r.last_agent ?? null,
-    messageCount: Number(r.message_count),
-    unreadCount: Number(r.unread_count),
-  }))
+  const threads: ThreadSummaryRow[] = dedupedRows.map(r => {
+    const phoneDigits = String(r.phone_digits)
+    return {
+      phoneDigits,
+      customerId: r.customer_id ?? null,
+      customerName: r.customer_name ?? null,
+      lastMessageText: r.last_message_text,
+      lastMessageAt: toIsoString(r.last_message_at),
+      lastDirection: inferSmsDirection(r.last_sender, phoneVariants(phoneDigits)),
+      lastAgent: r.last_agent ?? null,
+      messageCount: Number(r.message_count),
+      unreadCount: Number(r.unread_count),
+    }
+  })
 
   return {
     threads,
@@ -342,6 +384,7 @@ export async function getThreadForUser(
      WHERE s.company_id = ?
        AND (s.sender IN (${placeholders}) OR s.recipient IN (${placeholders}))
        AND NOT (s.direction = 'outbound' AND s.status IN ('pending', 'failed'))
+       AND ${OUTBOUND_ECHO_EXCLUSION}
        ${beforeClause}
      ORDER BY s.created_date DESC, s.id DESC
      LIMIT ?
@@ -356,7 +399,16 @@ export async function getThreadForUser(
   const hasOlder = rows.length > limit
   const trimmed = hasOlder ? rows.slice(0, limit) : rows
 
-  const messages: SmsRowExpanded[] = trimmed.map(mapRowToExpanded).reverse()
+  const customerVariants = phoneVariants(phoneDigits)
+  const messages: SmsRowExpanded[] = trimmed
+    .map(row => {
+      const expanded = mapRowToExpanded(row)
+      return {
+        ...expanded,
+        direction: inferSmsDirection(expanded.sender, customerVariants),
+      }
+    })
+    .reverse()
 
   return { messages, hasOlder }
 }
@@ -378,14 +430,17 @@ export async function markThreadReadForUser(
 
 export async function getUnreadThreadCountForUser(user: SessionUser): Promise<number> {
   const sql = `
-    SELECT COUNT(DISTINCT CONVERT(CAST(s.sender AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci) AS unread_count
+    SELECT COUNT(DISTINCT ${CUSTOMER_PHONE_SQL}) AS unread_count
       FROM cloudtalk_sms s
       LEFT JOIN cloudtalk_sms_thread_reads r
         ON r.user_id = ?
        AND r.company_id = s.company_id
-       AND r.customer_phone_digits = CONVERT(CAST(s.sender AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci
+       AND r.customer_phone_digits = ${CUSTOMER_PHONE_SQL}
      WHERE s.company_id = ?
        AND s.direction = 'inbound'
+       AND ${OUTBOUND_ECHO_EXCLUSION}
+       AND (s.agent IS NULL OR TRIM(s.agent) = '')
+       AND s.sender NOT IN ${COMPANY_SENDER_SUBQUERY}
        AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)
   `
   const queryParams: (string | number)[] = [user.id, user.company_id]
@@ -411,7 +466,6 @@ export async function getThreadUnreadCountForUser(
         AND r.company_id = s.company_id
         AND r.customer_phone_digits = ?
       WHERE s.company_id = ?
-        AND s.direction = 'inbound'
         AND s.sender IN (${placeholders})
         AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)`,
     [user.id, digits, user.company_id, ...variants],
@@ -429,6 +483,7 @@ export async function fetchCustomerByPhone(
        FROM customers c
        JOIN cloudtalk_contacts cc ON cc.customer_id = c.id
       WHERE cc.company_id = ?
+        AND c.deleted_at IS NULL
         AND (RIGHT(cc.phone_e164_1, 10) = RIGHT(?, 10)
           OR RIGHT(cc.phone_e164_2, 10) = RIGHT(?, 10))
       LIMIT 1`,
@@ -443,6 +498,7 @@ export async function fetchCustomerByPhone(
     `SELECT c.id, c.name
        FROM customers c
       WHERE c.company_id = ?
+        AND c.deleted_at IS NULL
         AND (RIGHT(REGEXP_REPLACE(COALESCE(c.phone, ''), '[^0-9]', ''), 10) = RIGHT(?, 10)
           OR RIGHT(REGEXP_REPLACE(COALESCE(c.phone_2, ''), '[^0-9]', ''), 10) = RIGHT(?, 10))
       LIMIT 1`,

@@ -11,9 +11,33 @@ interface DownloadedFile {
   filename: string
 }
 
-async function fetchFileBuffer(url: string): Promise<DownloadedFile | null> {
+const FETCH_TIMEOUT_MS = 30_000
+const PDF_TEXT_EXTRACT_TIMEOUT_MS = 45_000
+const OPENAI_EXTRACT_TIMEOUT_MS = 180_000
+
+function isS3StorageUrl(url: string): boolean {
+  return /\.s3\.[\w-]+\.amazonaws\.com\//i.test(url)
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeoutPromise = new Promise<undefined>(resolve => {
+    timeoutId = setTimeout(() => resolve(undefined), ms)
+  })
   try {
-    const response = await fetch(url)
+    return await Promise.race([promise, timeoutPromise])
+  } catch {
+    return undefined
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
+
+async function fetchFileBuffer(url: string): Promise<DownloadedFile | null> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
     if (!response.ok) return null
     const arrayBuffer = await response.arrayBuffer()
     const filenameFromUrl = url.split('?')[0].split('/').pop() ?? 'file'
@@ -24,10 +48,15 @@ async function fetchFileBuffer(url: string): Promise<DownloadedFile | null> {
     }
   } catch {
     return null
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
 async function downloadAnyFile(url: string): Promise<DownloadedFile | null> {
+  if (isS3StorageUrl(url)) {
+    return downloadFileAsBuffer(url)
+  }
   const fetched = await fetchFileBuffer(url)
   if (fetched && fetched.buffer.length > 0) return fetched
   return downloadFileAsBuffer(url)
@@ -129,6 +158,7 @@ interface SupplierFileRow {
   supplier_id: number
   name: string
   url: string
+  file_text: string | null
 }
 
 export interface SupplierSource {
@@ -146,7 +176,12 @@ export interface SupplierPriceListResult {
 
 export type PriceListProgress =
   | { state: 'searching' }
-  | { state: 'reading'; fileType: 'pdf' | 'image' | 'file'; name: string }
+  | {
+      state: 'reading'
+      phase?: 'downloading' | 'extracting'
+      fileType: 'pdf' | 'image' | 'file'
+      name: string
+    }
 
 function queryTerms(query: string): string[] {
   return query
@@ -313,26 +348,26 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   return parts.join('\n')
 }
 
-const PDF_EXTRACT_PROMPT =
-  'Read this supplier price list PDF and extract information to answer the question. Include exact dollar prices only if they appear in the document. Also extract the color group or level number, product name, and slab size if shown. If no dollar price is listed for the product, explicitly say that no price is specified and report the level or group and size instead.'
+const FULL_FILE_EXTRACT_PROMPT =
+  'Transcribe all text from this supplier price list document exactly as it appears. Include every product name, color group or level number, slab size, and dollar price. Preserve the document structure and list all entries completely. Do not summarize or omit anything.'
 
 const INLINE_PDF_LIMIT = 4 * 1024 * 1024
 const MAX_PDF_UPLOAD = 32 * 1024 * 1024
+const FULL_FILE_EXTRACT_MAX_TOKENS = 16000
 
 async function extractPdfInline(
   buffer: Buffer,
   filename: string,
-  query: string,
 ): Promise<string | null> {
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1-mini-2025-04-14',
     temperature: 0,
-    max_tokens: 1200,
+    max_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
     messages: [
       {
         role: 'user',
         content: [
-          { type: 'text', text: `${PDF_EXTRACT_PROMPT} Question: ${query}` },
+          { type: 'text', text: FULL_FILE_EXTRACT_PROMPT },
           {
             type: 'file',
             file: {
@@ -350,7 +385,6 @@ async function extractPdfInline(
 async function extractPdfViaUpload(
   buffer: Buffer,
   filename: string,
-  query: string,
 ): Promise<string | null> {
   const uploaded = await openai.files.create({
     file: await toFile(buffer, pdfFileName(filename), {
@@ -363,12 +397,12 @@ async function extractPdfViaUpload(
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini-2025-04-14',
       temperature: 0,
-      max_tokens: 1200,
+      max_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
       messages: [
         {
           role: 'user',
           content: [
-            { type: 'text', text: `${PDF_EXTRACT_PROMPT} Question: ${query}` },
+            { type: 'text', text: FULL_FILE_EXTRACT_PROMPT },
             { type: 'file', file: { file_id: uploaded.id } },
           ],
         },
@@ -376,44 +410,39 @@ async function extractPdfViaUpload(
     })
     return response.choices[0]?.message?.content?.trim() ?? null
   } finally {
-    try {
-      await openai.files.delete(uploaded.id)
-    } catch {
-      // best effort cleanup
-    }
+    await openai.files.delete(uploaded.id).catch(() => undefined)
   }
 }
 
 async function extractPdfWithOpenAI(
   buffer: Buffer,
   filename: string,
-  query: string,
 ): Promise<string | null> {
   if (buffer.length > MAX_PDF_UPLOAD) return null
 
   try {
     if (buffer.length <= INLINE_PDF_LIMIT) {
-      return await extractPdfInline(buffer, filename, query)
+      return await extractPdfInline(buffer, filename)
     }
-    return await extractPdfViaUpload(buffer, filename, query)
+    return await extractPdfViaUpload(buffer, filename)
   } catch {
     return null
   }
 }
 
-async function extractImageText(url: string, query: string): Promise<string | null> {
+async function extractFullImageText(url: string): Promise<string | null> {
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini-2025-04-14',
       temperature: 0,
-      max_tokens: 800,
+      max_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
       messages: [
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: `Extract information from this supplier price list image to answer the question. Include exact dollar prices only if they appear in the document. Also extract the color group or level number, product name, and slab size if shown. If no dollar price is listed for the product, explicitly say that no price is specified and report the level or group and size instead. Question: ${query}`,
+              text: FULL_FILE_EXTRACT_PROMPT,
             },
             {
               type: 'image_url',
@@ -429,46 +458,59 @@ async function extractImageText(url: string, query: string): Promise<string | nu
   }
 }
 
+async function saveSupplierFileText(fileId: number, text: string): Promise<void> {
+  await db
+    .execute('UPDATE supplier_files SET file_text = ? WHERE id = ?', [text, fileId])
+    .catch(() => undefined)
+}
+
 async function extractSupplierFileText(
   file: SupplierFileRow,
-  query: string,
+  onPhase?: (phase: 'downloading' | 'extracting') => void,
 ): Promise<string | null> {
+  const cached = file.file_text?.trim()
+  if (cached) {
+    return truncateText(cached, MAX_FILE_CHARS)
+  }
+
+  onPhase?.('downloading')
   const downloaded = await downloadAnyFile(file.url)
   if (!downloaded) return null
 
+  onPhase?.('extracting')
   const ext = fileExtension(downloaded.filename, file.url)
   const { buffer, contentType } = downloaded
+  let fullText: string | null = null
 
   if (isTextExtension(ext) || contentType.startsWith('text/')) {
-    return truncateText(buffer.toString('utf8'), MAX_FILE_CHARS)
+    fullText = buffer.toString('utf8').trim() || null
+  } else if (isPdfFile(ext, contentType, buffer)) {
+    const pdfText = await withTimeout(
+      extractPdfText(buffer),
+      PDF_TEXT_EXTRACT_TIMEOUT_MS,
+    )
+    fullText = pdfText?.trim() || null
+
+    if (!fullText) {
+      const openAiText = await withTimeout(
+        extractPdfWithOpenAI(buffer, downloaded.filename),
+        OPENAI_EXTRACT_TIMEOUT_MS,
+      )
+      fullText = openAiText?.trim() || null
+    }
+  } else if (isImageExtension(ext) || contentType.startsWith('image/')) {
+    const imageText = await withTimeout(
+      extractFullImageText(file.url),
+      OPENAI_EXTRACT_TIMEOUT_MS,
+    )
+    fullText = imageText?.trim() || null
   }
 
-  if (isPdfFile(ext, contentType, buffer)) {
-    let text = ''
-    try {
-      text = await extractPdfText(buffer)
-    } catch {
-      text = ''
-    }
+  if (!fullText) return null
 
-    if (text.trim()) {
-      return truncateText(text, MAX_FILE_CHARS)
-    }
-
-    const openAiText = await extractPdfWithOpenAI(buffer, downloaded.filename, query)
-    if (openAiText) {
-      return truncateText(openAiText, MAX_FILE_CHARS)
-    }
-
-    return null
-  }
-
-  if (isImageExtension(ext) || contentType.startsWith('image/')) {
-    const text = await extractImageText(file.url, query)
-    return text ? truncateText(text, MAX_FILE_CHARS) : null
-  }
-
-  return null
+  await saveSupplierFileText(file.id, fullText)
+  file.file_text = fullText
+  return truncateText(fullText, MAX_FILE_CHARS)
 }
 
 export async function buildSupplierPriceListContext(
@@ -491,7 +533,7 @@ export async function buildSupplierPriceListContext(
   const supplierIds = suppliers.map(supplier => supplier.id)
   const files = await selectMany<SupplierFileRow>(
     db,
-    'SELECT id, supplier_id, name, url FROM supplier_files WHERE supplier_id IN (?)',
+    'SELECT id, supplier_id, name, url, file_text FROM supplier_files WHERE supplier_id IN (?)',
     [supplierIds],
   )
 
@@ -570,22 +612,29 @@ export async function buildSupplierPriceListContext(
         ? 'image'
         : 'file'
 
-    if (isImage && visionCalls >= MAX_VISION_FILES) {
+    const hasCachedText = Boolean(file.file_text?.trim())
+
+    if (isImage && !hasCachedText && visionCalls >= MAX_VISION_FILES) {
       sections.push(`\nFILE: ${file.name} (${supplierName})`)
       sections.push('CONTENT: Skipped additional image files to limit processing.')
       continue
     }
-    if (isImage) {
+    if (isImage && !hasCachedText) {
       visionCalls += 1
     }
 
-    onProgress?.({
-      state: 'reading',
-      fileType: isPdf ? 'pdf' : isImage ? 'image' : 'file',
-      name: file.name,
-    })
+    const emitFilePhase = (phase: 'downloading' | 'extracting') => {
+      onProgress?.({
+        state: 'reading',
+        phase,
+        fileType,
+        name: file.name,
+      })
+    }
 
-    const extracted = await extractSupplierFileText(file, query)
+    emitFilePhase('downloading')
+
+    const extracted = await extractSupplierFileText(file, emitFilePhase)
     if (extracted) {
       const sourceId = sources.length + 1
       sources.push({

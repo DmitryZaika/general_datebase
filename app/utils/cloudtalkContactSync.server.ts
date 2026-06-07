@@ -39,7 +39,7 @@ export function resetCompanyHasCloudTalkCache(): void {
   companiesWithCloudTalk.clear()
 }
 
-async function companyHasCloudTalk(companyId: number): Promise<boolean> {
+export async function companyHasCloudTalk(companyId: number): Promise<boolean> {
   if (companiesWithCloudTalk.has(companyId)) return true
   const creds = await selectId<CompanyCreds>(
     db,

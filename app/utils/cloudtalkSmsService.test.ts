@@ -294,6 +294,220 @@ describe('getThreadForUser', () => {
     expect(texts).not.toContain('other company')
   })
 
+  test('infers outbound direction for webhook rows stored as inbound with agent', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const customerPhone = '3178351004'
+    const companyPhone = '3176767938'
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'Ok thank you',
+      created_date: new Date(Date.now() - 2000),
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      agent: '540273',
+      text: 'Good morning, Kea!',
+      created_date: new Date(Date.now() - 5000),
+    })
+
+    const result = await getThreadForUser({
+      user: admin,
+      phoneDigits: customerPhone,
+      limit: 30,
+    })
+
+    expect(result.messages).toHaveLength(2)
+    expect(result.messages[0].direction).toBe('outbound')
+    expect(result.messages[0].text).toBe('Good morning, Kea!')
+    expect(result.messages[1].direction).toBe('inbound')
+    expect(result.messages[1].text).toBe('Ok thank you')
+  })
+
+  test('groups webhook mislabeled messages under the customer thread', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const customerPhone = '3178351004'
+    const companyPhone = '3176767938'
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'From customer',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      agent: '540273',
+      text: 'From rep',
+    })
+
+    const result = await listThreadsForUser({
+      user: admin,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+
+    expect(result.threads).toHaveLength(1)
+    expect(result.threads[0].phoneDigits).toBe(customerPhone)
+    expect(result.threads[0].messageCount).toBe(2)
+    expect(result.threads[0].lastDirection).toBe('inbound')
+  })
+
+  test('infers outbound direction for webhook rows stored as inbound with agent', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const customerPhone = '3178351004'
+    const companyPhone = '3176767938'
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      agent: '540273',
+      text: 'Good morning, Kea!',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'Ok thank you',
+    })
+
+    const result = await getThreadForUser({
+      user: admin,
+      phoneDigits: customerPhone,
+      limit: 30,
+    })
+
+    expect(result.messages).toHaveLength(2)
+    expect(result.messages[0].direction).toBe('inbound')
+    expect(result.messages[0].text).toBe('Ok thank you')
+    expect(result.messages[1].direction).toBe('outbound')
+    expect(result.messages[1].text).toBe('Good morning, Kea!')
+  })
+
+  test('groups webhook mislabeled messages under the customer thread', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const customerPhone = '3178351004'
+    const companyPhone = '3176767938'
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      agent: '540273',
+      text: 'From rep',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'From customer',
+    })
+
+    const result = await listThreadsForUser({
+      user: admin,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+
+    expect(result.threads).toHaveLength(1)
+    expect(result.threads[0].phoneDigits).toBe(customerPhone)
+    expect(result.threads[0].messageCount).toBe(2)
+    expect(result.threads[0].lastDirection).toBe('outbound')
+  })
+
+  test('hides CloudTalk webhook echo of app-sent outbound', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const customerPhone = '8594208636'
+    const companyPhone = '3176767938'
+    const sentAt = new Date()
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'seed',
+      created_date: new Date(sentAt.getTime() - 60_000),
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: customerPhone,
+      sender_user_id: admin.id,
+      agent: '540273',
+      text: '😚🤥',
+      status: 'sent',
+      created_date: sentAt,
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      text: '😚🤥',
+      created_date: new Date(sentAt.getTime() + 3000),
+    })
+
+    const result = await getThreadForUser({
+      user: admin,
+      phoneDigits: customerPhone,
+      limit: 30,
+    })
+
+    const texts = result.messages.map(m => m.text)
+    expect(texts).toContain('😚🤥')
+    expect(texts.filter(t => t === '😚🤥')).toHaveLength(1)
+    expect(result.messages.find(m => m.text === '😚🤥')?.direction).toBe('outbound')
+  })
+
+  test('does not list company line as its own thread for webhook echo', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const customerPhone = '8594208636'
+    const companyPhone = '3176767938'
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'Ndnd',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      agent: '540273',
+      text: 'older rep msg',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      text: '😚🤥',
+    })
+
+    const result = await listThreadsForUser({
+      user: admin,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+
+    expect(result.threads.map(t => t.phoneDigits)).not.toContain(companyPhone)
+    expect(result.threads.some(t => t.phoneDigits === customerPhone)).toBe(true)
+  })
+
   test('excludes outbound pending/failed rows (handled optimistically client-side)', async () => {
     const company = await factory.company()
     const admin = await factory.user({ company_id: company.id, is_admin: true })
@@ -469,6 +683,41 @@ describe('fetchCustomerByPhone', () => {
 
     const result = await fetchCustomerByPhone(company.id, '3173161456')
     expect(result?.id).toBe(customer.id)
+  })
+
+  test('returns null when customer is deleted', async () => {
+    const company = await factory.company()
+    const customer = await factory.customer({
+      company_id: company.id,
+      name: 'Deleted Customer',
+      phone: '317-316-1456',
+    })
+    await helper.query('UPDATE customers SET deleted_at = NOW() WHERE id = ?', [
+      customer.id,
+    ])
+
+    const result = await fetchCustomerByPhone(company.id, '3173161456')
+    expect(result).toBeNull()
+  })
+
+  test('returns null when cloudtalk-linked customer is deleted', async () => {
+    const company = await factory.company()
+    const customer = await factory.customer({
+      company_id: company.id,
+      name: 'Deleted Linked Customer',
+    })
+    await factory.cloudtalkContact({
+      customer_id: customer.id,
+      company_id: company.id,
+      cloudtalk_id: 1004,
+      phone_e164_1: '+13173161456',
+    })
+    await helper.query('UPDATE customers SET deleted_at = NOW() WHERE id = ?', [
+      customer.id,
+    ])
+
+    const result = await fetchCustomerByPhone(company.id, '3173161456')
+    expect(result).toBeNull()
   })
 
   test('direct fallback does not cross company boundaries', async () => {
