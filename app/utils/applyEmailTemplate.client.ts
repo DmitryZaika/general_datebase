@@ -1,8 +1,7 @@
-import type { TemplateVariableData } from '~/services/types'
+import { replaceTemplateVariables } from '~/services/lambda.server'
 import { urlToFile } from '~/utils/attachmentFile.client'
 import { buildImageAttachmentPreviews } from '~/utils/emailAttachmentUi'
 import type { EmailTemplate, EmailTemplateAttachment } from '~/utils/emailTemplates'
-import { replaceTemplateVariables } from '~/utils/emailTemplateVariables'
 
 export async function resolveTemplateAttachmentFiles(
   attachments: EmailTemplateAttachment[],
@@ -12,10 +11,17 @@ export async function resolveTemplateAttachmentFiles(
 }
 
 export async function applyEmailTemplateContent(
+  userId: number,
+  dealId: number | null,
+  customerId: number | null,
   template: EmailTemplate,
-  templateVariableData: TemplateVariableData,
 ) {
-  const body = replaceTemplateVariables(template.template_body, templateVariableData)
+  const body = await replaceTemplateVariables(
+    userId,
+    dealId,
+    customerId,
+    template.template_body,
+  )
   const attachments = template.attachments?.length
     ? await resolveTemplateAttachmentFiles(template.attachments)
     : []

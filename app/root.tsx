@@ -296,6 +296,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
+  const headers = new Headers()
+
+  if (cookieHeader) {
+    headers.append('Set-Cookie', cookieHeader)
+  }
+  headers.append('Set-Cookie', await commitSession(session))
+
   return data(
     {
       message,
@@ -313,12 +320,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       unreadEmailCount,
     },
 
-    {
-      headers: [
-        ...(cookieHeader ? [['Set-Cookie', cookieHeader] as const] : []),
-        ['Set-Cookie', await commitSession(session)],
-      ],
-    },
+    { headers },
   )
 }
 

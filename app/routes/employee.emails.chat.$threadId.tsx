@@ -211,6 +211,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     threadId,
     currentUserSignature,
     companyId: user.company_id ?? 0,
+    userId: user.id,
   }
 }
 
@@ -233,6 +234,7 @@ export default function EmployeeEmailsChatRoute() {
       dealId={data.dealId}
       subject={data.subject}
       threadId={data.threadId}
+      userId={data.userId}
       currentUserSignature={data.currentUserSignature}
       customerEmail={data.customerEmail}
       companyId={data.companyId}

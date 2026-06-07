@@ -132,6 +132,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     threadId,
     currentUserSignature,
     companyId: user.company_id ?? 0,
+    userId: user.id,
   }
 }
 
@@ -151,6 +152,7 @@ export default function AdminDealsProjectChatRoute() {
       onClose={() =>
         navigate(`/admin/deals/edit/${data.dealId}/project${location.search}`)
       }
+      userId={data.userId}
       dealNav={{
         companyId: data.companyId,
         customerEmail: data.customerEmail,

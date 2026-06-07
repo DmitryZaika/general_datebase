@@ -54,6 +54,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return []
   }
 
+  if (!GOOGLE_KEY) {
+    return []
+  }
+
   const gRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
     method: 'POST',
     signal: request.signal,

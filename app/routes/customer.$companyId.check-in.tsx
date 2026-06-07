@@ -74,7 +74,6 @@ const customerCheckInSchema = z.object({
     .refine(val => val === true, 'You must acknowledge the safety instructions'),
 })
 
-type CheckInFormData = z.infer<typeof customerCheckInSchema>
 const resolver = zodResolver(customerCheckInSchema)
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
@@ -100,7 +99,7 @@ export default function CustomerCheckIn() {
   const { toast } = useToast()
   const { companyId, activeSession } = useLoaderData<typeof loader>()
 
-  const form = useForm<CheckInFormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       company_id: companyId,

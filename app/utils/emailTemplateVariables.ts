@@ -1,5 +1,3 @@
-import type { TemplateVariableData } from '~/services/types'
-
 interface EmailTemplateVariable {
   key: string
   label: string
@@ -35,18 +33,6 @@ function stripHtmlTags(html: string): string {
   return html.replace(HTML_TAG_REGEX, '')
 }
 
-function getFirstName(fullName: string | undefined | null): string {
-  if (!fullName) return ''
-  return fullName.split(' ')[0] || ''
-}
-
-function formatCurrentDate(): string {
-  return new Date().toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-  })
-}
-
 export function formatVariableForTemplate(key: string): string {
   return `{{${key}}}`
 }
@@ -55,7 +41,7 @@ export function extractVariablesFromTemplate(template: string): string[] {
   const textOnly = stripHtmlTags(template)
   const matches: string[] = []
   const regex = createVariableRegex()
-  let match
+  let match: RegExpExecArray | null
 
   while ((match = regex.exec(textOnly)) !== null) {
     matches.push(match[1])
@@ -66,7 +52,7 @@ export function extractVariablesFromTemplate(template: string): string[] {
 
 export function hasUnfilledVariables(text: string): boolean {
   const regex = createVariableRegex()
-  let match
+  let match: RegExpExecArray | null
 
   while ((match = regex.exec(text)) !== null) {
     if (VARIABLE_KEYS.includes(match[1])) {
@@ -85,7 +71,7 @@ export function hasAnyVariables(text: string): boolean {
 export function getUnfilledCustomVariables(text: string): string[] {
   const regex = createVariableRegex()
   const customVariables: string[] = []
-  let match
+  let match: RegExpExecArray | null
 
   while ((match = regex.exec(text)) !== null) {
     if (!VARIABLE_KEYS.includes(match[1])) {
@@ -115,7 +101,7 @@ export function validateTemplateBody(text: string): TemplateValidationResult {
   }
 
   const regex = createVariableRegex()
-  let match
+  let match: RegExpExecArray | null
   while ((match = regex.exec(text)) !== null) {
     const content = match[1]
     if (content.includes('{')) {
@@ -127,35 +113,4 @@ export function validateTemplateBody(text: string): TemplateValidationResult {
   }
 
   return { isValid: true }
-}
-
-function getVariableValue(key: string, data: TemplateVariableData): string | null {
-  const valueMap: Record<string, () => string | null> = {
-    'user.name': () => data.user?.name,
-    'user.first_name': () => getFirstName(data.user?.name),
-    'user.email': () => data.user?.email,
-    'user.phone_number': () => data.user?.phone_number,
-    'customer.name': () => data.customer?.name,
-    'customer.first_name': () => getFirstName(data.customer?.name),
-    'customer.address': () => data.customer?.address,
-    'company.name': () => data.company?.name,
-    'company.address': () => data.company?.address,
-    current_date: () => formatCurrentDate(),
-  }
-
-  const getValue = valueMap[key]
-  return getValue ? getValue() : null
-}
-
-export function replaceTemplateVariables(
-  template: string,
-  data: TemplateVariableData,
-): string {
-  return VARIABLE_KEYS.reduce((result, key) => {
-    const value = getVariableValue(key, data)
-    if (!value) return result
-
-    const placeholder = formatVariableForTemplate(key)
-    return result.replaceAll(placeholder, value)
-  }, template)
 }

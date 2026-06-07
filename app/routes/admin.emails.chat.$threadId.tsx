@@ -199,6 +199,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     threadId,
     currentUserSignature,
     companyId: user.company_id ?? 0,
+    userId: user.id,
   }
 }
 
@@ -218,6 +219,7 @@ export default function AdminEmailsChatRoute() {
         navigate(`/admin/emails${location.search}`)
       }}
       embedded
+      userId={data.userId}
       dealNav={{
         companyId: data.companyId,
         customerEmail: data.customerEmail,

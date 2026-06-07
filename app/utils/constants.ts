@@ -50,7 +50,7 @@ export const getSearchString = (url: URL) => {
 export const zodEmail = z.preprocess(
   val => (typeof val === 'string' ? val.trim() : val),
   z.email('Invalid email address').transform(val => val.toLowerCase()),
-)
+) as unknown as z.ZodString
 
 const strictPhone = z
   .string()
@@ -70,7 +70,7 @@ export const optionalZodPhone = z.union([z.literal(''), z.undefined(), strictPho
 export const optionalEmailSchema = z.preprocess(
   val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
   zodEmail.optional(),
-)
+) as unknown as z.ZodOptional<z.ZodString>
 
 export const optionalTrimmedEmailOrEmpty = z.preprocess(
   val => (typeof val === 'string' ? val.trim() : val),
