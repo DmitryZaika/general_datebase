@@ -11,9 +11,12 @@ import { SmsComposer } from './SmsComposer'
 import { ConversationMessagesSkeleton } from './SmsPageEmptyStates'
 import {
   buildSmsReactionMessage,
+  buildSmsReactionRemovalMessage,
   collectReactionsByMessageId,
   filterVisibleSmsMessages,
+  getReactionsForMessage,
   mergeMessageReactions,
+  setLocalReactionsForMessage,
 } from './smsReactionText'
 import type { SmsMessage, SmsThread } from './types'
 
@@ -93,14 +96,25 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
 
   const handleReact = useCallback(
     (messageId: string, emoji: string, reactedToText: string) => {
-      setLocalReactions(prev => {
-        const current = prev[messageId] ?? []
-        if (current.includes(emoji)) return prev
-        return { ...prev, [messageId]: [...current, emoji] }
-      })
-      props.onSend(buildSmsReactionMessage(emoji, reactedToText))
+      const message = visibleMessages.find(item => item.id === messageId)
+      if (!message) return
+
+      const current = getReactionsForMessage(message, reactionMap)
+      const removing = current.includes(emoji)
+      const next = removing
+        ? current.filter(item => item !== emoji)
+        : [...current, emoji]
+
+      setLocalReactions(prev =>
+        setLocalReactionsForMessage(prev, messageId, reactedToText, next),
+      )
+      props.onSend(
+        removing
+          ? buildSmsReactionRemovalMessage(emoji, reactedToText)
+          : buildSmsReactionMessage(emoji, reactedToText),
+      )
     },
-    [props.onSend],
+    [props.onSend, reactionMap, visibleMessages],
   )
 
   const handleScroll = useCallback(() => {
@@ -253,7 +267,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className='flex-1 overflow-y-auto px-4 py-3 space-y-3'
+        className='flex-1 overflow-y-auto overflow-x-visible px-4 py-3 space-y-3'
       >
         {props.hasOlder && (
           <div className='flex justify-center'>
@@ -279,7 +293,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
               <SmsBubble
                 key={msg.id}
                 message={msg}
-                reactions={reactionMap[msg.id] ?? []}
+                reactions={getReactionsForMessage(msg, reactionMap)}
                 onRetry={
                   msg.status === 'failed' ? () => props.onRetry(msg.id) : undefined
                 }
