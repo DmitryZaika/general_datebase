@@ -149,7 +149,7 @@ export function SmsComposer(props: SmsComposerProps) {
             maxHeight: `${MAX_HEIGHT}px`,
           }}
         />
-
+        <SmsEmojiPicker onPick={handleEmojiPick} />
         <AiImproveButton
           getText={() => text}
           setText={value => {
@@ -161,7 +161,6 @@ export function SmsComposer(props: SmsComposerProps) {
           buttonSize='icon'
           iconClassName='text-lg'
         />
-        <SmsEmojiPicker onPick={handleEmojiPick} />
         <LoadingButton type='submit' loading={props.isSending} disabled={isDisabled}>
           <SendIcon /> Send
         </LoadingButton>

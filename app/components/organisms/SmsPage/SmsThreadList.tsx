@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion'
 import { SquarePen } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { SearchInput } from '~/components/molecules/SearchInput'
@@ -9,6 +10,7 @@ import type { ThreadSummary } from './types'
 export interface SmsThreadListProps {
   threads: ThreadSummary[]
   isLoading: boolean
+  isSearchLoading?: boolean
   isFetchingMore: boolean
   hasMore: boolean
   activePhoneDigits: string | null
@@ -75,11 +77,29 @@ export function SmsThreadList(props: SmsThreadListProps) {
     [props],
   )
 
-  const showThreads = props.threads.length > 0
+  const isSearchLoading = draftSearch !== props.search || Boolean(props.isSearchLoading)
+  const hasThreads = props.threads.length > 0
+  const showThreads = !isSearchLoading && hasThreads
   const showSearchEmpty =
-    !props.isLoading && !showThreads && props.search.trim().length > 0
+    !isSearchLoading &&
+    !props.isLoading &&
+    !hasThreads &&
+    props.search.trim().length > 0
   const showGlobalEmpty =
-    !props.isLoading && !showThreads && props.search.trim().length === 0
+    !isSearchLoading &&
+    !props.isLoading &&
+    !hasThreads &&
+    props.search.trim().length === 0
+
+  const listContentKey = isSearchLoading
+    ? 'search-skeleton'
+    : showThreads
+      ? 'threads'
+      : showSearchEmpty
+        ? 'search-empty'
+        : showGlobalEmpty
+          ? 'global-empty'
+          : 'idle'
 
   return (
     <aside
@@ -122,38 +142,71 @@ export function SmsThreadList(props: SmsThreadListProps) {
         }
         onKeyDown={handleListKeyDown}
       >
-        {props.isLoading && !showThreads ? <ThreadListLoading /> : null}
-        {showThreads && (
-          <>
-            {props.threads.map(t => (
-              <SmsThreadListItem
-                key={t.phoneDigits}
-                thread={t}
-                isActive={props.activePhoneDigits === t.phoneDigits}
-                onClick={() => props.onSelect(t.phoneDigits)}
-              />
-            ))}
-            {props.hasMore && (
-              <div ref={sentinelRef} className='px-4 py-3'>
-                {props.isFetchingMore ? (
-                  <Skeleton className='h-12 w-full rounded-md' />
-                ) : (
-                  <button
-                    type='button'
-                    onClick={props.onLoadMore}
-                    className='w-full text-xs text-blue-600 hover:underline'
-                  >
-                    Load more
-                  </button>
-                )}
-              </div>
-            )}
-          </>
-        )}
-        {showSearchEmpty && (
-          <SearchNoMatch query={props.search} onClear={clearSearch} />
-        )}
-        {showGlobalEmpty && <NoThreadsEmpty />}
+        <AnimatePresence mode='wait'>
+          {listContentKey === 'search-skeleton' ? (
+            <motion.div
+              key='search-skeleton'
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <ThreadListLoading />
+            </motion.div>
+          ) : listContentKey === 'threads' ? (
+            <motion.div
+              key={`threads-${props.search}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              {props.threads.map(t => (
+                <SmsThreadListItem
+                  key={t.phoneDigits}
+                  thread={t}
+                  isActive={props.activePhoneDigits === t.phoneDigits}
+                  onClick={() => props.onSelect(t.phoneDigits)}
+                />
+              ))}
+              {props.hasMore && (
+                <div ref={sentinelRef} className='px-4 py-3'>
+                  {props.isFetchingMore ? (
+                    <Skeleton className='h-12 w-full rounded-md' />
+                  ) : (
+                    <button
+                      type='button'
+                      onClick={props.onLoadMore}
+                      className='w-full text-xs text-blue-600 hover:underline'
+                    >
+                      Load more
+                    </button>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          ) : listContentKey === 'search-empty' ? (
+            <motion.div
+              key={`search-empty-${props.search}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <SearchNoMatch query={props.search} onClear={clearSearch} />
+            </motion.div>
+          ) : listContentKey === 'global-empty' ? (
+            <motion.div
+              key='global-empty'
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <NoThreadsEmpty />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </aside>
   )

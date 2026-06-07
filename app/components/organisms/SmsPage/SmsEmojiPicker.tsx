@@ -396,7 +396,7 @@ export function SmsEmojiPicker(props: SmsEmojiPickerProps) {
           type='button'
           aria-label='Insert emoji'
           disabled={props.disabled}
-          className='shrink-0 h-11 w-11 inline-flex items-center justify-center rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+          className='shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
         >
           <Smile size={18} />
         </button>

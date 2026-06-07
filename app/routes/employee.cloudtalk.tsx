@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   type LoaderFunctionArgs,
   Outlet,
@@ -62,6 +62,7 @@ export default function CloudTalkPage() {
   const cloudtalkBase = cloudtalkBasePath(location.pathname)
   const activePhone = (params.phoneDigits ?? null) as Nullable<string>
   const [search, setSearch] = useState('')
+  const [searchFetchPending, setSearchFetchPending] = useState(false)
   const [newConversationOpen, setNewConversationOpen] = useState(false)
 
   const threadsQuery = useInfiniteQuery<ThreadsPage>({
@@ -94,6 +95,22 @@ export default function CloudTalkPage() {
   )
   const hasMore = Boolean(threadsQuery.hasNextPage)
 
+  const handleSearchChange = useCallback((q: string) => {
+    setSearch(q)
+    setSearchFetchPending(true)
+  }, [])
+
+  useEffect(() => {
+    if (!threadsQuery.isFetching && !threadsQuery.isPending) {
+      setSearchFetchPending(false)
+    }
+  }, [threadsQuery.isFetching, threadsQuery.isPending])
+
+  const isListSearchLoading = searchFetchPending
+
+  const showPageSkeleton =
+    threadsQuery.isPending && threads.length === 0 && search.trim().length === 0
+
   const handleSelect = useCallback(
     (phone: string) => navigate(`${cloudtalkBase}/thread/${phone}`),
     [navigate, cloudtalkBase],
@@ -112,8 +129,6 @@ export default function CloudTalkPage() {
       threadsQuery.fetchNextPage()
     }
   }, [threadsQuery])
-
-  const showPageSkeleton = threadsQuery.isPending && threads.length === 0
 
   if (showPageSkeleton) {
     const skeleton = (
@@ -142,11 +157,12 @@ export default function CloudTalkPage() {
         <SmsThreadList
           threads={threads}
           isLoading={threadsQuery.isLoading}
+          isSearchLoading={isListSearchLoading}
           isFetchingMore={threadsQuery.isFetchingNextPage}
           hasMore={hasMore}
           activePhoneDigits={activePhone}
           search={search}
-          onSearchChange={setSearch}
+          onSearchChange={handleSearchChange}
           onSelect={handleSelect}
           onLoadMore={handleLoadMore}
           readOnly={data.readOnly}
