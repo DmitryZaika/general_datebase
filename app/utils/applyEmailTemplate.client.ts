@@ -1,10 +1,8 @@
+import type { TemplateVariableData } from '~/services/types'
 import { urlToFile } from '~/utils/attachmentFile.client'
 import { buildImageAttachmentPreviews } from '~/utils/emailAttachmentUi'
 import type { EmailTemplate, EmailTemplateAttachment } from '~/utils/emailTemplates'
-import {
-  replaceTemplateVariables,
-  type TemplateVariableData,
-} from '~/utils/emailTemplateVariables'
+import { replaceTemplateVariables } from '~/utils/emailTemplateVariables'
 
 export async function resolveTemplateAttachmentFiles(
   attachments: EmailTemplateAttachment[],

@@ -1,4 +1,6 @@
-export interface EmailTemplateVariable {
+import type { TemplateVariableData } from '~/services/types'
+
+interface EmailTemplateVariable {
   key: string
   label: string
 }
@@ -24,23 +26,7 @@ function createVariableRegex(): RegExp {
   return /\{\{([^}]+)\}\}/g
 }
 
-export interface TemplateVariableData {
-  user?: {
-    name?: string
-    email?: string
-    phone_number?: string
-  }
-  customer?: {
-    name?: string
-    address?: string
-  }
-  company?: {
-    name?: string
-    address?: string
-  }
-}
-
-export interface TemplateValidationResult {
+interface TemplateValidationResult {
   isValid: boolean
   error?: string
 }
@@ -143,11 +129,8 @@ export function validateTemplateBody(text: string): TemplateValidationResult {
   return { isValid: true }
 }
 
-function getVariableValue(
-  key: string,
-  data: TemplateVariableData,
-): string | undefined {
-  const valueMap: Record<string, () => string | undefined> = {
+function getVariableValue(key: string, data: TemplateVariableData): string | null {
+  const valueMap: Record<string, () => string | null> = {
     'user.name': () => data.user?.name,
     'user.first_name': () => getFirstName(data.user?.name),
     'user.email': () => data.user?.email,
@@ -157,11 +140,11 @@ function getVariableValue(
     'customer.address': () => data.customer?.address,
     'company.name': () => data.company?.name,
     'company.address': () => data.company?.address,
-    'current_date': () => formatCurrentDate(),
+    current_date: () => formatCurrentDate(),
   }
 
   const getValue = valueMap[key]
-  return getValue ? getValue() : undefined
+  return getValue ? getValue() : null
 }
 
 export function replaceTemplateVariables(

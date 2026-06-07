@@ -63,7 +63,7 @@ import {
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
-import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import { fetchTemplateVariableData } from '~/services/lambda.server'
 import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
 import { zodEmail } from '~/utils/constants'
 import type { EmailTemplate } from '~/utils/emailTemplates'
@@ -184,7 +184,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const [senderInfo, templateVariableData] = await Promise.all([
     fetchSenderInfo(user),
-    fetchTemplateVariableData({ user, dealId }),
+    fetchTemplateVariableData(user.id, dealId || null, null),
   ])
 
   return {
