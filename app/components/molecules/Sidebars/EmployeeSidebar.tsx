@@ -296,6 +296,7 @@ export function EmployeeSidebar({
   const isContractorsRoute = location.pathname.startsWith('/contractors/')
   const data = useLoaderData<{
     user: {
+      id: number | null
       company_id: number
       is_admin: boolean
       is_superuser: boolean
@@ -443,12 +444,39 @@ export function EmployeeSidebar({
     !isMobile &&
     !isPinned
 
+  const showPinControl =
+    Boolean(data?.user) &&
+    !isMobile &&
+    (location.pathname.startsWith('/employee') ||
+      location.pathname.startsWith('/admin'))
+
+  const handleSidebarHoverZoneMouseEnter = isIconHoverDesktopSidebar
+    ? (event: React.MouseEvent) => {
+        if (
+          event.target instanceof Node &&
+          !event.currentTarget.contains(event.target)
+        ) {
+          return
+        }
+        setOpen(true)
+      }
+    : undefined
+  const handleSidebarHoverZoneMouseLeave = isIconHoverDesktopSidebar
+    ? (event: React.MouseEvent) => {
+        const next = event.relatedTarget
+        if (
+          next instanceof Element &&
+          (next.closest('[data-sidebar-hover-zone]') ||
+            next.closest('[data-sidebar-chat-panel]'))
+        ) {
+          return
+        }
+        setOpen(false)
+      }
+    : undefined
+
   return (
-    <Sidebar
-      collapsible={isIconHoverDesktopSidebar ? 'icon' : 'offcanvas'}
-      onMouseEnter={isIconHoverDesktopSidebar ? () => setOpen(true) : undefined}
-      onMouseLeave={isIconHoverDesktopSidebar ? () => setOpen(false) : undefined}
-    >
+    <Sidebar collapsible={isIconHoverDesktopSidebar ? 'icon' : 'offcanvas'}>
       {isMobile && data?.user && itemsBase !== 'shop' && (
         <SidebarHeader className='py-2 px-3'>
           <div className='flex gap-2 justify-center'>
@@ -481,239 +509,244 @@ export function EmployeeSidebar({
           )}
         </SidebarHeader>
       )}
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {/* INVENTORY */}
-              {inventoryItems.length > 0 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <button
-                      type='button'
-                      className='w-full flex items-center cursor-pointer'
-                      onClick={() => setInventoryOpen(o => !o)}
-                    >
-                      <Package />
-                      <span className='group-data-[collapsible=icon]:hidden'>
-                        Inventory
-                      </span>
-                      <ChevronDown
-                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${inventoryOpen ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                  </SidebarMenuButton>
-                  <Collapsible
-                    isOpen={inventoryOpen}
-                    openDuration='duration-300'
-                    closeDuration='duration-300'
-                    className='pl-2'
-                  >
-                    <SidebarMenuSub>
-                      {inventoryItems.map(sub => {
-                        const isActive = location.pathname.startsWith(sub.url)
-                        return (
-                          <SidebarMenuSubItem key={sub.title}>
-                            <SidebarMenuSubButton asChild isActive={isActive}>
-                              <Link
-                                to={sub.url}
-                                onClick={handleLinkClick}
-                                className='flex w-full items-center gap-2'
-                              >
-                                <sub.icon />
-                                <span>{sub.title}</span>
-                                {sub.title === 'Emails' && unreadEmailCount > 0 ? (
-                                  <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
-                                    {unreadEmailCount}
-                                  </span>
-                                ) : null}
-                              </Link>
-                            </SidebarMenuSubButton>
-                            {sub.component && isActive && <sub.component />}
-                          </SidebarMenuSubItem>
-                        )
-                      })}
-                    </SidebarMenuSub>
-                  </Collapsible>
-                </SidebarMenuItem>
-              )}
-
-              {/* CRM */}
-              {crmItems.length > 0 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <button
-                      type='button'
-                      className='w-full flex items-center cursor-pointer'
-                      onClick={() => setCrmOpen(o => !o)}
-                    >
-                      <Users />
-                      <span className='group-data-[collapsible=icon]:hidden'>CRM</span>
-                      <ChevronDown
-                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${crmOpen ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                  </SidebarMenuButton>
-                  <Collapsible
-                    isOpen={crmOpen}
-                    openDuration='duration-300'
-                    closeDuration='duration-300'
-                    className='pl-2'
-                  >
-                    <SidebarMenuSub>
-                      {crmItems.map(sub => {
-                        const isActive = navItemPathActive(location.pathname, sub.url)
-                        return (
-                          <SidebarMenuSubItem key={sub.title}>
-                            <SidebarMenuSubButton asChild isActive={isActive}>
-                              <Link
-                                to={sub.url}
-                                onClick={handleLinkClick}
-                                className='flex w-full items-center gap-2'
-                              >
-                                <sub.icon />
-                                <span>{sub.title}</span>
-                                {sub.title === 'Emails' && unreadEmailCount > 0 ? (
-                                  <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
-                                    {unreadEmailCount}
-                                  </span>
-                                ) : null}
-                                {sub.title === 'CloudTalk SMS' ? (
-                                  <SidebarCloudtalkBadge />
-                                ) : null}
-                              </Link>
-                            </SidebarMenuSubButton>
-                            {sub.component && isActive && <sub.component />}
-                          </SidebarMenuSubItem>
-                        )
-                      })}
-                    </SidebarMenuSub>
-                  </Collapsible>
-                </SidebarMenuItem>
-              )}
-
-              {/* RESOURCES */}
-              {resourcesItems.length > 0 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <button
-                      type='button'
-                      className='w-full flex items-center cursor-pointer'
-                      onClick={() => setResourcesOpen(o => !o)}
-                    >
-                      <FileIcon />
-                      <span className='group-data-[collapsible=icon]:hidden'>
-                        Resources
-                      </span>
-                      <ChevronDown
-                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${resourcesOpen ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                  </SidebarMenuButton>
-                  <Collapsible
-                    isOpen={resourcesOpen}
-                    openDuration='duration-300'
-                    closeDuration='duration-300'
-                    className='pl-2'
-                  >
-                    <SidebarMenuSub>
-                      {resourcesItems.map(sub => {
-                        const isActive = location.pathname.startsWith(sub.url)
-                        return (
-                          <SidebarMenuSubItem key={sub.title}>
-                            <SidebarMenuSubButton asChild isActive={isActive}>
-                              <Link to={sub.url} onClick={handleLinkClick}>
-                                <sub.icon />
-                                <span>{sub.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                            {sub.component && isActive && <sub.component />}
-                          </SidebarMenuSubItem>
-                        )
-                      })}
-                    </SidebarMenuSub>
-                  </Collapsible>
-                </SidebarMenuItem>
-              )}
-
-              {/* OPERATIONS */}
-              {operationsItems.length > 0 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <button
-                      type='button'
-                      className='w-full flex items-center cursor-pointer'
-                      onClick={() => setOperationsOpen(o => !o)}
-                    >
-                      <Calculator />
-                      <span className='group-data-[collapsible=icon]:hidden'>
-                        Operations
-                      </span>
-                      <ChevronDown
-                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${operationsOpen ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                  </SidebarMenuButton>
-                  <Collapsible
-                    isOpen={operationsOpen}
-                    openDuration='duration-300'
-                    closeDuration='duration-300'
-                    className='pl-2'
-                  >
-                    <SidebarMenuSub>
-                      {operationsItems.map(sub => {
-                        const isActive = location.pathname.startsWith(sub.url)
-                        return (
-                          <SidebarMenuSubItem key={sub.title}>
-                            <SidebarMenuSubButton asChild isActive={isActive}>
-                              <Link to={sub.url} onClick={handleLinkClick}>
-                                <sub.icon />
-                                <span>{sub.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                            {sub.component && isActive && <sub.component />}
-                          </SidebarMenuSubItem>
-                        )
-                      })}
-                    </SidebarMenuSub>
-                  </Collapsible>
-                </SidebarMenuItem>
-              )}
-
-              {otherItems.map(item => {
-                const isActive =
-                  (isCustomerRoute || isContractorsRoute) && item.title === 'Stones'
-                    ? location.pathname.includes('/stones')
-                    : navItemPathActive(location.pathname, item.url)
-
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <Link
-                        to={item.url}
-                        onClick={handleLinkClick}
-                        className='flex w-full items-center gap-2'
+      <div
+        data-sidebar-hover-zone
+        className='flex min-h-0 flex-1 flex-col'
+        onMouseEnter={handleSidebarHoverZoneMouseEnter}
+        onMouseLeave={handleSidebarHoverZoneMouseLeave}
+      >
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {/* INVENTORY */}
+                {inventoryItems.length > 0 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <button
+                        type='button'
+                        className='w-full flex items-center cursor-pointer'
+                        onClick={() => setInventoryOpen(o => !o)}
                       >
-                        <item.icon />
+                        <Package />
                         <span className='group-data-[collapsible=icon]:hidden'>
-                          {item.title}
+                          Inventory
                         </span>
-                        {item.title === 'Emails' && unreadEmailCount > 0 ? (
-                          <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white group-data-[collapsible=icon]:hidden'>
-                            {unreadEmailCount}
-                          </span>
-                        ) : null}
-                      </Link>
+                        <ChevronDown
+                          className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${inventoryOpen ? 'rotate-180' : ''}`}
+                        />
+                      </button>
                     </SidebarMenuButton>
-                    {item.component && isActive && <item.component />}
+                    <Collapsible
+                      isOpen={inventoryOpen}
+                      openDuration='duration-300'
+                      closeDuration='duration-300'
+                      className='pl-2'
+                    >
+                      <SidebarMenuSub>
+                        {inventoryItems.map(sub => {
+                          const isActive = location.pathname.startsWith(sub.url)
+                          return (
+                            <SidebarMenuSubItem key={sub.title}>
+                              <SidebarMenuSubButton asChild isActive={isActive}>
+                                <Link
+                                  to={sub.url}
+                                  onClick={handleLinkClick}
+                                  className='flex w-full items-center gap-2'
+                                >
+                                  <sub.icon />
+                                  <span>{sub.title}</span>
+                                  {sub.title === 'Emails' && unreadEmailCount > 0 ? (
+                                    <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
+                                      {unreadEmailCount}
+                                    </span>
+                                  ) : null}
+                                </Link>
+                              </SidebarMenuSubButton>
+                              {sub.component && isActive && <sub.component />}
+                            </SidebarMenuSubItem>
+                          )
+                        })}
+                      </SidebarMenuSub>
+                    </Collapsible>
                   </SidebarMenuItem>
-                )
-              })}
+                )}
 
-              {data?.user &&
-                !isMobile &&
-                (location.pathname.startsWith('/employee') ||
-                  location.pathname.startsWith('/admin')) && (
+                {/* CRM */}
+                {crmItems.length > 0 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <button
+                        type='button'
+                        className='w-full flex items-center cursor-pointer'
+                        onClick={() => setCrmOpen(o => !o)}
+                      >
+                        <Users />
+                        <span className='group-data-[collapsible=icon]:hidden'>
+                          CRM
+                        </span>
+                        <ChevronDown
+                          className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${crmOpen ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </SidebarMenuButton>
+                    <Collapsible
+                      isOpen={crmOpen}
+                      openDuration='duration-300'
+                      closeDuration='duration-300'
+                      className='pl-2'
+                    >
+                      <SidebarMenuSub>
+                        {crmItems.map(sub => {
+                          const isActive = navItemPathActive(location.pathname, sub.url)
+                          return (
+                            <SidebarMenuSubItem key={sub.title}>
+                              <SidebarMenuSubButton asChild isActive={isActive}>
+                                <Link
+                                  to={sub.url}
+                                  onClick={handleLinkClick}
+                                  className='flex w-full items-center gap-2'
+                                >
+                                  <sub.icon />
+                                  <span>{sub.title}</span>
+                                  {sub.title === 'Emails' && unreadEmailCount > 0 ? (
+                                    <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
+                                      {unreadEmailCount}
+                                    </span>
+                                  ) : null}
+                                  {sub.title === 'CloudTalk SMS' ? (
+                                    <SidebarCloudtalkBadge />
+                                  ) : null}
+                                </Link>
+                              </SidebarMenuSubButton>
+                              {sub.component && isActive && <sub.component />}
+                            </SidebarMenuSubItem>
+                          )
+                        })}
+                      </SidebarMenuSub>
+                    </Collapsible>
+                  </SidebarMenuItem>
+                )}
+
+                {/* RESOURCES */}
+                {resourcesItems.length > 0 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <button
+                        type='button'
+                        className='w-full flex items-center cursor-pointer'
+                        onClick={() => setResourcesOpen(o => !o)}
+                      >
+                        <FileIcon />
+                        <span className='group-data-[collapsible=icon]:hidden'>
+                          Resources
+                        </span>
+                        <ChevronDown
+                          className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${resourcesOpen ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </SidebarMenuButton>
+                    <Collapsible
+                      isOpen={resourcesOpen}
+                      openDuration='duration-300'
+                      closeDuration='duration-300'
+                      className='pl-2'
+                    >
+                      <SidebarMenuSub>
+                        {resourcesItems.map(sub => {
+                          const isActive = location.pathname.startsWith(sub.url)
+                          return (
+                            <SidebarMenuSubItem key={sub.title}>
+                              <SidebarMenuSubButton asChild isActive={isActive}>
+                                <Link to={sub.url} onClick={handleLinkClick}>
+                                  <sub.icon />
+                                  <span>{sub.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                              {sub.component && isActive && <sub.component />}
+                            </SidebarMenuSubItem>
+                          )
+                        })}
+                      </SidebarMenuSub>
+                    </Collapsible>
+                  </SidebarMenuItem>
+                )}
+
+                {/* OPERATIONS */}
+                {operationsItems.length > 0 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <button
+                        type='button'
+                        className='w-full flex items-center cursor-pointer'
+                        onClick={() => setOperationsOpen(o => !o)}
+                      >
+                        <Calculator />
+                        <span className='group-data-[collapsible=icon]:hidden'>
+                          Operations
+                        </span>
+                        <ChevronDown
+                          className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${operationsOpen ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </SidebarMenuButton>
+                    <Collapsible
+                      isOpen={operationsOpen}
+                      openDuration='duration-300'
+                      closeDuration='duration-300'
+                      className='pl-2'
+                    >
+                      <SidebarMenuSub>
+                        {operationsItems.map(sub => {
+                          const isActive = location.pathname.startsWith(sub.url)
+                          return (
+                            <SidebarMenuSubItem key={sub.title}>
+                              <SidebarMenuSubButton asChild isActive={isActive}>
+                                <Link to={sub.url} onClick={handleLinkClick}>
+                                  <sub.icon />
+                                  <span>{sub.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                              {sub.component && isActive && <sub.component />}
+                            </SidebarMenuSubItem>
+                          )
+                        })}
+                      </SidebarMenuSub>
+                    </Collapsible>
+                  </SidebarMenuItem>
+                )}
+
+                {otherItems.map(item => {
+                  const isActive =
+                    (isCustomerRoute || isContractorsRoute) && item.title === 'Stones'
+                      ? location.pathname.includes('/stones')
+                      : navItemPathActive(location.pathname, item.url)
+
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive}>
+                        <Link
+                          to={item.url}
+                          onClick={handleLinkClick}
+                          className='flex w-full items-center gap-2'
+                        >
+                          <item.icon />
+                          <span className='group-data-[collapsible=icon]:hidden'>
+                            {item.title}
+                          </span>
+                          {item.title === 'Emails' && unreadEmailCount > 0 ? (
+                            <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white group-data-[collapsible=icon]:hidden'>
+                              {unreadEmailCount}
+                            </span>
+                          ) : null}
+                        </Link>
+                      </SidebarMenuButton>
+                      {item.component && isActive && <item.component />}
+                    </SidebarMenuItem>
+                  )
+                })}
+
+                {showPinControl && (
                   <SidebarMenuItem className='mt-2 border-t border-sidebar-border pt-2 group-data-[collapsible=icon]:hidden'>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -722,7 +755,7 @@ export function EmployeeSidebar({
                           onClick={handleTogglePin}
                           aria-label={isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
                           aria-pressed={isPinned}
-                          className={`group/pin flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer ${
+                          className={`group/pin inline-flex w-fit items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer ${
                             isPinned
                               ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
                               : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
@@ -755,13 +788,19 @@ export function EmployeeSidebar({
                     </Tooltip>
                   </SidebarMenuItem>
                 )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter>
-        <Chat />
-      </SidebarFooter>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        {data?.user?.id != null ? (
+          <SidebarFooter className='gap-0 p-2 pt-0'>
+            <Chat
+              variant='sidebar'
+              onSidebarHoverCollapse={handleSidebarHoverZoneMouseLeave}
+            />
+          </SidebarFooter>
+        ) : null}
+      </div>
     </Sidebar>
   )
 }

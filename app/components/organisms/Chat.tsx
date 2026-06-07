@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type Variants } from 'framer-motion'
-import { ImagePlus, Plus, Sparkles, X } from 'lucide-react'
+import { ImagePlus, MessageCircle, Plus, Sparkles, X } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -1494,7 +1494,14 @@ interface DragState {
   didMove: boolean
 }
 
-export function Chat() {
+export function Chat({
+  variant = 'floating',
+  onSidebarHoverCollapse,
+}: {
+  variant?: 'floating' | 'sidebar'
+  onSidebarHoverCollapse?: (event: React.MouseEvent) => void
+}) {
+  const isSidebarVariant = variant === 'sidebar'
   const location = useLocation()
   const instructionsPath = location.pathname.startsWith('/admin')
     ? '/admin/instructions'
@@ -2400,56 +2407,76 @@ export function Chat() {
   const chatMessagesList =
     clearingSnapshot !== null ? clearingSnapshot : displayMessages
 
-  if (!ready) {
+  if (!isSidebarVariant && !ready) {
     return null
   }
 
   const pixelAnchor =
-    useCustomPosition && viewportRevision >= 0 ? pixelsFromPercent(anchor) : null
+    !isSidebarVariant && useCustomPosition && viewportRevision >= 0
+      ? pixelsFromPercent(anchor)
+      : null
   const positionStyle = pixelAnchor
     ? { right: pixelAnchor.right, bottom: pixelAnchor.bottom }
     : undefined
-  const anchorClass = useCustomPosition ? '' : DEFAULT_ANCHOR_CLASS
-  const visibilityClass = visible ? 'opacity-100' : 'opacity-0'
+  const anchorClass = !isSidebarVariant && useCustomPosition ? '' : DEFAULT_ANCHOR_CLASS
+  const visibilityClass = isSidebarVariant || visible ? 'opacity-100' : 'opacity-0'
+
+  const triggerButton = isSidebarVariant ? (
+    <button
+      type='button'
+      data-sidebar-chat-trigger
+      aria-label={open ? 'Close chat' : 'Open chat'}
+      aria-expanded={open}
+      onClick={() => setOpen(prev => !prev)}
+      className='flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-blue-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-600 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0'
+    >
+      <MessageCircle className='size-5 shrink-0' />
+      <span className='group-data-[collapsible=icon]:hidden'>Chat</span>
+    </button>
+  ) : (
+    <button
+      type='button'
+      aria-label='Open chat'
+      className={`${FIXED_BASE_CLASS} ${anchorClass} ${APPEARANCE_CLASS} ${visibilityClass} rounded-full bg-blue-500 hover:bg-blue-600 text-white size-14 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg`}
+      style={positionStyle}
+      onPointerDown={startDrag}
+      onPointerMove={moveDrag}
+      onPointerUp={endDrag}
+      onPointerCancel={e => {
+        if (dragStateRef.current?.didMove) persistAnchor()
+        dragStateRef.current = null
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId)
+        }
+      }}
+    >
+      <svg
+        xmlns='http://www.w3.org/2000/svg'
+        fill='none'
+        viewBox='0 0 24 24'
+        strokeWidth={2}
+        stroke='currentColor'
+        className='size-6 pointer-events-none'
+      >
+        <path
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          d='M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z'
+        />
+      </svg>
+    </button>
+  )
 
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen} modal={false}>
-        <button
-          type='button'
-          aria-label='Open chat'
-          className={`${FIXED_BASE_CLASS} ${anchorClass} ${APPEARANCE_CLASS} ${visibilityClass} rounded-full bg-blue-500 hover:bg-blue-600 text-white size-14 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg`}
-          style={positionStyle}
-          onPointerDown={startDrag}
-          onPointerMove={moveDrag}
-          onPointerUp={endDrag}
-          onPointerCancel={e => {
-            if (dragStateRef.current?.didMove) persistAnchor()
-            dragStateRef.current = null
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-              e.currentTarget.releasePointerCapture(e.pointerId)
-            }
-          }}
-        >
-          <svg
-            xmlns='http://www.w3.org/2000/svg'
-            fill='none'
-            viewBox='0 0 24 24'
-            strokeWidth={2}
-            stroke='currentColor'
-            className='size-6 pointer-events-none'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              d='M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z'
-            />
-          </svg>
-        </button>
+        {triggerButton}
         <DialogContent
           hideClose
           className='h-full p-0 gap-0'
           position='br'
+          onMouseEnter={event => event.stopPropagation()}
+          onPointerEnter={event => event.stopPropagation()}
           onOpenAutoFocus={e => {
             e.preventDefault()
             focusInput()
@@ -2458,7 +2485,21 @@ export function Chat() {
             e.preventDefault()
           }}
         >
-          <div className='h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-hidden'>
+          <div
+            data-sidebar-chat-panel
+            className='h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-hidden'
+            onMouseLeave={event => {
+              const next = event.relatedTarget
+              if (
+                next instanceof Element &&
+                (next.closest('[data-sidebar-hover-zone]') ||
+                  next.closest('[data-sidebar-chat-panel]'))
+              ) {
+                return
+              }
+              onSidebarHoverCollapse?.(event)
+            }}
+          >
             <DialogFullHeader
               actions={
                 <Button
