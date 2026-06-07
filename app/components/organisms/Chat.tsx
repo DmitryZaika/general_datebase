@@ -308,7 +308,7 @@ function AnimatedPriceListMenu({
           transition={{ duration: 0.28, ease: FORM_EXPAND_EASE }}
           className='inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800'
         >
-          <span>Price lists</span>
+          <span>Price list</span>
           <button
             type='button'
             aria-label='Close price lists mode'
