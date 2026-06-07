@@ -5,6 +5,7 @@ import type { SmsMessage } from './types'
 
 export interface SmsBubbleProps {
   message: SmsMessage
+  reactions?: string[]
   onRetry?: () => void
   onReact?: (emoji: string, reactedToText: string) => void
   canReact?: boolean
@@ -13,6 +14,7 @@ export interface SmsBubbleProps {
 
 export function SmsBubble({
   message,
+  reactions = [],
   onRetry,
   onReact,
   canReact = false,
@@ -48,6 +50,23 @@ export function SmsBubble({
         >
           {message.text}
         </div>
+        {reactions.length > 0 ? (
+          <div
+            className={cn(
+              'mt-1 flex flex-wrap gap-1',
+              isOutbound ? 'justify-end' : 'justify-start',
+            )}
+          >
+            {reactions.map(emoji => (
+              <span
+                key={emoji}
+                className='inline-flex min-w-7 items-center justify-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-base leading-none shadow-sm'
+              >
+                {emoji}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div
           className={cn(
             'text-[10px] mt-0.5 px-1',

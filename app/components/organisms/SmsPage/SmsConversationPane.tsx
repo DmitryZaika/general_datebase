@@ -9,7 +9,12 @@ import { formatDayLabel } from './dayLabel'
 import { SmsBubble } from './SmsBubble'
 import { SmsComposer } from './SmsComposer'
 import { ConversationMessagesSkeleton } from './SmsPageEmptyStates'
-import { buildSmsReactionMessage } from './smsReactionText'
+import {
+  buildSmsReactionMessage,
+  collectReactionsByMessageId,
+  filterVisibleSmsMessages,
+  mergeMessageReactions,
+} from './smsReactionText'
 import type { SmsMessage, SmsThread } from './types'
 
 export interface SmsConversationPaneProps {
@@ -56,6 +61,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [newSinceScroll, setNewSinceScroll] = useState(0)
+  const [localReactions, setLocalReactions] = useState<Record<string, string[]>>({})
   const messageCountRef = useRef(0)
   const wasLoadingRef = useRef(false)
   const location = useLocation()
@@ -64,12 +70,38 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
     ? '/admin/cloudtalk'
     : '/employee/cloudtalk'
 
-  const allMessages = useMemo(() => {
+  const rawMessages = useMemo(() => {
     if (!props.thread) return []
     return [...props.thread.messages, ...props.pendingMessages]
   }, [props.thread, props.pendingMessages])
 
-  const dayGroups = useMemo(() => groupByDay(allMessages), [allMessages])
+  const visibleMessages = useMemo(
+    () => filterVisibleSmsMessages(rawMessages),
+    [rawMessages],
+  )
+
+  const reactionMap = useMemo(() => {
+    const fromServer = collectReactionsByMessageId(rawMessages)
+    return mergeMessageReactions(fromServer, localReactions)
+  }, [rawMessages, localReactions])
+
+  const dayGroups = useMemo(() => groupByDay(visibleMessages), [visibleMessages])
+
+  useEffect(() => {
+    setLocalReactions({})
+  }, [props.phoneDigits])
+
+  const handleReact = useCallback(
+    (messageId: string, emoji: string, reactedToText: string) => {
+      setLocalReactions(prev => {
+        const current = prev[messageId] ?? []
+        if (current.includes(emoji)) return prev
+        return { ...prev, [messageId]: [...current, emoji] }
+      })
+      props.onSend(buildSmsReactionMessage(emoji, reactedToText))
+    },
+    [props.onSend],
+  )
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current
@@ -103,7 +135,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
 
   useEffect(() => {
     const prev = messageCountRef.current
-    const next = allMessages.length
+    const next = visibleMessages.length
     messageCountRef.current = next
     if (next > prev) {
       const added = next - prev
@@ -117,7 +149,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
         setNewSinceScroll(c => c + added)
       }
     }
-  }, [allMessages.length, isAtBottom])
+  }, [visibleMessages.length, isAtBottom])
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -247,6 +279,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
               <SmsBubble
                 key={msg.id}
                 message={msg}
+                reactions={reactionMap[msg.id] ?? []}
                 onRetry={
                   msg.status === 'failed' ? () => props.onRetry(msg.id) : undefined
                 }
@@ -255,7 +288,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
                 onReact={
                   canInteract
                     ? (emoji, reactedToText) =>
-                        props.onSend(buildSmsReactionMessage(emoji, reactedToText))
+                        handleReact(msg.id, emoji, reactedToText)
                     : undefined
                 }
               />
