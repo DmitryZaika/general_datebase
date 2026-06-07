@@ -767,6 +767,7 @@ function parseImageUrlsPayload(data: string): string[] {
 
 interface PriceListStatus {
   state: 'searching' | 'reading' | 'answering'
+  phase?: 'downloading' | 'extracting'
   fileType?: 'pdf' | 'image' | 'file'
   name?: string
 }
@@ -792,6 +793,11 @@ function parsePriceListStatus(data: string): PriceListStatus | null {
     if ('name' in parsed && typeof parsed.name === 'string') {
       status.name = parsed.name
     }
+    if ('phase' in parsed && typeof parsed.phase === 'string') {
+      if (parsed.phase === 'downloading' || parsed.phase === 'extracting') {
+        status.phase = parsed.phase
+      }
+    }
     return status
   } catch {
     return null
@@ -801,13 +807,20 @@ function parsePriceListStatus(data: string): PriceListStatus | null {
 function statusLabel(status: PriceListStatus): string {
   if (status.state === 'searching') return 'Searching supplier files…'
   if (status.state === 'reading') {
+    const suffix = status.name ? `: ${status.name}` : ''
     if (status.fileType === 'pdf') {
-      return `Downloading PDF${status.name ? `: ${status.name}` : ''}…`
+      if (status.phase === 'extracting') {
+        return `Extracting text from PDF${suffix}…`
+      }
+      return `Downloading PDF${suffix}…`
     }
     if (status.fileType === 'image') {
-      return `Reading image${status.name ? `: ${status.name}` : ''}…`
+      if (status.phase === 'extracting') {
+        return `Extracting text from image${suffix}…`
+      }
+      return `Reading image${suffix}…`
     }
-    return `Reading file${status.name ? `: ${status.name}` : ''}…`
+    return `Reading file${suffix}…`
   }
   return 'Reading documents…'
 }
