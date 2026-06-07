@@ -242,7 +242,6 @@ export default function AdminDeals() {
         activitiesIconMap={activitiesIconMap}
         notesMap={notesMap}
         groupQueryParam='group'
-        animateBoard
         readonly
         showAddDeal={false}
         toolbarLeft={<SalesRepsFilter />}

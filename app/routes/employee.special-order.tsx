@@ -3,15 +3,26 @@ import { useState } from 'react'
 import type { LoaderFunctionArgs } from 'react-router'
 import { useLoaderData, useLocation } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
+import { db } from '~/db.server'
 import {
   EMPLOYEE_VIEW_ENTER,
   employeeViewMotionKey,
 } from '~/utils/employeeViewEnterMotion'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
+import { calculateSpecialOrder } from '~/utils/specialOrderCalculator'
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request)
-  return { company_id: user.company_id }
+  const rows = await selectMany<{ state_taxes: number | string | null }>(
+    db,
+    'SELECT state_taxes FROM company WHERE id = ?',
+    [user.company_id],
+  )
+  const raw = rows[0]?.state_taxes
+  const parsed = typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw)
+  const taxRate = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+  return { taxRate }
 }
 
 export default function SpecialOrder() {
@@ -21,13 +32,7 @@ export default function SpecialOrder() {
   const [length, setLength] = useState<number | undefined>()
   const [slabs, setSlabs] = useState(1)
   const [deliveryCost, setDeliveryCost] = useState<number | undefined>()
-  const { company_id } = useLoaderData<typeof loader>()
-  // Set tax rate: 0.07 if company_id === 1, 0.08 if company_id === 3
-  function getTaxRate(company_id: number | undefined) {
-    if (company_id === 1) return 0.07
-    if (company_id === 3) return 0.08
-    return 0 // default or handle as needed
-  }
+  const { taxRate } = useLoaderData<typeof loader>()
 
   const minusSlab = () => {
     if (slabs > 1) {
@@ -36,21 +41,27 @@ export default function SpecialOrder() {
   }
 
   function calculateTotal() {
-    const areaPerSlab = ((width || 0) * (length || 0)) / 144
-    const totalSquareFeet = areaPerSlab * slabs
-    const materialCost =
-      areaPerSlab * (price || 0) * slabs * (1 + getTaxRate(company_id))
-    const totalCost = materialCost + (deliveryCost || 0)
-    const costPerSqftWithDelivery = totalSquareFeet ? totalCost / totalSquareFeet : 0
+    if (!width || !length || !price) {
+      return {
+        totalSquareFeet: '0.00',
+        totalCost: '0.00',
+        totalPrice: '0.00',
+      }
+    }
+
+    const result = calculateSpecialOrder({
+      pricePerSqft: price,
+      lengthInches: length,
+      widthInches: width,
+      slabs,
+      deliveryCost: deliveryCost || 0,
+      taxRate,
+    })
 
     return {
-      totalSquareFeet: Number.isFinite(totalSquareFeet)
-        ? totalSquareFeet.toFixed(2)
-        : '0.00',
-      totalCost: width && length && price ? totalCost.toFixed(2) : '0.00',
-      totalPrice: Number.isFinite(costPerSqftWithDelivery)
-        ? costPerSqftWithDelivery.toFixed(2)
-        : '0.00',
+      totalSquareFeet: result.totalSquareFeet.toFixed(2),
+      totalCost: result.totalCost.toFixed(2),
+      totalPrice: result.costPerSqftWithDelivery.toFixed(2),
     }
   }
 

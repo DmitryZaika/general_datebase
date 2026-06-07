@@ -11,6 +11,11 @@ export function dealsLayoutShouldRevalidate(
   }
   const cur = getDealEditRoot(currentUrl.pathname, editPathPrefix)
   const next = getDealEditRoot(nextUrl.pathname, editPathPrefix)
-  if (cur !== null && next !== null && cur === next) return false
+  if (cur !== null && next !== null && cur === next) {
+    if (currentUrl.pathname === nextUrl.pathname && defaultShouldRevalidate) {
+      return true
+    }
+    return false
+  }
   return defaultShouldRevalidate
 }

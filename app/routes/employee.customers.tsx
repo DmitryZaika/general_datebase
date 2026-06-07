@@ -12,7 +12,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  return loadCustomersListPage(request, user)
+  return loadCustomersListPage(request, user, { includeWalkInsBySalesRep: true })
 }
 
 export default function EmployeeCustomers() {

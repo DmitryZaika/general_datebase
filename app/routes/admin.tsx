@@ -24,9 +24,8 @@ function adminShellMotionKey(pathname: string, search: string): string {
   if (pathname.startsWith('/admin/emails')) {
     return '/admin/emails'
   }
-  const dealEdit = /^(\/admin\/deals\/edit\/[^/]+)(?:\/|$)/.exec(pathname)
-  if (dealEdit) {
-    return `${dealEdit[1]}${search}`
+  if (pathname.startsWith('/admin/deals')) {
+    return '/admin/deals'
   }
   if (pathname.startsWith('/admin/stones')) {
     return `/admin/stones${adminListMotionSearch(search, ['viewMode'])}`
@@ -42,9 +41,6 @@ function adminShellMotionKey(pathname: string, search: string): string {
   }
   if (pathname.startsWith('/admin/customers')) {
     return '/admin/customers'
-  }
-  if (pathname === '/admin/deals' || pathname === '/admin/deals/') {
-    return '/admin/deals'
   }
   return `${pathname}${search}`
 }

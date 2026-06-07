@@ -13,6 +13,12 @@ import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { Button } from '~/components/ui/button'
 import { useToast } from '~/hooks/use-toast'
+import {
+  isVoicemailGreetingOnly,
+  resolveIsVoicemail,
+  sanitizeCallNoteContent,
+  VOICEMAIL_GREETING_ACTIVITY_NAME,
+} from '~/lib/callAiHelpers'
 import { buildActivityApiAction, buildNoteApiAction } from '~/lib/dealApiHelpers'
 import { cn } from '~/lib/utils'
 import { ActivityPriority } from '~/routes/api.deal-activities.$dealId'
@@ -23,6 +29,7 @@ type CallTranscriptionOptions = {
   recordingLink: string
   dealId?: number
   callStartedAt?: string
+  isVoicemail?: boolean
 }
 
 type CallTranscriptionContextValue = {
@@ -55,11 +62,16 @@ function useCallTranscriptionContext(): CallTranscriptionContextValue {
   return context
 }
 
+const VOICEMAIL_FOLLOW_UP_ACTIVITY = 'Follow-up to confirm interest'
+
+const callTranscriptSessionCache = new Map<number, string>()
+
 function useCallTranscriptionLogic({
   callId,
   recordingLink,
   dealId,
   callStartedAt,
+  isVoicemail = false,
 }: CallTranscriptionOptions): CallTranscriptionContextValue {
   const [loading, setLoading] = useState(false)
   const [text, setText] = useState<string | null>(null)
@@ -70,12 +82,14 @@ function useCallTranscriptionLogic({
   const [activityLoading, setActivityLoading] = useState(false)
   const [activityCreated, setActivityCreated] = useState(false)
   const noteSubmitted = useRef(false)
-  const activitySubmitted = useRef(false)
+  const transcribeRequestRef = useRef<Promise<string> | null>(null)
+  const activeCallIdRef = useRef(callId)
 
   const noteFetcher = useFetcher<ApiResponse>()
-  const activityFetcher = useFetcher<ApiResponse>()
   const revalidator = useRevalidator()
   const token = useAuthenticityToken()
+  const csrfTokenRef = useRef(token)
+  csrfTokenRef.current = token
   const { toast } = useToast()
 
   useEffect(() => {
@@ -103,75 +117,109 @@ function useCallTranscriptionLogic({
   }, [noteFetcher.state, noteFetcher.data, revalidator, toast])
 
   useEffect(() => {
-    if (
-      !activitySubmitted.current ||
-      activityFetcher.state !== 'idle' ||
-      !activityFetcher.data
-    )
-      return
-    activitySubmitted.current = false
+    activeCallIdRef.current = callId
+    setLoading(false)
+    setText(callTranscriptSessionCache.get(callId) ?? null)
+    setVisible(false)
+    setError(null)
+    setNoteLoading(false)
+    setNoteCreated(false)
     setActivityLoading(false)
+    setActivityCreated(false)
+    noteSubmitted.current = false
+    transcribeRequestRef.current = null
+  }, [callId, recordingLink])
 
-    if (activityFetcher.data.success) {
-      setActivityCreated(true)
-      setVisible(false)
-      revalidator.revalidate()
-      toast({
-        title: 'Activity added',
-        description: 'Follow-up action saved to the deal',
-        variant: 'success',
-      })
-    } else {
-      toast({
-        title: 'Failed to add activity',
-        description: activityFetcher.data.error ?? 'Something went wrong',
-        variant: 'destructive',
-      })
-    }
-  }, [activityFetcher.state, activityFetcher.data, revalidator, toast])
+  const isActiveCall = useCallback(() => activeCallIdRef.current === callId, [callId])
 
-  const fetchTranscript = useCallback(
-    async (showText: boolean): Promise<string> => {
-      const response = await fetch(`/api/aiTranscribe/call/${callId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordingLink }),
-      })
-
-      const json: { text?: string; error?: string } = await response.json()
-      if (!response.ok) {
-        throw new Error(json.error ?? 'Failed to transcribe call')
-      }
-
-      const transcript = json.text?.trim()
-      if (!transcript) {
-        throw new Error('No transcription returned')
-      }
-
-      setText(transcript)
+  const applyTranscript = useCallback(
+    (transcript: string, showText: boolean) => {
+      const trimmed = transcript.trim()
+      callTranscriptSessionCache.set(callId, trimmed)
+      setText(trimmed)
       if (showText) {
         setVisible(true)
       }
-      return transcript
+      return trimmed
     },
-    [callId, recordingLink],
+    [callId],
+  )
+
+  const fetchTranscript = useCallback(
+    async (showText: boolean): Promise<string> => {
+      const cached = callTranscriptSessionCache.get(callId)
+      if (cached) {
+        return applyTranscript(cached, showText)
+      }
+
+      if (transcribeRequestRef.current) {
+        if (showText) {
+          setLoading(true)
+          setError(null)
+        }
+        try {
+          return await transcribeRequestRef.current
+        } finally {
+          if (showText) {
+            setLoading(false)
+          }
+        }
+      }
+
+      if (showText) {
+        setLoading(true)
+        setError(null)
+      }
+
+      const request = (async () => {
+        const response = await fetch(`/api/aiTranscribe/call/${callId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recordingLink }),
+        })
+
+        const json: { text?: string; error?: string } = await response.json()
+        if (!response.ok) {
+          throw new Error(json.error ?? 'Failed to transcribe call')
+        }
+
+        const transcript = json.text?.trim()
+        if (!transcript) {
+          throw new Error('No transcription returned')
+        }
+
+        return applyTranscript(transcript, showText)
+      })()
+
+      transcribeRequestRef.current = request
+
+      try {
+        return await request
+      } finally {
+        transcribeRequestRef.current = null
+        if (showText) {
+          setLoading(false)
+        }
+      }
+    },
+    [callId, recordingLink, applyTranscript],
   )
 
   const ensureTranscript = useCallback(async (): Promise<string> => {
     if (text) return text
-    setLoading(true)
-    setError(null)
     try {
       return await fetchTranscript(false)
-    } finally {
-      setLoading(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to transcribe call')
+      throw err
     }
   }, [text, fetchTranscript])
 
   const handleTranscribe = useCallback(async () => {
     if (loading) return
-    setLoading(true)
+    setVisible(true)
     setError(null)
+    setLoading(true)
     try {
       await fetchTranscript(true)
     } catch (err) {
@@ -198,10 +246,11 @@ function useCallTranscriptionLogic({
 
     try {
       const transcript = await ensureTranscript()
+      const voicemail = resolveIsVoicemail(isVoicemail, transcript)
       const response = await fetch('/api/aiSummarize/callNote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript }),
+        body: JSON.stringify({ transcript, isVoicemail: voicemail }),
       })
 
       const json: { content?: string; error?: string } = await response.json()
@@ -209,77 +258,142 @@ function useCallTranscriptionLogic({
         throw new Error(json.error ?? 'Failed to summarize call')
       }
 
-      const content = json.content?.trim()
-      if (!content) {
+      const summarized = json.content?.trim()
+      if (!summarized) {
         throw new Error('No note content returned')
       }
 
+      const content = sanitizeCallNoteContent(summarized, voicemail, transcript)
       noteSubmitted.current = true
       noteFetcher.submit(
-        { intent: 'create', content, csrf: token },
+        { intent: 'create', content, csrf: csrfTokenRef.current },
         { method: 'POST', action: buildNoteApiAction(dealId) },
       )
     } catch (err) {
       setNoteLoading(false)
       setError(err instanceof Error ? err.message : 'Failed to add note')
     }
-  }, [dealId, noteLoading, noteCreated, ensureTranscript, noteFetcher, token])
+  }, [dealId, noteLoading, noteCreated, ensureTranscript, noteFetcher, isVoicemail])
 
   const handleCreateActivity = useCallback(async () => {
-    if (!dealId || activityLoading || activityCreated || activitySubmitted.current)
-      return
+    if (!dealId || activityLoading || activityCreated) return
 
+    const requestCallId = callId
     setActivityLoading(true)
     setError(null)
     setVisible(false)
 
     try {
       const transcript = await ensureTranscript()
+      if (!isActiveCall() || requestCallId !== callId) return
+      const voicemail = resolveIsVoicemail(isVoicemail, transcript)
       const response = await fetch('/api/aiSummarize/callActivity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transcript,
           callStartedAt,
+          committedAt: new Date().toISOString(),
+          isVoicemail: voicemail,
         }),
       })
 
-      const json: { name?: string; deadline?: string | null; error?: string } =
-        await response.json()
+      const json: {
+        activities?: Array<{ name?: string; deadline?: string | null }>
+        name?: string
+        deadline?: string | null
+        error?: string
+      } = await response.json()
       if (!response.ok) {
         throw new Error(json.error ?? 'Failed to extract activity')
       }
+      if (!isActiveCall() || requestCallId !== callId) return
 
-      const name = json.name?.trim() || 'Follow-up'
+      const extracted: Array<{ name: string; deadline: string | null }> = []
 
-      const payload: Record<string, string> = {
-        intent: 'create',
-        name,
-        priority: ActivityPriority.Medium,
-        csrf: token,
+      if (json.activities && json.activities.length > 0) {
+        for (const item of json.activities) {
+          const name = item.name?.trim()
+          if (!name) continue
+          extracted.push({
+            name,
+            deadline: item.deadline?.trim() || null,
+          })
+        }
+      } else {
+        const name = json.name?.trim()
+        if (name) {
+          extracted.push({
+            name,
+            deadline: json.deadline?.trim() || null,
+          })
+        }
       }
 
-      if (json.deadline?.trim()) {
-        payload.deadline = json.deadline.trim()
+      if (extracted.length === 0) {
+        const fallbackName = voicemail
+          ? isVoicemailGreetingOnly(transcript)
+            ? VOICEMAIL_GREETING_ACTIVITY_NAME
+            : VOICEMAIL_FOLLOW_UP_ACTIVITY
+          : 'Follow-up'
+        extracted.push({ name: fallbackName, deadline: null })
       }
 
-      activitySubmitted.current = true
-      activityFetcher.submit(payload, {
-        method: 'POST',
-        action: buildActivityApiAction(dealId),
+      for (const activity of extracted) {
+        const formData = new FormData()
+        formData.append('intent', 'create')
+        formData.append('name', activity.name)
+        formData.append('priority', ActivityPriority.Medium)
+        formData.append('csrf', csrfTokenRef.current)
+        if (activity.deadline) {
+          formData.append('deadline', activity.deadline)
+        }
+
+        const createResponse = await fetch(buildActivityApiAction(dealId), {
+          method: 'POST',
+          body: formData,
+        })
+
+        const createJson: ApiResponse = await createResponse.json()
+        if (!createResponse.ok || !createJson.success) {
+          throw new Error(
+            createJson.success === false ? createJson.error : 'Failed to add activity',
+          )
+        }
+      }
+
+      if (!isActiveCall() || requestCallId !== callId) return
+
+      setActivityCreated(true)
+      setVisible(false)
+      revalidator.revalidate()
+      toast({
+        title: extracted.length > 1 ? 'Activities added' : 'Activity added',
+        description:
+          extracted.length > 1
+            ? `${extracted.length} follow-up tasks saved to the deal`
+            : 'Follow-up action saved to the deal',
+        variant: 'success',
       })
     } catch (err) {
-      setActivityLoading(false)
+      if (!isActiveCall() || requestCallId !== callId) return
       setError(err instanceof Error ? err.message : 'Failed to add activity')
+    } finally {
+      if (isActiveCall() && requestCallId === callId) {
+        setActivityLoading(false)
+      }
     }
   }, [
     dealId,
+    callId,
     activityLoading,
     activityCreated,
     ensureTranscript,
     callStartedAt,
-    activityFetcher,
-    token,
+    isVoicemail,
+    isActiveCall,
+    revalidator,
+    toast,
   ])
 
   return {
@@ -304,6 +418,7 @@ export function CallTranscriptionProvider({
   recordingLink,
   dealId,
   callStartedAt,
+  isVoicemail,
   children,
 }: CallTranscriptionOptions & { children: ReactNode }) {
   const value = useCallTranscriptionLogic({
@@ -311,6 +426,7 @@ export function CallTranscriptionProvider({
     recordingLink,
     dealId,
     callStartedAt,
+    isVoicemail,
   })
 
   return (
@@ -437,9 +553,10 @@ export function CallTranscriptionMenu({
           type='button'
           variant='ghost'
           className={cn('h-6 w-6 p-0', buttonClassName)}
+          disabled={loading}
         >
           <span className='sr-only'>Call actions</span>
-          <MoreVertical className='h-3.5 w-3.5' />
+          <MoreVertical className='h-3.5 w-3.5' aria-hidden />
         </Button>
       }
       options={[
@@ -465,9 +582,25 @@ export function CallTranscriptionMenu({
 }
 
 export function CallTranscriptionText({ textClassName }: { textClassName?: string }) {
-  const { visible, text } = useCallTranscriptionContext()
+  const { visible, text, loading } = useCallTranscriptionContext()
 
-  if (!visible || !text) return null
+  if (!visible) return null
+
+  if (loading) {
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-1.5 text-xs text-slate-500',
+          textClassName,
+        )}
+      >
+        <Loader2 className='h-3 w-3 shrink-0 animate-spin' aria-hidden />
+        <span>Transcribing…</span>
+      </div>
+    )
+  }
+
+  if (!text) return null
 
   return (
     <p
@@ -501,6 +634,7 @@ export function CallTranscription({
   recordingLink,
   dealId,
   callStartedAt,
+  isVoicemail,
   showRecording,
   onToggleRecording,
   buttonClassName,
@@ -508,10 +642,12 @@ export function CallTranscription({
 }: CallTranscriptionProps) {
   return (
     <CallTranscriptionProvider
+      key={callId}
       callId={callId}
       recordingLink={recordingLink}
       dealId={dealId}
       callStartedAt={callStartedAt}
+      isVoicemail={isVoicemail}
     >
       <div className='flex flex-col gap-1'>
         <div className='flex items-center justify-end gap-1'>

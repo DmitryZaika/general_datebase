@@ -36,7 +36,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import type { CustomersListCustomer } from '~/utils/customersListLoader.server'
+import type {
+  CustomersListCustomer,
+  WalkInSalesRepCount,
+} from '~/utils/customersListLoader.server'
 
 function SalesRepCell({ customer }: { customer: CustomersListCustomer }) {
   const { data: reps = [] } = useQuery<{ id: number; name: string }[]>({
@@ -258,7 +261,10 @@ function isSameCustomerActionNavigation(from: string, to: string) {
 }
 
 export function CustomersListPage() {
-  const { customers } = useLoaderData<{ customers: CustomersListCustomer[] }>()
+  const { customers, walkInsBySalesRep = [] } = useLoaderData<{
+    customers: CustomersListCustomer[]
+    walkInsBySalesRep?: WalkInSalesRepCount[]
+  }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const navigation = useNavigation()
@@ -548,7 +554,7 @@ export function CustomersListPage() {
           />
         </div>
       </div>
-      <div className='w-fit'>
+      <div className='flex flex-wrap items-center gap-3'>
         {viewParam === 'customers' && (
           <Link
             to={`add${location.search}`}
@@ -561,6 +567,20 @@ export function CustomersListPage() {
             </LoadingButton>
           </Link>
         )}
+        {walkInsBySalesRep.length > 0 ? (
+          <div className='flex flex-wrap items-center gap-2'>
+            <span className='text-sm text-slate-500'>Walk-ins this month:</span>
+            {walkInsBySalesRep.map(item => (
+              <span
+                key={item.salesRepId ?? 'unassigned'}
+                className='inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700'
+              >
+                {item.salesRepName}:{' '}
+                <span className='ml-1 font-semibold text-slate-900'>{item.count}</span>
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
       {isListLoading ? (
         <CustomersPaginationSkeleton />
@@ -623,7 +643,7 @@ export function CustomersListPage() {
             className={
               compactCustomerAction || compactCustomerActionNav
                 ? 'sm:max-w-[425px] overflow-auto p-5'
-                : 'sm:max-w-[560px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh] p-5'
+                : 'sm:max-w-[560px] max-h-[95vh] overflow-y-auto flex flex-col p-5'
             }
           >
             {showCustomerActionSkeleton ? (

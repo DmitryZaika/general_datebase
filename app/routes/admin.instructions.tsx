@@ -1,7 +1,7 @@
 import DOMPurify from 'isomorphic-dompurify'
 import { Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import type { FC } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -351,7 +351,8 @@ const searchAllInstructions = (
 export default function AdminInstructions() {
   const { instructions, allowGeneral, mode } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
-  const [_, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const instructionIdParam = searchParams.get('instructionId')
   const location = useLocation()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -375,6 +376,17 @@ export default function AdminInstructions() {
     const selected = findInstructionById(selectedId, instructionTree)
     return selected ? [selected] : instructionTree
   }, [selectedId, instructionTree])
+
+  useEffect(() => {
+    if (!instructionIdParam) return
+    const id = Number.parseInt(instructionIdParam, 10)
+    if (!Number.isFinite(id)) return
+    const selected = findInstructionById(id, instructionTree)
+    if (!selected) return
+    setSelectedId(id)
+    setSearchTerm(selected.title)
+    setShowDropdown(false)
+  }, [instructionIdParam, instructionTree])
 
   const handleEdit = (id: number) => navigate(`edit/${id}${location.search}`)
   const handleDelete = (id: number) => navigate(`delete/${id}${location.search}`)

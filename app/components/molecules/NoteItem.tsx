@@ -21,6 +21,7 @@ import { cn } from '~/lib/utils'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { Nullable } from '~/types/utils'
 import type { ApiResponse } from '~/utils/apiResponse.server'
+import { NoteContent } from './NoteContent'
 
 function shouldShowCreatorAttribution(
   viewerName: string | null | undefined,
@@ -268,9 +269,7 @@ export function NoteItem({
           </div>
         </div>
       ) : (
-        <p className='mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800'>
-          {note.content}
-        </p>
+        <NoteContent content={note.content} />
       )}
 
       {note.comments.length > 0 && (

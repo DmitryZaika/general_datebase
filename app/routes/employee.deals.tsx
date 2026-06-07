@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion } from 'framer-motion'
-import { useEffect } from 'react'
+import { AlertCircle } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -29,6 +30,7 @@ import { csrf } from '~/utils/csrf.server'
 import {
   emptyDealsBoardMaps,
   loadDealsBoardMaps,
+  loadGroupIdsWithOverdueActivities,
 } from '~/utils/dealsBoardLoader.server'
 import { dealsLayoutShouldRevalidate } from '~/utils/dealsLayoutShouldRevalidate'
 import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
@@ -102,6 +104,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ? 0
             : null
 
+    const groupIds = groups.map(g => g.id)
+    const groupIdsWithOverdueActivity = await loadGroupIdsWithOverdueActivities(
+      db,
+      user.id,
+      user.company_id,
+      groupIds,
+      isWon,
+    )
+
     const lists = await selectMany<{ id: number; name: string }>(
       db,
       'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
@@ -128,6 +139,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         groups,
         activeGroupId,
         isWon,
+        groupIdsWithOverdueActivity,
       }
     }
 
@@ -187,6 +199,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       groups,
       activeGroupId,
       isWon,
+      groupIdsWithOverdueActivity,
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -211,6 +224,7 @@ export default function EmployeeDeals() {
     groups,
     activeGroupId,
     isWon,
+    groupIdsWithOverdueActivity,
   } = useLoaderData<{
     deals: FullDeal[]
     customers: { id: number; name: string }[]
@@ -227,6 +241,7 @@ export default function EmployeeDeals() {
     groups: { id: number; name: string }[]
     activeGroupId: number | undefined
     isWon: number | null
+    groupIdsWithOverdueActivity: number[]
   }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -253,20 +268,50 @@ export default function EmployeeDeals() {
     navigate({ pathname: location.pathname, search: params.toString() })
   }
 
+  const overdueActivityGroupIds = useMemo(
+    () => new Set(groupIdsWithOverdueActivity.map(groupId => Number(groupId))),
+    [groupIdsWithOverdueActivity],
+  )
+
+  const showOverdueIconOnGroupTrigger = useMemo(() => {
+    if (activeGroupId == null) return false
+    const activeId = Number(activeGroupId)
+    return groupIdsWithOverdueActivity.some(groupId => Number(groupId) !== activeId)
+  }, [activeGroupId, groupIdsWithOverdueActivity])
+
+  const activeGroupName = groups.find(g => g.id === activeGroupId)?.name
+
   const groupSelect = (
     <Select
       value={activeGroupId ? String(activeGroupId) : ''}
       onValueChange={handleGroupChange}
     >
-      <SelectTrigger className='w-[150px]'>
-        <SelectValue placeholder='Select group' />
+      <SelectTrigger className='w-[150px] gap-1 pr-2'>
+        <SelectValue placeholder='Select group'>{activeGroupName}</SelectValue>
+        {showOverdueIconOnGroupTrigger ? (
+          <AlertCircle
+            className='h-4 w-4 shrink-0 text-red-600'
+            aria-label='Overdue activity in another group'
+          />
+        ) : null}
       </SelectTrigger>
       <SelectContent>
-        {groups.map(group => (
-          <SelectItem key={group.id} value={String(group.id)}>
-            {group.name}
-          </SelectItem>
-        ))}
+        {groups.map(group => {
+          const groupHasOverdueActivity = overdueActivityGroupIds.has(Number(group.id))
+          return (
+            <SelectItem key={group.id} value={String(group.id)}>
+              <span className='flex items-center gap-2'>
+                <span>{group.name}</span>
+                {groupHasOverdueActivity ? (
+                  <AlertCircle
+                    className='h-4 w-4 shrink-0 text-red-600'
+                    aria-label='Overdue activity in this group'
+                  />
+                ) : null}
+              </span>
+            </SelectItem>
+          )
+        })}
       </SelectContent>
     </Select>
   )

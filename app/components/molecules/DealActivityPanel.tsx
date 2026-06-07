@@ -27,7 +27,14 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Link, useFetcher, useLocation, useNavigate, useParams } from 'react-router'
+import {
+  Link,
+  useFetcher,
+  useLocation,
+  useNavigate,
+  useParams,
+  useRevalidator,
+} from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
@@ -86,6 +93,7 @@ import type { Calls200Response } from '~/utils/cloudtalk.server'
 import { phoneDigitsOnly } from '~/utils/phone'
 import { mapRowToSmsEntry, type SmsEntry, type SmsRow } from '~/utils/smsDisplayHelpers'
 import { stripHtmlTags } from '~/utils/stringHelpers'
+import { NoteContent } from './NoteContent'
 import { NoteForm } from './NoteForm'
 import { NoteItem } from './NoteItem'
 
@@ -227,6 +235,25 @@ const INITIAL_FORM_STATE: FormState = {
   priority: ActivityPriority.Medium,
 }
 
+function useRevalidateAfterActivityFetcherSubmit(
+  fetcher: ReturnType<typeof useFetcher>,
+) {
+  const revalidator = useRevalidator()
+  const wasSubmittingRef = useRef(false)
+
+  useEffect(() => {
+    if (fetcher.state !== 'idle') {
+      wasSubmittingRef.current = true
+      return
+    }
+    if (!wasSubmittingRef.current) return
+    wasSubmittingRef.current = false
+    const action = fetcher.formAction ?? ''
+    if (!action.includes('/api/deal-activities/')) return
+    revalidator.revalidate()
+  }, [fetcher.state, fetcher.formAction, revalidator])
+}
+
 const formReducer = (state: FormState, action: FormAction): FormState => {
   switch (action.type) {
     case 'SET_NAME':
@@ -266,6 +293,7 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
   const fetcher = useFetcher()
   const token = useAuthenticityToken()
   const [form, dispatch] = useReducer(formReducer, INITIAL_FORM_STATE)
+  useRevalidateAfterActivityFetcherSubmit(fetcher)
 
   const isSubmitting = fetcher.state !== 'idle'
   const isValid = form.name.trim().length > 0
@@ -274,19 +302,18 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
   const submit = useCallback(() => {
     if (!isValid) return
 
-    const payload: Record<string, string> = {
-      intent: isEditing ? 'update' : 'create',
-      name: form.name.trim(),
-      deadline: buildDeadlinePayload(form.deadline),
-      priority: form.priority,
-      csrf: token,
-    }
+    const formData = new FormData()
+    formData.set('intent', isEditing ? 'update' : 'create')
+    formData.set('name', form.name.trim())
+    formData.set('deadline', buildDeadlinePayload(form.deadline))
+    formData.set('priority', form.priority)
+    formData.set('csrf', token)
 
     if (isEditing) {
-      payload.activityId = String(editingActivityId)
+      formData.set('activityId', String(editingActivityId))
     }
 
-    fetcher.submit(payload, {
+    fetcher.submit(formData, {
       method: 'POST',
       action: buildActivityApiAction(dealId),
     })
@@ -300,6 +327,8 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
 function useActivityAction(dealId: number) {
   const toggleFetcher = useFetcher()
   const deleteFetcher = useFetcher()
+  useRevalidateAfterActivityFetcherSubmit(toggleFetcher)
+  useRevalidateAfterActivityFetcherSubmit(deleteFetcher)
   const token = useAuthenticityToken()
   const { toast } = useToast()
 
@@ -343,13 +372,43 @@ function useActivityAction(dealId: number) {
     [deleteFetcher.submit, dealId, toast, token],
   )
 
+  const deletingActivityId =
+    dealId <= 0 || deleteFetcher.state === 'idle'
+      ? null
+      : (() => {
+          const raw = deleteFetcher.formData?.get('activityId')
+          if (typeof raw !== 'string') return null
+          const id = Number(raw)
+          return Number.isFinite(id) ? id : null
+        })()
+
   return {
     toggle,
     remove,
+    deleteFetcher,
     isToggling: dealId <= 0 ? false : toggleFetcher.state !== 'idle',
-    isDeleting: dealId <= 0 ? false : deleteFetcher.state !== 'idle',
+    deletingActivityId,
     togglingData: dealId <= 0 ? undefined : toggleFetcher.formData,
   }
+}
+
+function ActivityItemSkeleton() {
+  return (
+    <div className='flex items-start gap-2 rounded-md border border-gray-200 px-2 py-1.5'>
+      <Skeleton className='mt-0.5 h-4 w-4 shrink-0 rounded-sm' />
+      <div className='min-w-0 flex-1 space-y-2'>
+        <Skeleton className='h-4 w-4/5' />
+        <div className='flex flex-wrap items-center gap-1.5'>
+          <Skeleton className='h-4 w-14 rounded-md' />
+          <Skeleton className='h-4 w-20 rounded-md' />
+        </div>
+      </div>
+      <div className='flex shrink-0 flex-col items-end gap-1'>
+        <Skeleton className='h-3 w-16' />
+        <Skeleton className='h-2.5 w-12' />
+      </div>
+    </div>
+  )
 }
 
 function ActivityItemReadOnly({
@@ -485,9 +544,7 @@ function NoteHistoryReadOnly({
           ) : null}
         </div>
       </div>
-      <p className='mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800'>
-        {note.content}
-      </p>
+      <NoteContent content={note.content} />
       {note.comments.length > 0 ? (
         <div className='mt-2.5 space-y-1.5 border-l-2 border-gray-200 pl-3'>
           {note.comments.map(c => (
@@ -637,9 +694,36 @@ function ActivityItem({
   isBeingEdited: boolean
   viewerName?: Nullable<string>
 }) {
-  const { toggle, remove, isToggling, isDeleting, togglingData } =
-    useActivityAction(dealId)
+  const {
+    toggle,
+    remove,
+    deleteFetcher,
+    isToggling,
+    deletingActivityId,
+    togglingData,
+  } = useActivityAction(dealId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [pendingRemoval, setPendingRemoval] = useState(false)
+  const isDeleting = deletingActivityId === activity.id
+
+  useEffect(() => {
+    if (isDeleting) {
+      setPendingRemoval(true)
+    }
+  }, [isDeleting])
+
+  useEffect(() => {
+    if (!pendingRemoval || isDeleting || deleteFetcher.state !== 'idle') return
+    const response = deleteFetcher.data
+    if (
+      response &&
+      typeof response === 'object' &&
+      'success' in response &&
+      response.success === false
+    ) {
+      setPendingRemoval(false)
+    }
+  }, [pendingRemoval, isDeleting, deleteFetcher.state, deleteFetcher.data])
 
   const isDone = !!activity.is_completed
   const optimisticDone = togglingData?.get('intent') === 'toggle' ? !isDone : isDone
@@ -678,12 +762,15 @@ function ActivityItem({
     </AlertDialog>
   )
 
+  if (pendingRemoval) {
+    return <ActivityItemSkeleton />
+  }
+
   if (optimisticDone) {
     return (
       <div
         className={cn(
           'group flex flex-col gap-0.5 rounded-md px-2 py-1.5 transition-colors hover:bg-gray-50',
-          isDeleting && 'pointer-events-none scale-95 opacity-0',
           isBeingEdited && 'bg-blue-50 ring-1 ring-blue-200',
         )}
       >
@@ -728,7 +815,6 @@ function ActivityItem({
     <div
       className={cn(
         'group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-gray-50',
-        isDeleting && 'pointer-events-none scale-95 opacity-0',
         isBeingEdited && 'bg-blue-50 ring-1 ring-blue-200',
         URGENCY_BORDER_STYLE[urgency],
       )}
@@ -922,15 +1008,20 @@ function ActivityForm({
     editingActivity?.id ?? null,
   )
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const loadedEditActivityIdRef = useRef<Nullable<number>>(null)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
   const [deadlineCalendarKey, setDeadlineCalendarKey] = useState(0)
   const { toast } = useToast()
 
   useEffect(() => {
-    if (editingActivity) {
-      dispatch({ type: 'SET_EDIT', payload: editingActivity })
-      requestAnimationFrame(() => inputRef.current?.focus())
+    if (!editingActivity) {
+      loadedEditActivityIdRef.current = null
+      return
     }
+    if (loadedEditActivityIdRef.current === editingActivity.id) return
+    loadedEditActivityIdRef.current = editingActivity.id
+    dispatch({ type: 'SET_EDIT', payload: editingActivity })
+    requestAnimationFrame(() => inputRef.current?.focus())
   }, [editingActivity])
 
   const handleCancel = () => {
@@ -1034,6 +1125,7 @@ function ActivityForm({
               }
               onClearDate={() => {
                 dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
+                setDeadlineCalendarKey(k => k + 1)
                 setDeadlineOpen(false)
               }}
             />

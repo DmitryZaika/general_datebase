@@ -311,9 +311,10 @@ function ChildrenImagesDialog({
     setLens(current => ({ ...current, visible: false }))
   }, [isMobile])
 
-  const isEmployeeInventoryView =
-    userRole === 'employee' &&
-    (type === 'stones' || type === 'sinks' || type === 'images')
+  const showCarouselImageLoading =
+    (userRole === 'employee' &&
+      (type === 'stones' || type === 'sinks' || type === 'images')) ||
+    (userRole === 'customer' && type === 'stones')
 
   useLayoutEffect(() => {
     if (mainImageRevealTimerRef.current) {
@@ -321,7 +322,7 @@ function ChildrenImagesDialog({
       mainImageRevealTimerRef.current = null
     }
 
-    if (!isEmployeeInventoryView || !selectedImage) {
+    if (!showCarouselImageLoading || !selectedImage) {
       setMainImageLoading(false)
       setMainImageReveal(100)
       return
@@ -349,7 +350,7 @@ function ChildrenImagesDialog({
         mainImageRevealTimerRef.current = null
       }
     }
-  }, [selectedImage, isEmployeeInventoryView])
+  }, [selectedImage, showCarouselImageLoading])
 
   const finishMainImageLoad = () => {
     if (mainImageRevealTimerRef.current) {
@@ -367,7 +368,7 @@ function ChildrenImagesDialog({
   }
 
   const handleMainImageRef = (node: HTMLImageElement | null) => {
-    if (!isEmployeeInventoryView || !node) return
+    if (!showCarouselImageLoading || !node) return
     if (node.complete && node.naturalWidth > 0) {
       finishMainImageLoad()
     }
@@ -515,7 +516,7 @@ function ChildrenImagesDialog({
   const isStoneCarousel = type === 'stones'
   const isCustomerStone = isStoneCarousel && userRole === 'customer'
   const isEmployeeStone = isStoneCarousel && userRole === 'employee'
-  const showInstalledThumbnailMotion = isEmployeeInventoryView
+  const showInstalledThumbnailMotion = showCarouselImageLoading
   const isCustomerSinkOrFaucet =
     userRole === 'customer' && (type === 'sinks' || type === 'faucets')
 
@@ -554,7 +555,7 @@ function ChildrenImagesDialog({
         : 'cursor-default',
   )
 
-  const mainPreviewStyle: React.CSSProperties | undefined = isEmployeeInventoryView
+  const mainPreviewStyle: React.CSSProperties | undefined = showCarouselImageLoading
     ? {
         clipPath: mainImageLoading
           ? `circle(${Math.max(0, mainImageReveal)}% at 50% 50%)`
@@ -566,7 +567,7 @@ function ChildrenImagesDialog({
   const mainImageLoadHandlers: Pick<
     ComponentProps<'img'>,
     'ref' | 'onLoad' | 'onError'
-  > = isEmployeeInventoryView
+  > = showCarouselImageLoading
     ? {
         ref: handleMainImageRef,
         onLoad: handleMainImageLoaded,
@@ -611,7 +612,7 @@ function ChildrenImagesDialog({
                 name={name}
                 index={index}
                 animated={showInstalledThumbnailMotion}
-                showLoadingSpinner={isEmployeeInventoryView}
+                showLoadingSpinner={showCarouselImageLoading}
                 onSelect={() => {
                   setPinnedInstalledUrl(image.url)
                   setSelectedImage(image.url)
@@ -712,7 +713,7 @@ function ChildrenImagesDialog({
                 : 'h-[85vh] md:h-[87vh] 2xl:h-[93vh]',
             )}
           >
-            {isEmployeeInventoryView && mainImageLoading ? (
+            {showCarouselImageLoading && mainImageLoading ? (
               <div
                 className='absolute inset-0 z-[60] flex items-center justify-center pointer-events-none'
                 aria-hidden

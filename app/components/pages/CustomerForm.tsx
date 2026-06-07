@@ -304,7 +304,7 @@ export function CustomerForm({
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='max-h-[95vh] overflow-y-auto'>
+      <DialogContent className='sm:max-w-[560px] max-h-[95vh] overflow-y-auto flex flex-col p-5'>
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>

@@ -42,17 +42,28 @@ function isValidPriority(value: string): value is ActivityPriority {
   return VALID_PRIORITIES.includes(value as ActivityPriority)
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
 function toMySQLDatetime(dateString: string): Nullable<string> {
+  const dateOnly = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnly) {
+    const [, y, mo, d] = dateOnly
+    return `${y}-${mo}-${d} 00:00:00`
+  }
+
+  const parsed = new Date(dateString)
+  if (!Number.isNaN(parsed.getTime()) && dateString.includes('T')) {
+    return `${parsed.getUTCFullYear()}-${pad2(parsed.getUTCMonth() + 1)}-${pad2(parsed.getUTCDate())} ${pad2(parsed.getUTCHours())}:${pad2(parsed.getUTCMinutes())}:${pad2(parsed.getUTCSeconds())}`
+  }
+
   const full = dateString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
   if (full) {
     const [, y, mo, d, h, mi, s] = full
     return `${y}-${mo}-${d} ${h}:${mi}:${s}`
   }
-  const date = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (date) {
-    const [, y, mo, d] = date
-    return `${y}-${mo}-${d} 00:00:00`
-  }
+
   return null
 }
 

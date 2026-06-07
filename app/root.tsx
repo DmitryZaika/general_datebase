@@ -90,7 +90,7 @@ export function Posthog() {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const [token, cookieHeader] = await csrf.commitToken()
+  const [token, cookieHeader] = await csrf.commitToken(request)
   const session = await getSession(request.headers.get('Cookie'))
   const activeSession = session.data.sessionId || null
   const message: ToastMessage | null = session.get('message') || null
@@ -299,7 +299,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     {
       headers: [
-        ['Set-Cookie', cookieHeader || ''],
+        ...(cookieHeader ? [['Set-Cookie', cookieHeader] as const] : []),
         ['Set-Cookie', await commitSession(session)],
       ],
     },

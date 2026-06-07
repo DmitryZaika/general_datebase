@@ -9,6 +9,7 @@ import type {
   UseFormReturn,
 } from 'react-hook-form'
 import { useDebounce } from 'use-debounce'
+import { Spinner } from '~/components/atoms/Spinner'
 import { Command, CommandGroup, CommandItem } from '~/components/ui/command'
 import {
   FormControl,
@@ -18,23 +19,22 @@ import {
   FormMessage,
 } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
+import type { FinalSuggestion } from '~/services/types'
 
 function replaceZipCode(address: string, zipCode: string) {
   if (address.includes(zipCode)) return address
   return address.replace('USA', zipCode)
 }
 
-async function completeAddress(q: string): Promise<
-  {
-    description: { text: string }
-    place_id: string
-    zip_code: string | null
-  }[]
-> {
-  const res = await fetch(`/api/google/address-complete?q=${encodeURIComponent(q)}`)
+async function completeAddress(
+  q: string,
+  signal?: AbortSignal,
+): Promise<FinalSuggestion[]> {
+  const res = await fetch(`/api/google/address-complete?q=${encodeURIComponent(q)}`, {
+    signal,
+  })
   if (!res.ok) throw new Error('Failed to fetch address')
-  const data = await res.json()
-  return data.suggestions
+  return await res.json()
 }
 
 export type StringPath<T extends FieldValues> = {
@@ -57,13 +57,14 @@ export function AddressInput<T extends FieldValues>({
   const [open, setOpen] = useState(false)
 
   const value = form.watch(field)
-  const [debounced] = useDebounce(value, 300)
+  const [debounced] = useDebounce(value, 150)
 
   const { data = [], isFetching } = useQuery({
     queryKey: ['google', 'address', debounced],
-    queryFn: () => completeAddress(debounced),
-    enabled: debounced?.length >= 6,
+    queryFn: ({ signal }) => completeAddress(debounced, signal),
+    enabled: (debounced?.length ?? 0) >= 3,
     staleTime: 60_000,
+    placeholderData: previousData => previousData,
   })
 
   function handleSelect(address: string, zipCode: string) {
@@ -88,6 +89,10 @@ export function AddressInput<T extends FieldValues>({
 
   const toUpperCase = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
 
+  const isDebouncing =
+    open && (value?.length ?? 0) >= 3 && (value ?? '') !== (debounced ?? '')
+  const isSearching = isFetching || isDebouncing
+
   return (
     <FormField
       control={form.control}
@@ -98,7 +103,8 @@ export function AddressInput<T extends FieldValues>({
           <FormControl>
             <div className='relative w-full'>
               <Input
-                placeholder={`Enter ${toUpperCase(type)} address (min 5 characters)`}
+                className={isSearching ? 'pr-9' : undefined}
+                placeholder={`Enter ${toUpperCase(type)} address (min 3 characters)`}
                 value={
                   zipField
                     ? replaceZipCode(rhf.value ?? '', form.watch(zipField) ?? '')
@@ -116,27 +122,41 @@ export function AddressInput<T extends FieldValues>({
                 onKeyDown={e => {
                   if (e.key === 'Tab' && open && data.length > 0) {
                     e.preventDefault()
-                    handleSelect(data[0].description.text, data[0].zip_code ?? '')
+                    handleSelect(data[0].description.text, data[0].address.zip ?? '')
                     setOpen(false)
                   }
                 }}
               />
+              {isSearching && (
+                <div className='pointer-events-none absolute inset-y-0 right-3 flex items-center'>
+                  <Spinner size={16} className='text-muted-foreground' />
+                </div>
+              )}
             </div>
           </FormControl>
           <FormMessage />
 
           {open && (
             <Command className='absolute z-10 top-full mt-1 w-full h-auto max-h-40 overflow-y-auto border rounded-md bg-white shadow-md'>
-              <CommandGroup heading={isFetching ? 'Searching…' : 'Suggestions'}>
-                {data.map(s => (
-                  <CommandItem
-                    key={s.place_id}
-                    onSelect={() => handleSelect(s.description.text, s.zip_code ?? '')}
-                  >
-                    {replaceZipCode(s.description.text, s.zip_code ?? '')}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              {isSearching && data.length === 0 ? (
+                <div className='flex items-center justify-center gap-2 px-3 py-4 text-sm text-muted-foreground'>
+                  <Spinner size={16} />
+                  Searching…
+                </div>
+              ) : (
+                <CommandGroup heading={isSearching ? 'Searching…' : 'Suggestions'}>
+                  {data.map(s => (
+                    <CommandItem
+                      key={s.place_id}
+                      onSelect={() =>
+                        handleSelect(s.description.text, s.address.zip ?? '')
+                      }
+                    >
+                      {replaceZipCode(s.description.text, s.address.zip ?? '')}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
             </Command>
           )}
         </FormItem>
