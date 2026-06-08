@@ -152,8 +152,66 @@ function scoreInstructions(
   }))
 }
 
-function pickBestMatches(scored: ScoredInstruction[]): InstructionSlim[] {
+const PRICE_SIGNAL_TERMS = [
+  'price',
+  'prices',
+  'cost',
+  'costs',
+  'fee',
+  'fees',
+  'rate',
+  'rates',
+  'charge',
+  'charges',
+  'fabrication',
+  'pricing',
+  'sqft',
+  'sqft',
+]
+
+function isPriceQuery(query: string): boolean {
+  const lower = query.toLowerCase()
+  return PRICE_SIGNAL_TERMS.some(term => lower.includes(term))
+}
+
+export { isPriceQuery }
+
+function hasPricingInBody(body: string): boolean {
+  return /\$\s*\d/.test(body) || /(?:per|\/)\s*sq\.?\s*ft/.test(body)
+}
+
+function scorePriceRelevance(instruction: InstructionSlim, terms: string[]): number {
+  const body = bodyText(instruction)
+  if (!hasPricingInBody(body)) return 0
+  let score = countMatchingTerms(terms, body)
+  if (terms.some(term => term.includes('fabric')) && body.includes('fabrication')) {
+    score += 2
+  }
+  return score
+}
+
+function pickBestMatches(
+  scored: ScoredInstruction[],
+  query: string,
+): InstructionSlim[] {
   if (scored.length === 0) return []
+
+  if (isPriceQuery(query)) {
+    const terms = queryTerms(query)
+    const withPriceScore = scored.map(item => ({
+      item,
+      priceScore: scorePriceRelevance(item.instruction, terms),
+    }))
+    const maxPriceScore = withPriceScore.reduce(
+      (max, entry) => Math.max(max, entry.priceScore),
+      0,
+    )
+    if (maxPriceScore > 0) {
+      return withPriceScore
+        .filter(entry => entry.priceScore === maxPriceScore)
+        .map(entry => entry.item.instruction)
+    }
+  }
 
   const maxTitleScore = scored.reduce((max, item) => Math.max(max, item.titleScore), 0)
 
@@ -230,6 +288,13 @@ export function resolveInstructionsUsedForReply(
     if (!instruction) continue
     const item = byInstruction.get(instruction)
     if (!item) continue
+    if (isPriceQuery(query)) {
+      const terms = queryTerms(query)
+      if (scorePriceRelevance(instruction, terms) > 0) {
+        add(instruction)
+        continue
+      }
+    }
     const acceptable = hasBodyEvidence
       ? isBodyStrong(item)
       : isTitleStrong(item) || item.bodyScore >= 2
@@ -240,11 +305,26 @@ export function resolveInstructionsUsedForReply(
   return result
 }
 
+export function buildPriceQueryHint(
+  instructions: InstructionSlim[],
+  query: string,
+): string {
+  if (!isPriceQuery(query)) return ''
+  const scored = scoreInstructions(instructions, query)
+  const matches = pickBestMatches(scored, query)
+  if (matches.length === 0) return ''
+
+  const match = matches[0]
+  const index = instructions.findIndex(item => item.id === match.id)
+  if (index < 0) return ''
+  return `PRICE QUERY: Check Instruction ${index + 1} first — its body contains pricing relevant to this question.\n\n`
+}
+
 export function findBestMatchingInstruction(
   instructions: InstructionSlim[],
   query: string,
 ): MatchedInstruction | null {
-  const matches = pickBestMatches(scoreInstructions(instructions, query))
+  const matches = pickBestMatches(scoreInstructions(instructions, query), query)
   if (matches.length === 0) return null
 
   const instruction = matches[0]

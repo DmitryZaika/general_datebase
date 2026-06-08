@@ -1026,14 +1026,96 @@ function buildCarouselImages(urls: string[]): InstructionCarouselImage[] {
   }))
 }
 
-function renderMessageContent(content: string) {
-  const parts = content.split(/(\*\*[^*]+\*\*)/g)
+function renderInlineContent(text: string, keyPrefix: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>
+      return <strong key={`${keyPrefix}-${index}`}>{part.slice(2, -2)}</strong>
     }
-    return part
+    return <span key={`${keyPrefix}-${index}`}>{part}</span>
   })
+}
+
+function renderMessageContent(content: string) {
+  const lines = content.split('\n')
+  const elements: React.ReactNode[] = []
+  let listItems: React.ReactNode[] = []
+  let listType: 'ul' | 'ol' | null = null
+
+  const flushList = () => {
+    if (listItems.length === 0 || !listType) return
+    if (listType === 'ul') {
+      elements.push(
+        <ul
+          key={`list-${elements.length}`}
+          className='list-disc pl-5 my-1 flex flex-col gap-1'
+        >
+          {listItems}
+        </ul>,
+      )
+    } else {
+      elements.push(
+        <ol
+          key={`list-${elements.length}`}
+          className='list-decimal pl-5 my-1 flex flex-col gap-1'
+        >
+          {listItems}
+        </ol>,
+      )
+    }
+    listItems = []
+    listType = null
+  }
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const line = lines[lineIndex]
+    const trimmed = line.trim()
+
+    if (trimmed === '') {
+      flushList()
+      elements.push(<div key={`spacer-${lineIndex}`} className='h-2' />)
+      continue
+    }
+
+    const bulletMatch = trimmed.match(/^[-*•]\s+(.+)$/)
+    const numberedMatch = trimmed.match(/^\d+\.\s+(.+)$/)
+
+    if (bulletMatch) {
+      if (listType !== 'ul') {
+        flushList()
+        listType = 'ul'
+      }
+      listItems.push(
+        <li key={`li-${lineIndex}`}>
+          {renderInlineContent(bulletMatch[1], `line-${lineIndex}`)}
+        </li>,
+      )
+      continue
+    }
+
+    if (numberedMatch) {
+      if (listType !== 'ol') {
+        flushList()
+        listType = 'ol'
+      }
+      listItems.push(
+        <li key={`li-${lineIndex}`}>
+          {renderInlineContent(numberedMatch[1], `line-${lineIndex}`)}
+        </li>,
+      )
+      continue
+    }
+
+    flushList()
+    elements.push(
+      <div key={`line-${lineIndex}`}>
+        {renderInlineContent(line, `line-${lineIndex}`)}
+      </div>,
+    )
+  }
+
+  flushList()
+  return <div className='flex flex-col gap-0.5'>{elements}</div>
 }
 
 function SpecialOrderQuoteContent({ content }: { content: string }) {

@@ -7,11 +7,15 @@ import { getSession } from '~/sessions.server'
 import type { InstructionSlim } from '~/types'
 import {
   answerHasUsableInfo,
+  parseInstructionIndices,
   stripChatResponseMarkersTrimmed,
 } from '~/utils/chatAnswerHelpers'
 import { DONE_KEY } from '~/utils/constants'
 import {
+  buildPriceQueryHint,
   collectRelatedInstructionImages,
+  findBestMatchingInstruction,
+  isPriceQuery,
   resolveInstructionsUsedForReply,
 } from '~/utils/instructionImages'
 import {
@@ -121,7 +125,10 @@ async function getContext(
   return { messages: currentConvo, id: history[0].id }
 }
 
-function buildInstructionContext(instructions: InstructionSlim[]): string {
+function buildInstructionContext(
+  instructions: InstructionSlim[],
+  query: string,
+): string {
   const entries = instructions.map((instruction, index) => {
     const title = instruction.title?.trim() || `Untitled #${instruction.id}`
     const body = htmlToPlainText(instruction.rich_text).trim() || '(empty)'
@@ -130,24 +137,35 @@ TITLE: ${title}
 BODY: ${body}`
   })
 
-  return `Here are the instructions you can use, each TITLE is linked to its own BODY:
+  return `${buildPriceQueryHint(instructions, query)}Here are the instructions you can use, each TITLE is linked to its own BODY:
 
 ${entries.join('\n\n')}`
 }
 
+function buildInstructionUserMessage(query: string): string {
+  const priceHint = isPriceQuery(query)
+    ? 'Answer only the specific price or fee the user asked about. Do not include formulas, minimum charges, discounts, or unrelated fees unless the user asked for them.\n\n'
+    : ''
+  return `${priceHint}Answer the question as best as you can.\n\nQuestion: ${query}\n\nAnswer:`
+}
+
 const INSTRUCTION_RULES = `How to use this context:
 1. Each entry above is one instruction with a clear TITLE and the BODY that belongs to that exact title.
-2. When the user asks about a topic, FIRST find the instruction whose TITLE best matches the topic (for example, a question about fabrication must be answered from a Fabrication title's BODY, not Quotes or unrelated titles).
-3. Answer using ONLY that matching title's BODY. Do not mix in content from other titles unless the user explicitly asks about them.
-4. If no title matches the topic, say that you do not have an instruction for it instead of guessing.
-5. Be brief and direct. Do NOT copy the instruction text word-for-word. Summarize the main idea in your own words using short paragraphs or bullet points.
-6. Include every important fact, step, requirement, and exception from the matching BODY. Do not leave out actionable information, but skip filler and repetition.
-7. Do NOT add unnecessary assumptions or commentary beyond what the matching instruction requires.
-8. Each instruction above is labeled with an instruction number (Instruction 1, Instruction 2, etc.). After your answer, add a final line containing ONLY the marker in the exact form [[INSTRUCTION:n]]. If your answer draws on more than one instruction BODY, list every instruction number you actually used, comma-separated, like [[INSTRUCTION:2,5]].
-9. Be VERY STRICT about citations. Cite an instruction ONLY when the facts in your answer came from that instruction's BODY. Do NOT cite an instruction just because a word from the user's message also appears in its TITLE (for example, do not cite a "Template" instruction merely because the user's text contains the word "template").
-10. If the user gives you their own text and asks you to continue, complete, finish, rewrite, rephrase, translate, summarize, fix, or reformat it, that text is the user's own. Use [[INSTRUCTION:none]] unless an instruction BODY genuinely supplied additional facts that you actually used.
-11. If the user asks a meta question about your previous answer or about which sources/instructions you used (for example "which information did you take from X?"), you are explaining your earlier answer, not providing new facts from an instruction BODY. Use [[INSTRUCTION:none]].
-12. Never invent or guess a number. When unsure, use [[INSTRUCTION:none]]. Never describe or mention this marker in your prose.`
+2. When the user asks about a topic, find the instruction whose TITLE or BODY best matches what they need.
+3. If the user asks about a price, cost, fee, rate, or charge, search instruction BODIES for the specific dollar amount or rate they asked about. The answer often lives under a general title like "Standard Formula" even when the title does not mention the topic.
+4. Match your answer scope to the question scope. A narrow question gets a narrow answer. Example: if the user asks "price for fabrication", give only the fabrication rates by material — do not include special-order formulas, minimum charges, contractor discounts, cutting board prices, or other fees unless the user asked about them.
+5. Use the single best-matching instruction when it fully answers the question. Only combine a second instruction when the user explicitly asks about multiple topics or the first instruction is missing a specific detail they asked for.
+6. If no instruction BODY contains the requested information, say that you do not have an instruction for it instead of guessing.
+7. Do not use outside knowledge. Every fact in your answer must come from an instruction BODY.
+8. Be brief and direct. Do NOT copy the instruction text word-for-word. Summarize the main idea in your own words.
+9. Format every answer for easy reading. Put each distinct topic, rule, or step on its own line and use blank lines between sections. Use **bold** for headings, prices, minimum charges, and other key terms that are emphasized in the matching BODY. Present multiple steps, requirements, or rules as a numbered list (1. 2. 3.) or bullet list (- ) with one item per line. Never output one long paragraph.
+10. Include only the facts that directly answer the user's question. Do not dump the entire instruction BODY.
+11. Do NOT add unnecessary assumptions or commentary beyond what the matching instruction requires.
+12. Each instruction above is labeled with an instruction number (Instruction 1, Instruction 2, etc.). After your answer, add a final line containing ONLY the marker in the exact form [[INSTRUCTION:n]]. If your answer draws on more than one instruction BODY, list every instruction number you actually used, comma-separated, like [[INSTRUCTION:2,5]].
+13. Be VERY STRICT about citations. Cite an instruction ONLY when the facts in your answer came from that instruction's BODY. Do NOT cite an instruction just because a word from the user's message also appears in its TITLE (for example, do not cite a "Template" instruction merely because the user's text contains the word "template").
+14. If the user gives you their own text and asks you to continue, complete, finish, rewrite, rephrase, translate, summarize, fix, or reformat it, that text is the user's own. Use [[INSTRUCTION:none]] unless an instruction BODY genuinely supplied additional facts that you actually used.
+15. If the user asks a meta question about your previous answer or about which sources/instructions you used (for example "which information did you take from X?"), you are explaining your earlier answer, not providing new facts from an instruction BODY. Use [[INSTRUCTION:none]].
+16. Never invent or guess a number. When unsure, use [[INSTRUCTION:none]]. Never describe or mention this marker in your prose.`
 
 const PRICE_LIST_RULES = `How to use this context:
 1. You are in Price lists mode. Use ONLY the supplier documents below.
@@ -204,11 +222,11 @@ async function newInstructionContext(
     history: [
       {
         role: 'system',
-        content: `${buildInstructionContext(instructions)}\n\n${INSTRUCTION_RULES}`,
+        content: `${buildInstructionContext(instructions, query)}\n\n${INSTRUCTION_RULES}`,
       },
       {
         role: 'user',
-        content: `Answer the question as best as you can.\n\nQuestion: ${query}\n\nAnswer:`,
+        content: buildInstructionUserMessage(query),
       },
     ],
   }
@@ -550,11 +568,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
           const imagesToSend = mode === 'instructions' ? instructionMatch.images : []
 
           if (hasInfo && mode === 'instructions') {
-            const instructionsUsed = resolveInstructionsUsedForReply(
+            let instructionsUsed = resolveInstructionsUsedForReply(
               instructionMatch.instructions,
               answer,
               query,
             )
+            if (
+              instructionsUsed.length === 0 &&
+              parseInstructionIndices(answer) !== 'none'
+            ) {
+              const fallback = findBestMatchingInstruction(
+                instructionMatch.instructions,
+                query,
+              )
+              if (fallback) {
+                instructionsUsed = [fallback]
+              }
+            }
             if (instructionsUsed.length > 0) {
               send({
                 event: 'instructions',

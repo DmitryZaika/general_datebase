@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { ArrowDown, ArrowLeft, ChevronUp, Link as LinkIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link as RouterLink, useLocation } from 'react-router'
+import { GoToDealButton } from '~/components/molecules/GoToDealButton'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Skeleton } from '~/components/ui/skeleton'
 import { formatPhoneForDisplay } from '~/utils/phone'
@@ -72,6 +73,7 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
   const backHref = location.pathname.startsWith('/admin')
     ? '/admin/cloudtalk'
     : '/employee/cloudtalk'
+  const pathPrefix = location.pathname.startsWith('/admin') ? 'admin' : 'employee'
 
   const rawMessages = useMemo(() => {
     if (!props.thread) return []
@@ -228,14 +230,20 @@ export function SmsConversationPane(props: SmsConversationPaneProps) {
             <ArrowLeft size={20} />
           </RouterLink>
           <div className='min-w-0'>
-            <div className='font-medium text-slate-900 truncate flex items-center gap-2'>
+            <div className='font-medium text-slate-900 truncate flex items-center gap-2 flex-wrap'>
               {customer ? (
-                <RouterLink
-                  to={`/employee/customers/info/${customer.id}/info`}
-                  className='hover:underline'
-                >
-                  {customer.name}
-                </RouterLink>
+                <>
+                  <RouterLink
+                    to={`/${pathPrefix}/customers/info/${customer.id}/info`}
+                    className='hover:underline truncate'
+                  >
+                    {customer.name}
+                  </RouterLink>
+                  <GoToDealButton
+                    customerId={customer.id}
+                    customerName={customer.name}
+                  />
+                </>
               ) : (
                 <>
                   <span>{formatPhoneForDisplay(props.phoneDigits)}</span>

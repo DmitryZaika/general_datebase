@@ -30,6 +30,12 @@ import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { CopyText } from '~/components/atoms/CopyText'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { AttachmentImageEditorDialog } from '~/components/molecules/AttachmentImageEditorDialog'
+import {
+  DealChoiceList,
+  dealOptionName,
+  parseDealOptionsFromPayload,
+  readPayloadError,
+} from '~/components/molecules/DealChoiceList'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { EmailTemplatePickerPopover } from '~/components/molecules/EmailTemplatePickerPopover'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -70,6 +76,7 @@ import { cn } from '~/lib/utils'
 import type { Nullable } from '~/types/utils'
 import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
 import { dateClass, fileSize } from '~/utils/constants'
+import type { CustomerDealOption } from '~/utils/customerDeals.server'
 import {
   type EmailTemplate,
   fetchAllTemplates,
@@ -98,26 +105,6 @@ export interface EmailChatAttachment {
   filename: string
   url: string
   signed_url?: string
-}
-
-interface AttachmentDealOption {
-  id: number
-  title: string | null
-  status: string | null
-  amount: number | null
-  list_name: string | null
-  notes: {
-    id: number
-    content: string
-    created_at: string
-  }[]
-  activities: {
-    id: number
-    name: string
-    deadline: string | null
-    priority: string
-    is_completed: number
-  }[]
 }
 
 export interface EmailChatMessage {
@@ -536,114 +523,6 @@ function MobileTemplatePicker({
   )
 }
 
-function dealOptionName(deal: AttachmentDealOption): string {
-  const title = deal.title?.trim()
-  return title ? title : `Deal #${deal.id}`
-}
-
-function dealAmount(value: number | null): string | null {
-  if (value === null) return null
-  return `$${Number(value).toLocaleString()}`
-}
-
-function shortDealText(value: string): string {
-  const trimmed = value.trim()
-  if (trimmed.length <= 80) return trimmed
-  return `${trimmed.slice(0, 80)}...`
-}
-
-function readPayloadError(payload: unknown): string | undefined {
-  if (payload === null || typeof payload !== 'object') return undefined
-  if (!Object.hasOwn(payload, 'error')) return undefined
-  const err = Reflect.get(payload, 'error')
-  return typeof err === 'string' ? err : undefined
-}
-
-function isAttachmentDealOption(item: unknown): item is AttachmentDealOption {
-  if (item === null || typeof item !== 'object') return false
-  const id = Reflect.get(item, 'id')
-  if (typeof id !== 'number') return false
-  const notes = Reflect.get(item, 'notes')
-  if (!Array.isArray(notes)) return false
-  const activities = Reflect.get(item, 'activities')
-  if (!Array.isArray(activities)) return false
-  return true
-}
-
-function parseDealOptionsFromPayload(payload: unknown): AttachmentDealOption[] {
-  if (payload === null || typeof payload !== 'object') return []
-  if (!Object.hasOwn(payload, 'deals')) return []
-  const raw = Reflect.get(payload, 'deals')
-  if (!Array.isArray(raw)) return []
-  return raw.filter(isAttachmentDealOption)
-}
-
-function DealChoiceList({
-  deals,
-  onSelectDeal,
-  disabled,
-}: {
-  deals: AttachmentDealOption[]
-  onSelectDeal: (dealId: number) => void
-  disabled?: boolean
-}) {
-  return (
-    <div className='max-h-[60vh] space-y-2 overflow-y-auto pr-1'>
-      {deals.map(deal => (
-        <button
-          key={deal.id}
-          type='button'
-          className='w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
-          disabled={disabled}
-          onClick={() => onSelectDeal(deal.id)}
-        >
-          <div className='flex items-center justify-between gap-2'>
-            <span className='text-sm font-medium text-slate-900'>
-              {dealOptionName(deal)}
-            </span>
-            <span className='text-xs text-slate-500'>#{deal.id}</span>
-          </div>
-          <div className='mt-1 text-xs text-slate-500'>
-            {[deal.list_name, deal.status, dealAmount(deal.amount)]
-              .filter(Boolean)
-              .join(' - ') || 'No stage'}
-          </div>
-          {deal.notes.length > 0 ? (
-            <div className='mt-2 rounded-md bg-amber-50 px-2 py-1.5'>
-              <div className='text-[11px] font-semibold text-amber-900'>Notes</div>
-              <div className='mt-1 space-y-1'>
-                {deal.notes.map(note => (
-                  <div key={note.id} className='text-xs leading-snug text-amber-950'>
-                    {shortDealText(note.content)}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {deal.activities.length > 0 ? (
-            <div className='mt-2 rounded-md bg-blue-50 px-2 py-1.5'>
-              <div className='text-[11px] font-semibold text-blue-900'>Activities</div>
-              <div className='mt-1 space-y-1'>
-                {deal.activities.map(activity => (
-                  <div
-                    key={activity.id}
-                    className='flex items-center justify-between gap-2 text-xs leading-snug text-blue-950'
-                  >
-                    <span>{shortDealText(activity.name)}</span>
-                    <span className='shrink-0 text-[11px] capitalize text-blue-700'>
-                      {activity.is_completed ? 'Done' : activity.priority}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 export function EmailChat(props: EmailChatProps) {
   const {
     variant,
@@ -695,11 +574,11 @@ export function EmailChat(props: EmailChatProps) {
   const [pendingDealAttachment, setPendingDealAttachment] =
     useState<Nullable<EmailChatAttachment>>(null)
   const [attachmentDealChoices, setAttachmentDealChoices] = useState<
-    AttachmentDealOption[]
+    CustomerDealOption[]
   >([])
   const [isAddingAttachmentToDeal, setIsAddingAttachmentToDeal] = useState(false)
   const [dealNavPickerOpen, setDealNavPickerOpen] = useState(false)
-  const [dealNavChoices, setDealNavChoices] = useState<AttachmentDealOption[]>([])
+  const [dealNavChoices, setDealNavChoices] = useState<CustomerDealOption[]>([])
   const [dealNavLoading, setDealNavLoading] = useState(false)
   const [dealNavRouteActive, setDealNavRouteActive] = useState(false)
   const { toast } = useToast()

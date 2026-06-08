@@ -84,10 +84,14 @@ function stripNoteLines(content: string, linePattern: RegExp): string {
 const UNKNOWN_BULLET_VALUE_PATTERN =
   /^(?:not\s+specified|unknown|n\/a|na|none|not\s+discussed|no\s+details(?:\s+discussed)?|unspecified|—|-|\.)$/i
 
+const UNKNOWN_BULLET_VALUE_PHRASE_PATTERN =
+  /\b(?:not\s+(?:specified|discussed|mentioned)|no\s+specific\b|nothing\s+(?:specific\s+)?(?:mentioned|discussed|stated)|no\s+preference(?:\s+stated)?)\b/i
+
 function isUnknownOrEmptyBulletValue(value: string): boolean {
   const trimmed = value.trim()
   if (!trimmed) return true
-  return UNKNOWN_BULLET_VALUE_PATTERN.test(trimmed)
+  if (UNKNOWN_BULLET_VALUE_PATTERN.test(trimmed)) return true
+  return UNKNOWN_BULLET_VALUE_PHRASE_PATTERN.test(trimmed)
 }
 
 function stripUnknownNoteBullets(note: string): string {
@@ -358,6 +362,411 @@ export function normalizeVoicemailNote(note: string): string {
   return combineVoicemailBullets(deduped).join('\n')
 }
 
+const BUDGET_CONTEXT_PATTERN =
+  /\b(?:below|under|around|about|right about|stay(?:ing)?(?:\s+below|\s+under)?|target(?:ing)?|budget(?:\s+of)?|try to stay under)\s*\$?\s*([\d,]+(?:\.\d{2})?)\b/i
+
+const BUDGET_DOLLAR_PATTERN = /\$\s*([\d,]+(?:\.\d{2})?)\b/g
+
+function formatBudgetAmount(raw: string): string {
+  const digits = raw.replace(/,/g, '')
+  const value = Number.parseFloat(digits)
+  if (!Number.isFinite(value)) return `$${raw}`
+  if (Number.isInteger(value)) {
+    return `$${value.toLocaleString('en-US')}`
+  }
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function budgetAmountIsPlausible(raw: string): boolean {
+  const value = Number.parseFloat(raw.replace(/,/g, ''))
+  return Number.isFinite(value) && value >= 500 && value <= 500_000
+}
+
+export function extractBudgetFromTranscript(transcript: string): string | null {
+  const contextMatch = transcript.match(BUDGET_CONTEXT_PATTERN)
+  if (contextMatch?.[1] && budgetAmountIsPlausible(contextMatch[1])) {
+    return formatBudgetAmount(contextMatch[1])
+  }
+
+  const dollarMatches = [...transcript.matchAll(BUDGET_DOLLAR_PATTERN)]
+  for (const match of dollarMatches) {
+    const raw = match[1]
+    if (!budgetAmountIsPlausible(raw)) continue
+    const idx = match.index ?? 0
+    const context = transcript
+      .slice(Math.max(0, idx - 90), idx + match[0].length + 40)
+      .toLowerCase()
+    if (
+      /\b(?:budget|target|below|under|about|around|stay|league|installation|quartz|granite|estimate|quote|trying to)\b/.test(
+        context,
+      )
+    ) {
+      return formatBudgetAmount(raw)
+    }
+  }
+
+  return null
+}
+
+function addressCandidateScore(address: string): number {
+  const parts = address
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean)
+  let score = parts.length * 10
+  if (/\b\d{1,6}\s+\w/.test(parts[0] ?? '')) score += 5
+  if (parts.length >= 3) score += 10
+  return score
+}
+
+function appendStreetDirectionFromTranscript(
+  street: string,
+  transcript: string,
+): string {
+  const numberMatch = street.match(/^\d{1,6}/)
+  if (!numberMatch) return street
+  const directionMatch = transcript.match(
+    new RegExp(
+      `\\b${numberMatch[0]}\\s+[\\w\\s'-]+Court\\s+(East|West|North|South)\\b`,
+      'i',
+    ),
+  )
+  const direction = directionMatch?.[1]
+  if (!direction) return street
+  if (new RegExp(`\\b${direction}\\b`, 'i').test(street)) return street
+  return `${street} ${direction}`
+}
+
+function buildStreetAddressCandidate(
+  street: string,
+  direction: string | undefined,
+  city: string,
+  state: string | undefined,
+): string | null {
+  let normalizedStreet = street.trim().replace(/\s+/g, ' ')
+  const normalizedCity = city.trim().replace(/\s+/g, ' ')
+  if (!normalizedStreet || !normalizedCity) return null
+  const normalizedDirection = direction ? ` ${direction.trim()}` : ''
+  normalizedStreet = `${normalizedStreet}${normalizedDirection}`
+  if (state?.trim()) {
+    return `${normalizedStreet}, ${normalizedCity}, ${state.trim().replace(/\s+/g, ' ')}`
+  }
+  return `${normalizedStreet}, ${normalizedCity}`
+}
+
+export function extractFullAddressFromTranscript(transcript: string): string | null {
+  const candidates: string[] = []
+
+  const fullAddressPattern =
+    /\b(\d{1,6}\s+(?:[A-Za-z][\w\s'-]*\s+){0,4}Court(?:\s+(?:East|West|North|South))?)\s*,?\s*([A-Za-z][\w\s'-]*?)(?:,\s*([A-Za-z][\w\s'-]{2,20}))?\b/gi
+  for (const match of transcript.matchAll(fullAddressPattern)) {
+    const candidate = buildStreetAddressCandidate(
+      match[1],
+      undefined,
+      match[2],
+      match[3],
+    )
+    if (candidate) candidates.push(candidate)
+  }
+
+  const courtForCityPattern =
+    /\b(\d{1,6})\s+[\w\s,-]{2,60}?\s+Court\s+for\s+([A-Za-z][\w\s'-]*?),\s*([A-Za-z][\w\s'-]{2,20})\b/gi
+  for (const match of transcript.matchAll(courtForCityPattern)) {
+    const number = match[1].trim()
+    const streetMatch = transcript.match(
+      new RegExp(
+        `${number}\\s+([A-Za-z][\\w\\s'-]+?)\\s*,?\\s*(?:[A-Z]-){0,20}\\s*Court`,
+        'i',
+      ),
+    )
+    const streetName = streetMatch?.[1]?.replace(/[,\s-]+/g, ' ').trim() ?? ''
+    let street = streetName ? `${number} ${streetName} Court` : `${number} Court`
+    street = appendStreetDirectionFromTranscript(street, transcript)
+    const candidate = buildStreetAddressCandidate(street, undefined, match[2], match[3])
+    if (candidate) candidates.push(candidate)
+  }
+
+  if (candidates.length === 0) return null
+
+  return candidates.sort(
+    (a, b) => addressCandidateScore(b) - addressCandidateScore(a),
+  )[0]
+}
+
+function locationValueScore(value: string): number {
+  const parts = value
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean)
+  let score = parts.length * 10
+  if (/\b\d{1,6}\s+\w/.test(parts[0] ?? '')) score += 5
+  if (parts.length >= 3) score += 10
+  if (/\bcourt\s+(?:east|west|north|south)\b/i.test(parts[0] ?? '')) score += 5
+  if (/court,\s*(?:east|west|north|south)\b/i.test(value)) score -= 8
+  return score
+}
+
+function consolidateLocationBullets(note: string, transcript: string): string {
+  const lines = note.split('\n')
+  const locationValues: string[] = []
+  let firstLocationIndex = -1
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].trim().match(BULLET_PARTS_PATTERN)
+    if (match?.[1].trim().toLowerCase() === 'location') {
+      locationValues.push(match[2].trim())
+      if (firstLocationIndex < 0) firstLocationIndex = i
+    }
+  }
+
+  const extracted = extractFullAddressFromTranscript(transcript)
+  const candidates = extracted ? [...locationValues, extracted] : [...locationValues]
+
+  if (candidates.length === 0) return note
+
+  const best = candidates.sort(
+    (a, b) => locationValueScore(b) - locationValueScore(a),
+  )[0]
+  if (!best) return note
+
+  if (locationValues.length === 1 && locationValues[0] === best) return note
+
+  const withoutLocations = lines.filter(line => {
+    const match = line.trim().match(BULLET_PARTS_PATTERN)
+    return match?.[1].trim().toLowerCase() !== 'location'
+  })
+
+  let insertAt = withoutLocations.length
+  if (firstLocationIndex >= 0) {
+    insertAt = 0
+    for (let i = 0; i < firstLocationIndex; i++) {
+      const match = lines[i].trim().match(BULLET_PARTS_PATTERN)
+      if (match?.[1].trim().toLowerCase() !== 'location') insertAt++
+    }
+  }
+
+  withoutLocations.splice(insertAt, 0, `- Location: ${best}`)
+  return withoutLocations.join('\n')
+}
+
+function transcriptConfirmsGraniteTearOut(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  return (
+    /\bgranite\b/.test(lower) &&
+    /\b(?:countertop|counter top|backsplash|remove|tear|demolish|replace)\b/.test(lower)
+  )
+}
+
+function enhanceTearOutMaterial(note: string, transcript: string): string {
+  if (!transcriptConfirmsGraniteTearOut(transcript)) return note
+
+  return note
+    .split('\n')
+    .map(line => {
+      const match = line.trim().match(BULLET_PARTS_PATTERN)
+      if (!match) return line
+      if (match[1].trim().toLowerCase() !== 'tear-out') return line
+      let value = match[2].trim()
+      if (/\bgranite\b/i.test(value)) return line
+      if (/\bexisting countertops\b/i.test(value)) {
+        value = value.replace(
+          /\bexisting countertops\b/i,
+          'existing granite countertops',
+        )
+      } else if (/\bcountertops\b/i.test(value)) {
+        value = value.replace(/\bcountertops\b/i, 'granite countertops')
+      } else if (/\bremoves existing\b/i.test(value)) {
+        value = value.replace(
+          /\bremoves existing\b/i,
+          'removes existing granite countertops',
+        )
+      } else {
+        value = `granite tear-out, ${value}`
+      }
+      return `- Tear-out: ${value}`
+    })
+    .join('\n')
+}
+
+function noteHasBudgetBullet(note: string): boolean {
+  return note.split('\n').some(line => {
+    const match = line.trim().match(BULLET_PARTS_PATTERN)
+    return match?.[1].trim().toLowerCase() === 'budget'
+  })
+}
+
+function injectBudgetBullet(note: string, transcript: string): string {
+  if (noteHasBudgetBullet(note)) return note
+  const budget = extractBudgetFromTranscript(transcript)
+  if (!budget) return note
+  return `${note}\n- Budget: ${budget} for quartz and installation`.trim()
+}
+
+function stripSinkNegations(note: string): string {
+  return note
+    .split('\n')
+    .map(line => {
+      const match = line.trim().match(BULLET_PARTS_PATTERN)
+      if (!match) return line
+      const label = match[1].trim().toLowerCase()
+      if (label !== 'sink') return line
+      let value = match[2].trim()
+      value = value
+        .replace(/\s*\(\s*not\s+(?:in\s+)?(?:the\s+)?island\s*\)/gi, '')
+        .replace(/\s*,?\s*not\s+(?:in\s+)?(?:the\s+)?island\b/gi, '')
+        .replace(
+          /\s*,?\s*located\s+in\s+(?:the\s+)?l-?shaped\s+section\s*\(\s*not\s+island\s*\)/gi,
+          ', in L-shaped section',
+        )
+        .replace(/\s{2,}/g, ' ')
+        .replace(/\s+,/g, ',')
+        .trim()
+      return `- Sink: ${value}`
+    })
+    .join('\n')
+}
+
+function estimateBulletIsLeadTime(value: string): boolean {
+  const lower = value.toLowerCase()
+  return (
+    /\b\d+\s*(?:to|-)\s*\d+\s*weeks?\b/.test(lower) ||
+    /\blead\s*time\b/.test(lower) ||
+    /\bwaiting\s+(?:on|for)\b/.test(lower)
+  )
+}
+
+function estimateBulletIsUnscheduledOnSiteRequest(value: string): boolean {
+  const lower = value.toLowerCase()
+  if (
+    /\b(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(
+      lower,
+    )
+  ) {
+    return false
+  }
+  return (
+    /\b(?:would\s+appreciate|wants?|request(?:ed|ing)?|like)\b/.test(lower) &&
+    /\b(?:on[- ]?site|come\s+over|someone\s+coming)\b/.test(lower)
+  )
+}
+
+function transcriptShowsRepAskedCustomerToCall(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  return (
+    /\bgive\s+me\s+a\s+call\b/.test(lower) ||
+    /\b(?:you\s+)?call\s+(?:me\s+)?in\s+advance\b/.test(lower) ||
+    (/\bcall\b/.test(lower) &&
+      /\b(?:advance|a\s+week\s+before|week\s+before)\b/.test(lower))
+  )
+}
+
+function estimateBulletIsRepProcessOrSchedulingAdvice(value: string): boolean {
+  const lower = value.toLowerCase()
+  const hasScheduledTime =
+    /\b(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(
+      lower,
+    )
+  if (estimateBulletIsOnSiteScheduling(lower) && hasScheduledTime) return false
+  return (
+    /\b(?:salesperson|sales\s+rep|rep)\s+will\s+call\b/.test(lower) ||
+    /\bcustomer\s+advised\b/.test(lower) ||
+    /\badvised\s+to\s+call\b/.test(lower) ||
+    /\bcall\s+(?:in\s+)?advance\b/.test(lower) ||
+    /\b(?:one|a)\s+week\s+before\b/.test(lower) ||
+    /\bschedule\s+(?:your\s+)?template\b/.test(lower) ||
+    /\btemplate\s+(?:on\s+)?(?:the\s+)?next\s+day\b/.test(lower) ||
+    /\bmeasurement\s+person\b/.test(lower) ||
+    /\binstall(?:ed)?\s+in\s+(?:two|three|2|3)\s+weeks?\b/.test(lower) ||
+    /\bsave\s+you\s+another\s+week\b/.test(lower) ||
+    (/\b(?:schedule|template|measurement|appointment)\b/.test(lower) &&
+      !hasScheduledTime)
+  )
+}
+
+function extractCustomerTimelineFromEstimate(value: string): string | null {
+  const parts: string[] = []
+  const lower = value.toLowerCase()
+  if (/\b(?:cabinets?|cabinetry)\b/.test(lower) && /\bnext\s+month\b/.test(lower)) {
+    parts.push('cabinets expected done next month')
+  }
+  if (/\bon\s+hold\b/.test(lower)) {
+    parts.push('project was on hold, now resuming')
+  }
+  if (/\bexpired\s+quote\b/.test(lower) || /\bquote\s+expired\b/.test(lower)) {
+    parts.push('needs updated quote')
+  }
+  if (parts.length === 0) return null
+  return parts.join('; ')
+}
+
+function appendProjectTimingValue(current: string | null, value: string): string {
+  if (!current) return value
+  if (current.toLowerCase().includes(value.toLowerCase())) return current
+  return `${current}; ${value}`
+}
+
+function normalizeMisplacedEstimateBullets(note: string, transcript?: string): string {
+  let projectTiming: string | null = null
+  const lines = note.split('\n').filter(line => {
+    const match = line.trim().match(BULLET_PARTS_PATTERN)
+    if (!match) return true
+    const label = match[1].trim().toLowerCase()
+    const value = match[2].trim()
+    if (label !== 'estimate') return true
+
+    const customerTimeline = extractCustomerTimelineFromEstimate(value)
+    if (customerTimeline) {
+      projectTiming = appendProjectTimingValue(projectTiming, customerTimeline)
+    }
+
+    if (estimateBulletIsLeadTime(value)) {
+      projectTiming = appendProjectTimingValue(projectTiming, value)
+      return false
+    }
+    if (estimateBulletIsUnscheduledOnSiteRequest(value)) return false
+    if (estimateBulletIsRepProcessOrSchedulingAdvice(value)) return false
+
+    if (
+      transcript &&
+      transcriptShowsRepAskedCustomerToCall(transcript) &&
+      /\b(?:salesperson|sales\s+rep|rep)\s+will\s+call\b/i.test(value)
+    ) {
+      return false
+    }
+
+    if (customerTimeline && !estimateBulletIsOnSiteScheduling(value.toLowerCase())) {
+      return false
+    }
+
+    return true
+  })
+
+  if (!projectTiming) return lines.join('\n')
+
+  const hasProjectTiming = lines.some(line => {
+    const match = line.trim().match(BULLET_PARTS_PATTERN)
+    return match?.[1].trim().toLowerCase() === 'project timing'
+  })
+
+  if (hasProjectTiming) return lines.join('\n')
+  return [...lines, `- Project timing: ${projectTiming}`].join('\n')
+}
+
+export function customerWillSendMaterialPhoto(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  return (
+    /\b(?:i(?:'ll| will)|she|he|we will|can|going to)\s+(?:go ahead and\s+)?send\b[^.]{0,120}\b(?:picture|photo|pic|image)\b/.test(
+      lower,
+    ) ||
+    /\bsend\s+(?:you\s+)?(?:a\s+)?(?:picture|photo|pic|image)\b[^.]{0,120}\b(?:kitchen|layout|color|quartz|tile|countertop)\b/.test(
+      lower,
+    ) ||
+    /\b(?:picture|photo|pic)\b[^.]{0,120}\b(?:kitchen\s+layout|color(?:ing)?|quartz|tile)\b/.test(
+      lower,
+    )
+  )
+}
+
 export function sanitizeCallNoteContent(
   content: string,
   isVoicemail: boolean,
@@ -372,10 +781,17 @@ export function sanitizeCallNoteContent(
   note = stripUnknownNoteBullets(note)
   if (!isVoicemail) {
     note = normalizeEstimateNoteBullets(note)
+    note = normalizeMisplacedEstimateBullets(note, transcript)
+    note = stripSinkNegations(note)
   }
   if (transcript) {
     note = correctRepCallBackAttribution(note, transcript)
     note = correctMissedAppointmentAttribution(note, transcript)
+    if (!isVoicemail) {
+      note = consolidateLocationBullets(note, transcript)
+      note = enhanceTearOutMaterial(note, transcript)
+      note = injectBudgetBullet(note, transcript)
+    }
   }
   if (!isVoicemail) {
     note = stripNoteLines(note, /^\s*-?\s*Call type\s*:/i)

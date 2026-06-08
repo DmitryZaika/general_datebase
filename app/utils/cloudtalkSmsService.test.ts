@@ -25,6 +25,7 @@ import {
 
 const helper = new DatabaseTestHelper()
 const factory = new TestDataFactory(helper)
+const TEST_AGENT = '540273'
 
 beforeAll(async () => {
   await DatabaseTestHelper.ensureDatabase()
@@ -46,7 +47,18 @@ afterEach(async () => {
 describe('getThreadUnreadCountForUser', () => {
   test('counts inbound newer than last_read_at, clears after mark-read', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: admin.id,
+      agent: TEST_AGENT,
+      text: 'seed',
+    })
     await factory.smsInbound({
       company_id: company.id,
       sender: '3173161456',
@@ -72,7 +84,18 @@ describe('getThreadUnreadCountForUser', () => {
 
   test('canonicalizes 11-digit input to match 10-digit stored sender', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: admin.id,
+      agent: TEST_AGENT,
+      text: 'seed',
+    })
     await factory.smsInbound({
       company_id: company.id,
       sender: '3173161456',
@@ -90,7 +113,18 @@ describe('getThreadUnreadCountForUser', () => {
 
   test('counts inbound only, not outbound, on the same thread', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: admin.id,
+      agent: TEST_AGENT,
+      text: 'seed',
+    })
     await factory.smsInbound({
       company_id: company.id,
       sender: '3173161456',
@@ -100,25 +134,32 @@ describe('getThreadUnreadCountForUser', () => {
       company_id: company.id,
       recipient: '3173161456',
       sender_user_id: admin.id,
+      agent: TEST_AGENT,
     })
     expect(await getThreadUnreadCountForUser(admin, '3173161456')).toBe(1)
   })
 })
 
 describe('listThreadsForUser', () => {
-  test('admin sees every thread in their company', async () => {
+  test('user with linked agent sees only their company threads for that agent', async () => {
     const company = await factory.company()
     const otherCompany = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
 
     await factory.smsInbound({
       company_id: company.id,
       sender: '3173161456',
+      agent: TEST_AGENT,
       text: 'A1',
     })
     await factory.smsInbound({
       company_id: company.id,
       sender: '5125559090',
+      agent: TEST_AGENT,
       text: 'B1',
     })
     await factory.smsInbound({
@@ -141,7 +182,7 @@ describe('listThreadsForUser', () => {
     ])
   })
 
-  test('employee sees every thread in the company (shared inbox), not just their own agent', async () => {
+  test('employee sees only threads linked to their agent id', async () => {
     const company = await factory.company()
     const otherCompany = await factory.company()
     const user = await factory.user({
@@ -160,7 +201,6 @@ describe('listThreadsForUser', () => {
       sender: '5125559090',
       agent: 'agent-B',
     })
-    // Another company's thread must never leak.
     await factory.smsInbound({
       company_id: otherCompany.id,
       sender: '9999999999',
@@ -173,10 +213,7 @@ describe('listThreadsForUser', () => {
       offset: 0,
     })
 
-    expect(result.threads.map(t => t.phoneDigits).sort()).toEqual([
-      '3173161456',
-      '5125559090',
-    ])
+    expect(result.threads.map(t => t.phoneDigits)).toEqual(['3173161456'])
   })
 
   test('employee sees their own outbound threads even without inbound match', async () => {
@@ -205,16 +242,51 @@ describe('listThreadsForUser', () => {
     expect(result.threads[0].phoneDigits).toBe('3173161456')
     expect(result.threads[0].lastDirection).toBe('outbound')
   })
+
+  test('wrong agent id does not show messages sent under another agent', async () => {
+    const company = await factory.company()
+    const user = await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      cloudtalk_agent_id: 'wrong-random-agent',
+    })
+
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: user.id,
+      agent: 'real-agent-A',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: '3173161456',
+      text: 'customer reply',
+    })
+
+    const result = await listThreadsForUser({
+      user,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+
+    expect(result.threads).toHaveLength(0)
+  })
 })
 
 describe('getThreadForUser', () => {
   test('returns most-recent N messages first', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     for (let i = 0; i < 40; i++) {
       await factory.smsInbound({
         company_id: company.id,
         sender: '3173161456',
+        agent: TEST_AGENT,
         text: `msg ${i}`,
         created_date: new Date(Date.now() - (40 - i) * 1000),
       })
@@ -232,12 +304,17 @@ describe('getThreadForUser', () => {
 
   test('beforeId cursor returns next older page', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     const ids: number[] = []
     for (let i = 0; i < 5; i++) {
       const row = await factory.smsInbound({
         company_id: company.id,
         sender: '3173161456',
+        agent: TEST_AGENT,
         text: `msg ${i}`,
         created_date: new Date(Date.now() - (5 - i) * 1000),
       })
@@ -253,7 +330,7 @@ describe('getThreadForUser', () => {
     expect(result.hasOlder).toBe(false)
   })
 
-  test('shows the full conversation to any employee (company-shared), incl. replies from other agents', async () => {
+  test('shows customer replies on owned threads but hides other agents messages', async () => {
     const company = await factory.company()
     const otherCompany = await factory.company()
     const user = await factory.user({
@@ -261,7 +338,6 @@ describe('getThreadForUser', () => {
       is_employee: true,
       cloudtalk_agent_id: 'agent-A',
     })
-    // The employee texted the customer...
     await factory.smsOutbound({
       company_id: company.id,
       recipient: '3173161456',
@@ -269,14 +345,17 @@ describe('getThreadForUser', () => {
       agent: 'agent-A',
       text: 'hi from rep',
     })
-    // ...the customer replied (inbound carries a different agent, no sender_user_id)...
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: '3173161456',
+      text: 'customer reply',
+    })
     await factory.smsInbound({
       company_id: company.id,
       sender: '3173161456',
       agent: 'agent-B',
-      text: 'customer reply',
+      text: 'other agent only',
     })
-    // ...and another company's thread on the same number must not leak.
     await factory.smsInbound({
       company_id: otherCompany.id,
       sender: '3173161456',
@@ -291,12 +370,17 @@ describe('getThreadForUser', () => {
     const texts = result.messages.map(m => m.text)
     expect(texts).toContain('hi from rep')
     expect(texts).toContain('customer reply')
+    expect(texts).not.toContain('other agent only')
     expect(texts).not.toContain('other company')
   })
 
   test('infers outbound direction for webhook rows stored as inbound with agent', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     const customerPhone = '3178351004'
     const companyPhone = '3176767938'
 
@@ -331,7 +415,11 @@ describe('getThreadForUser', () => {
 
   test('groups webhook mislabeled messages under the customer thread', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     const customerPhone = '3178351004'
     const companyPhone = '3176767938'
 
@@ -364,7 +452,11 @@ describe('getThreadForUser', () => {
 
   test('infers outbound direction for webhook rows stored as inbound with agent', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     const customerPhone = '3178351004'
     const companyPhone = '3176767938'
 
@@ -397,7 +489,11 @@ describe('getThreadForUser', () => {
 
   test('groups webhook mislabeled messages under the customer thread', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     const customerPhone = '3178351004'
     const companyPhone = '3176767938'
 
@@ -430,7 +526,11 @@ describe('getThreadForUser', () => {
 
   test('hides CloudTalk webhook echo of app-sent outbound', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     const customerPhone = '8594208636'
     const companyPhone = '3176767938'
     const sentAt = new Date()
@@ -473,7 +573,11 @@ describe('getThreadForUser', () => {
 
   test('does not list company line as its own thread for webhook echo', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     const customerPhone = '8594208636'
     const companyPhone = '3176767938'
 
@@ -510,7 +614,18 @@ describe('getThreadForUser', () => {
 
   test('excludes outbound pending/failed rows (handled optimistically client-side)', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: admin.id,
+      agent: TEST_AGENT,
+      text: 'seed',
+    })
     await factory.smsInbound({
       company_id: company.id,
       sender: '3173161456',
@@ -520,6 +635,7 @@ describe('getThreadForUser', () => {
       company_id: company.id,
       recipient: '3173161456',
       sender_user_id: admin.id,
+      agent: TEST_AGENT,
       text: 'sent ok',
       status: 'sent',
     })
@@ -527,6 +643,7 @@ describe('getThreadForUser', () => {
       company_id: company.id,
       recipient: '3173161456',
       sender_user_id: admin.id,
+      agent: TEST_AGENT,
       text: 'still sending',
       status: 'pending',
     })
@@ -534,6 +651,7 @@ describe('getThreadForUser', () => {
       company_id: company.id,
       recipient: '3173161456',
       sender_user_id: admin.id,
+      agent: TEST_AGENT,
       text: 'failed one',
       status: 'failed',
     })
@@ -554,7 +672,11 @@ describe('getThreadForUser', () => {
 describe('markThreadReadForUser', () => {
   test('inserts on first call, updates on second', async () => {
     const company = await factory.company()
-    const user = await factory.user({ company_id: company.id, is_admin: true })
+    const user = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
 
     await markThreadReadForUser({ user, phoneDigits: '3173161456' })
     const firstRows = await helper.query<{ last_read_at: Date | string }>(
@@ -580,8 +702,26 @@ describe('markThreadReadForUser', () => {
 describe('getUnreadThreadCountForUser', () => {
   test('counts distinct phones with unread inbound newer than last_read_at', async () => {
     const company = await factory.company()
-    const user = await factory.user({ company_id: company.id, is_admin: true })
+    const user = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
 
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: user.id,
+      agent: TEST_AGENT,
+      text: 'seed A',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '5125559090',
+      sender_user_id: user.id,
+      agent: TEST_AGENT,
+      text: 'seed B',
+    })
     await factory.smsInbound({
       company_id: company.id,
       sender: '3173161456',
@@ -604,11 +744,16 @@ describe('getUnreadThreadCountForUser', () => {
 
   test('does not count outbound rows as unread', async () => {
     const company = await factory.company()
-    const user = await factory.user({ company_id: company.id, is_admin: true })
+    const user = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     await factory.smsOutbound({
       company_id: company.id,
       recipient: '3173161456',
       sender_user_id: user.id,
+      agent: TEST_AGENT,
     })
     const result = await getUnreadThreadCountForUser(user)
     expect(result).toBe(0)
@@ -892,12 +1037,16 @@ describe('userHasMessagesForPhone', () => {
 
   test('returns false when no row exists for that phone', async () => {
     const company = await factory.company()
-    const user = await factory.user({ company_id: company.id, is_admin: true })
+    const user = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     const result = await userHasMessagesForPhone(user, '3173161456')
     expect(result).toBe(false)
   })
 
-  test('returns true for any message in the company (shared inbox), regardless of agent', async () => {
+  test('returns false when only another agent has messages for that phone', async () => {
     const company = await factory.company()
     const user = await factory.user({
       company_id: company.id,
@@ -910,7 +1059,7 @@ describe('userHasMessagesForPhone', () => {
       agent: 'agent-B',
     })
     const result = await userHasMessagesForPhone(user, '3173161456')
-    expect(result).toBe(true)
+    expect(result).toBe(false)
   })
 
   test('does not leak another company’s messages', async () => {
@@ -960,7 +1109,11 @@ describe('cloudtalk_sms unique constraint on (company_id, cloudtalk_id)', () => 
 describe('expireStalePendingOutbound (via listThreadsForUser)', () => {
   test('pending rows older than threshold become failed', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     await helper.query(
       `INSERT INTO cloudtalk_sms
          (cloudtalk_id, sender, recipient, text, direction, status, error_message,
@@ -982,7 +1135,11 @@ describe('expireStalePendingOutbound (via listThreadsForUser)', () => {
 
   test('fresh pending rows are not expired', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     await helper.query(
       `INSERT INTO cloudtalk_sms
          (cloudtalk_id, sender, recipient, text, direction, status, error_message,
@@ -1000,7 +1157,11 @@ describe('expireStalePendingOutbound (via listThreadsForUser)', () => {
 
   test('does not touch sent or failed rows even if old', async () => {
     const company = await factory.company()
-    const admin = await factory.user({ company_id: company.id, is_admin: true })
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
     await helper.query(
       `INSERT INTO cloudtalk_sms
          (cloudtalk_id, sender, recipient, text, direction, status, error_message,

@@ -32,26 +32,39 @@ export async function findCustomerDealsForUser(
   companyId: number,
   customerEmail?: string,
   customerName?: string,
+  customerId?: number,
 ): Promise<CustomerDealOption[]> {
   const email = customerEmail?.trim() ?? ''
   const name = customerName?.trim() ?? ''
-  if (!email && !name) return []
+  const id =
+    Number.isFinite(customerId) && customerId && customerId > 0 ? customerId : 0
+  if (!email && !name && id === 0) return []
 
   const deals = await selectMany<Omit<CustomerDealOption, 'notes' | 'activities'>>(
     db,
-    `SELECT d.id, d.title, d.status, d.amount, dl.name list_name
-       FROM deals d
-       JOIN customers c ON c.id = d.customer_id
-       LEFT JOIN deals_list dl ON dl.id = d.list_id
-      WHERE d.deleted_at IS NULL
-        AND c.company_id = ?
-        AND c.deleted_at IS NULL
-        AND (
-          (? != '' AND LOWER(c.email) = LOWER(?))
-          OR (? != '' AND LOWER(c.name) = LOWER(?))
-        )
-      ORDER BY CASE WHEN d.user_id = ? THEN 0 ELSE 1 END, d.id DESC`,
-    [companyId, email, email, name, name, userId],
+    id > 0
+      ? `SELECT d.id, d.title, d.status, d.amount, dl.name list_name
+           FROM deals d
+           JOIN customers c ON c.id = d.customer_id
+           LEFT JOIN deals_list dl ON dl.id = d.list_id
+          WHERE d.deleted_at IS NULL
+            AND c.company_id = ?
+            AND c.deleted_at IS NULL
+            AND d.customer_id = ?
+          ORDER BY CASE WHEN d.user_id = ? THEN 0 ELSE 1 END, d.id DESC`
+      : `SELECT d.id, d.title, d.status, d.amount, dl.name list_name
+           FROM deals d
+           JOIN customers c ON c.id = d.customer_id
+           LEFT JOIN deals_list dl ON dl.id = d.list_id
+          WHERE d.deleted_at IS NULL
+            AND c.company_id = ?
+            AND c.deleted_at IS NULL
+            AND (
+              (? != '' AND LOWER(c.email) = LOWER(?))
+              OR (? != '' AND LOWER(c.name) = LOWER(?))
+            )
+          ORDER BY CASE WHEN d.user_id = ? THEN 0 ELSE 1 END, d.id DESC`,
+    id > 0 ? [companyId, id, userId] : [companyId, email, email, name, name, userId],
   )
 
   if (deals.length === 0) return []

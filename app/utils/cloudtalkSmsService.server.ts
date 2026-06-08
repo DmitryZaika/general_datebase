@@ -162,6 +162,39 @@ interface ThreadRow {
   customer_name: Nullable<string>
 }
 
+function userAgentId(user: SessionUser): string | null {
+  const agentId = user.cloudtalk_agent_id?.trim() ?? ''
+  return agentId.length > 0 ? agentId : null
+}
+
+function agentScopeClause(
+  user: SessionUser,
+  alias: string,
+): { clause: string; params: (string | number)[] } {
+  const agentId = userAgentId(user)
+  if (!agentId) {
+    return { clause: '1 = 0', params: [] }
+  }
+  return {
+    clause: `(
+      TRIM(IFNULL(${alias}.agent, '')) = ?
+      OR (
+        TRIM(IFNULL(${alias}.agent, '')) = ''
+        AND EXISTS (
+          SELECT 1 FROM cloudtalk_sms link
+          WHERE link.company_id = ${alias}.company_id
+            AND TRIM(IFNULL(link.agent, '')) = ?
+            AND (
+              CAST(link.recipient AS CHAR) = CAST(${alias}.sender AS CHAR)
+              OR CAST(link.sender AS CHAR) = CAST(${alias}.sender AS CHAR)
+            )
+        )
+      )
+    )`,
+    params: [agentId, agentId],
+  }
+}
+
 const COMPANY_SENDER_SUBQUERY = `(
   SELECT DISTINCT CAST(s2.sender AS CHAR) AS phone
   FROM cloudtalk_sms s2
@@ -231,8 +264,13 @@ export async function listThreadsForUser(
   }
   const searchClause = hasSearch ? ` AND (${searchClauseParts.join(' OR ')})` : ''
 
-  const baseWhere = `s.company_id = ?${searchClause} AND ${OUTBOUND_ECHO_EXCLUSION} AND ${COMPANY_LINE_EXCLUSION}`
-  const baseParams: (string | number)[] = [user.company_id, ...searchParams]
+  const agentScope = agentScopeClause(user, 's')
+  const baseWhere = `s.company_id = ?${searchClause} AND ${OUTBOUND_ECHO_EXCLUSION} AND ${COMPANY_LINE_EXCLUSION} AND ${agentScope.clause}`
+  const baseParams: (string | number)[] = [
+    user.company_id,
+    ...searchParams,
+    ...agentScope.params,
+  ]
 
   const sql = `
     WITH scoped AS (
@@ -370,8 +408,12 @@ export async function getThreadForUser(
     return { messages: [], hasOlder: false }
   }
 
-  // Shared company SMS inbox: the full conversation is visible to anyone in the company
-  // (both directions, every agent), scoped only by company_id.
+  const hasAccess = await userHasMessagesForPhone(user, phoneDigits)
+  if (!hasAccess) {
+    return { messages: [], hasOlder: false }
+  }
+
+  const agentScope = agentScopeClause(user, 's')
   const placeholders = variants.map(() => '?').join(',')
   const beforeClause = beforeId ? ' AND s.id < ?' : ''
   const sql = `
@@ -385,11 +427,17 @@ export async function getThreadForUser(
        AND (s.sender IN (${placeholders}) OR s.recipient IN (${placeholders}))
        AND NOT (s.direction = 'outbound' AND s.status IN ('pending', 'failed'))
        AND ${OUTBOUND_ECHO_EXCLUSION}
+       AND ${agentScope.clause}
        ${beforeClause}
      ORDER BY s.created_date DESC, s.id DESC
      LIMIT ?
   `
-  const queryParams: (string | number)[] = [user.company_id, ...variants, ...variants]
+  const queryParams: (string | number)[] = [
+    user.company_id,
+    ...variants,
+    ...variants,
+    ...agentScope.params,
+  ]
   if (beforeId) queryParams.push(Number(beforeId))
   // LIMIT N+1: fetch one extra row so we know whether older history exists
   // without issuing a second COUNT query.
@@ -429,6 +477,7 @@ export async function markThreadReadForUser(
 }
 
 export async function getUnreadThreadCountForUser(user: SessionUser): Promise<number> {
+  const agentScope = agentScopeClause(user, 's')
   const sql = `
     SELECT COUNT(DISTINCT ${CUSTOMER_PHONE_SQL}) AS unread_count
       FROM cloudtalk_sms s
@@ -441,9 +490,14 @@ export async function getUnreadThreadCountForUser(user: SessionUser): Promise<nu
        AND ${OUTBOUND_ECHO_EXCLUSION}
        AND (s.agent IS NULL OR TRIM(s.agent) = '')
        AND s.sender NOT IN ${COMPANY_SENDER_SUBQUERY}
+       AND ${agentScope.clause}
        AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)
   `
-  const queryParams: (string | number)[] = [user.id, user.company_id]
+  const queryParams: (string | number)[] = [
+    user.id,
+    user.company_id,
+    ...agentScope.params,
+  ]
   const rows = await selectMany<UnreadCountRow>(db, sql, queryParams)
   return Number(rows[0]?.unread_count ?? 0)
 }
@@ -457,6 +511,7 @@ export async function getThreadUnreadCountForUser(
   if (digits.length === 0) return 0
   const variants = phoneVariants(digits)
   const placeholders = variants.map(() => '?').join(',')
+  const agentScope = agentScopeClause(user, 's')
   const rows = await selectMany<UnreadCountRow>(
     db,
     `SELECT COUNT(*) AS unread_count
@@ -467,8 +522,9 @@ export async function getThreadUnreadCountForUser(
         AND r.customer_phone_digits = ?
       WHERE s.company_id = ?
         AND s.sender IN (${placeholders})
+        AND ${agentScope.clause}
         AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)`,
-    [user.id, digits, user.company_id, ...variants],
+    [user.id, digits, user.company_id, ...variants, ...agentScope.params],
   )
   return Number(rows[0]?.unread_count ?? 0)
 }
@@ -570,14 +626,16 @@ export async function userHasMessagesForPhone(
 ): Promise<boolean> {
   const variants = phoneVariants(phoneDigits)
   if (variants.length === 0) return false
+  const agentScope = agentScopeClause(user, 's')
   const placeholders = variants.map(() => '?').join(',')
   const rows = await selectMany<{ found: number }>(
     db,
     `SELECT 1 AS found FROM cloudtalk_sms s
       WHERE s.company_id = ?
         AND (s.sender IN (${placeholders}) OR s.recipient IN (${placeholders}))
+        AND ${agentScope.clause}
       LIMIT 1`,
-    [user.company_id, ...variants, ...variants],
+    [user.company_id, ...variants, ...variants, ...agentScope.params],
   )
   return rows.length > 0
 }
