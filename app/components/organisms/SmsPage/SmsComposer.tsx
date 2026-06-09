@@ -32,6 +32,14 @@ export function SmsComposer(props: SmsComposerProps) {
     if (textareaRef.current) resizeTextarea(textareaRef.current)
   }, [resizeTextarea])
 
+  useEffect(() => {
+    if (props.readOnly || !props.canSend) return
+    const id = window.setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [props.phoneDigits, props.canSend, props.readOnly])
+
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setText(e.target.value)

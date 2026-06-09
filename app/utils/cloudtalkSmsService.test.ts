@@ -9,6 +9,7 @@ import {
 } from 'vitest'
 import type { Nullable } from '~/types/utils'
 import { DatabaseTestHelper, TestDataFactory } from '../../tests/testDatabase'
+import { fetchSmsForCompanyAndPhones } from './cloudtalkSms.server'
 import {
   __resetPendingCleanupThrottle,
   canUserSendSms,
@@ -271,6 +272,133 @@ describe('listThreadsForUser', () => {
     })
 
     expect(result.threads).toHaveLength(0)
+  })
+
+  test('scope all lets admins without agent id see every company thread', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: null,
+    })
+
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      agent: 'agent-A',
+      text: 'agent A message',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '5125559090',
+      agent: 'agent-B',
+      text: 'agent B message',
+    })
+
+    const mine = await listThreadsForUser({
+      user: admin,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+    expect(mine.threads).toHaveLength(0)
+
+    const all = await listThreadsForUser({
+      user: admin,
+      search: '',
+      limit: 20,
+      offset: 0,
+      scope: 'all',
+    })
+    expect(all.threads).toHaveLength(2)
+  })
+
+  test('employees cannot bypass agent filter with scope all', async () => {
+    const company = await factory.company()
+    const user = await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      cloudtalk_agent_id: 'agent-A',
+    })
+
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: user.id,
+      agent: 'agent-A',
+      text: 'mine',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '5125559090',
+      agent: 'agent-B',
+      text: 'theirs',
+    })
+
+    const result = await listThreadsForUser({
+      user,
+      search: '',
+      limit: 20,
+      offset: 0,
+      scope: 'all',
+    })
+
+    expect(result.threads).toHaveLength(1)
+    expect(result.threads[0].phoneDigits).toBe('3173161456')
+  })
+
+  test('scope all with agentId filter shows only that rep threads', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: null,
+    })
+    await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      name: 'Rep A',
+      cloudtalk_agent_id: 'agent-A',
+    })
+    await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      name: 'Rep B',
+      cloudtalk_agent_id: 'agent-B',
+    })
+
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      agent: 'agent-A',
+      text: 'from A',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '5125559090',
+      agent: 'agent-B',
+      text: 'from B',
+    })
+
+    const all = await listThreadsForUser({
+      user: admin,
+      search: '',
+      limit: 20,
+      offset: 0,
+      scope: 'all',
+    })
+    expect(all.threads).toHaveLength(2)
+
+    const filtered = await listThreadsForUser({
+      user: admin,
+      search: '',
+      limit: 20,
+      offset: 0,
+      scope: 'all',
+      agentId: 'agent-A',
+    })
+    expect(filtered.threads).toHaveLength(1)
+    expect(filtered.threads[0].phoneDigits).toBe('3173161456')
   })
 })
 
@@ -1077,6 +1205,51 @@ describe('userHasMessagesForPhone', () => {
     })
     const result = await userHasMessagesForPhone(user, '3173161456')
     expect(result).toBe(false)
+  })
+})
+
+describe('fetchSmsForCompanyAndPhones', () => {
+  test('hides CloudTalk webhook echo of app-sent outbound', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
+    const customerPhone = '8594208636'
+    const companyPhone = '3176767938'
+    const sentAt = new Date()
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'seed',
+      created_date: new Date(sentAt.getTime() - 60_000),
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: customerPhone,
+      sender_user_id: admin.id,
+      agent: '540273',
+      text: '😚🤥',
+      status: 'sent',
+      created_date: sentAt,
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      text: '😚🤥',
+      created_date: new Date(sentAt.getTime() + 3000),
+    })
+
+    const result = await fetchSmsForCompanyAndPhones({
+      companyId: company.id,
+      phoneDigits: [customerPhone],
+    })
+
+    expect(result.items.filter(r => r.text === '😚🤥')).toHaveLength(1)
   })
 })
 

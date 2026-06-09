@@ -1,6 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type LoaderFunctionArgs, data as routerData, useParams } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  data as routerData,
+  useParams,
+  useSearchParams,
+} from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { SmsConversationPane } from '~/components/organisms/SmsPage/SmsConversationPane'
 import { SmsLinkCustomerDialog } from '~/components/organisms/SmsPage/SmsLinkCustomerDialog'
@@ -37,6 +42,9 @@ export default function CloudTalkThread() {
   const params = useParams()
   const phoneDigits = params.phoneDigits ?? ''
   const readOnly = useCloudtalkReadOnly()
+  const [searchParams] = useSearchParams()
+  const selectedRep = searchParams.get('rep') ?? 'all'
+  const filterAgentId = selectedRep === 'all' ? undefined : selectedRep
   const queryClient = useQueryClient()
   const csrfToken = useAuthenticityToken()
 
@@ -55,8 +63,20 @@ export default function CloudTalkThread() {
   }, [phoneDigits])
 
   const threadQuery = useQuery<ThreadResponse>({
-    queryKey: ['cloudtalk-sms-thread', phoneDigits, messageLimit],
-    queryFn: () => fetchThread({ phoneDigits, limit: messageLimit }),
+    queryKey: [
+      'cloudtalk-sms-thread',
+      phoneDigits,
+      messageLimit,
+      readOnly ? 'all' : 'mine',
+      selectedRep,
+    ],
+    queryFn: () =>
+      fetchThread({
+        phoneDigits,
+        limit: messageLimit,
+        scope: readOnly ? 'all' : 'mine',
+        agentId: filterAgentId,
+      }),
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
   })

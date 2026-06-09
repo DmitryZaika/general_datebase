@@ -3,7 +3,9 @@ import { SquarePen } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { SearchInput } from '~/components/molecules/SearchInput'
 import { Skeleton } from '~/components/ui/skeleton'
+import type { SmsSalesRep } from '~/utils/cloudtalkSmsService.server'
 import { NoThreadsEmpty, SearchNoMatch, ThreadListLoading } from './SmsPageEmptyStates'
+import { SmsSalesRepFilter } from './SmsSalesRepFilter'
 import { SmsThreadListItem } from './SmsThreadListItem'
 import type { ThreadSummary } from './types'
 
@@ -20,6 +22,9 @@ export interface SmsThreadListProps {
   onLoadMore: () => void
   readOnly?: boolean
   onNewConversation?: () => void
+  salesReps?: SmsSalesRep[]
+  selectedRep?: string
+  onRepChange?: (agentId: string) => void
 }
 
 export function SmsThreadList(props: SmsThreadListProps) {
@@ -110,7 +115,18 @@ export function SmsThreadList(props: SmsThreadListProps) {
     >
       <div className='px-4 py-3 border-b border-slate-200'>
         <div className='flex items-center justify-between gap-2 mb-3'>
-          <h2 className='text-base font-semibold text-slate-900'>CloudTalk SMS</h2>
+          <h2 className='text-base font-semibold text-slate-900 shrink-0'>
+            CloudTalk SMS
+          </h2>
+          {props.salesReps && props.onRepChange ? (
+            <div className='ml-auto min-w-0 w-[9rem] sm:w-[11rem]'>
+              <SmsSalesRepFilter
+                salesReps={props.salesReps}
+                value={props.selectedRep ?? 'all'}
+                onChange={props.onRepChange}
+              />
+            </div>
+          ) : null}
           {!props.readOnly && props.onNewConversation ? (
             <button
               type='button'
@@ -155,7 +171,7 @@ export function SmsThreadList(props: SmsThreadListProps) {
             </motion.div>
           ) : listContentKey === 'threads' ? (
             <motion.div
-              key={`threads-${props.search}`}
+              key={`threads-${props.search}-${props.selectedRep ?? 'all'}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

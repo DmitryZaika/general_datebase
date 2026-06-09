@@ -234,7 +234,7 @@ function AddressLinkCell({
       {isPhoneField || isPhone2Field ? (
         <div className='flex gap-2 items-center'>
           <CopyText value={row.original.value} className='font-bold' />
-          <SmsDealButton phone={row.original.value} />
+          <SmsDealButton phone={row.original.value} showCallIcon={isPhoneField} />
         </div>
       ) : isEmailField ? (
         <div className='flex gap-2 '>

@@ -9,6 +9,7 @@ import {
   useLocation,
   useNavigate,
   useParams,
+  useSearchParams,
 } from 'react-router'
 import { CloudTalkPageSkeleton } from '~/components/organisms/SmsPage/CloudTalkPageSkeleton'
 import { SmsNewConversationDialog } from '~/components/organisms/SmsPage/SmsNewConversationDialog'
@@ -21,6 +22,7 @@ import { fetchThreads } from '~/components/organisms/SmsPage/service'
 import type { ThreadSummary } from '~/components/organisms/SmsPage/types'
 import type { Nullable } from '~/types/utils'
 import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'
+import type { SmsSalesRep } from '~/utils/cloudtalkSmsService.server'
 import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
 import { getEmployeeUser } from '~/utils/session.server'
 import { cloudtalkBasePath } from '~/utils/urlHelpers'
@@ -38,6 +40,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       hasCloudtalkAgent: Boolean(user.cloudtalk_agent_id),
       isAdmin: Boolean(user.is_admin || user.is_superuser),
       readOnly: false,
+      salesReps: [] satisfies SmsSalesRep[],
     }
   } catch (error) {
     if (error instanceof Response) throw error
@@ -65,15 +68,40 @@ export default function CloudTalkPage() {
   const [searchFetchPending, setSearchFetchPending] = useState(false)
   const [newConversationOpen, setNewConversationOpen] = useState(false)
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedRep = searchParams.get('rep') ?? 'all'
+  const filterAgentId = selectedRep === 'all' ? undefined : selectedRep
+
+  const handleRepChange = useCallback(
+    (agentId: string) => {
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev)
+          if (agentId === 'all') next.delete('rep')
+          else next.set('rep', agentId)
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
   const threadsQuery = useInfiniteQuery<ThreadsPage>({
-    queryKey: ['cloudtalk-sms-threads', search],
+    queryKey: [
+      'cloudtalk-sms-threads',
+      data.readOnly ? 'all' : 'mine',
+      selectedRep,
+      search,
+    ],
     queryFn: async ({ pageParam }) => {
       const offset = (pageParam as number) ?? 0
       const result = await fetchThreads({
-        scope: 'mine',
+        scope: data.readOnly ? 'all' : 'mine',
         search,
         limit: PAGE_SIZE,
         offset,
+        agentId: filterAgentId,
       })
       return {
         threads: result.threads,
@@ -112,8 +140,11 @@ export default function CloudTalkPage() {
     threadsQuery.isPending && threads.length === 0 && search.trim().length === 0
 
   const handleSelect = useCallback(
-    (phone: string) => navigate(`${cloudtalkBase}/thread/${phone}`),
-    [navigate, cloudtalkBase],
+    (phone: string) => {
+      const qs = searchParams.toString()
+      navigate(`${cloudtalkBase}/thread/${phone}${qs ? `?${qs}` : ''}`)
+    },
+    [navigate, cloudtalkBase, searchParams],
   )
 
   const handleStartConversation = useCallback(
@@ -166,6 +197,9 @@ export default function CloudTalkPage() {
           onSelect={handleSelect}
           onLoadMore={handleLoadMore}
           readOnly={data.readOnly}
+          salesReps={data.readOnly ? data.salesReps : undefined}
+          selectedRep={selectedRep}
+          onRepChange={data.readOnly ? handleRepChange : undefined}
           onNewConversation={
             data.readOnly ? undefined : () => setNewConversationOpen(true)
           }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
+import { OUTBOUND_ECHO_EXCLUSION } from '~/utils/cloudtalkSms.server'
 import { canonicalPhone10, phoneVariants } from '~/utils/phone'
 import { selectMany } from '~/utils/queryHelpers'
 import type { SessionUser } from '~/utils/session.server'
@@ -61,11 +62,20 @@ export interface SmsRowExpanded {
   recipient: string
 }
 
+export type SmsScope = 'mine' | 'all'
+
+export interface SmsSalesRep {
+  agentId: string
+  name: string
+}
+
 export interface ListThreadsParams {
   user: SessionUser
   search: string
   limit: number
   offset: number
+  scope?: SmsScope
+  agentId?: string | null
 }
 
 export interface ListThreadsResult {
@@ -80,6 +90,8 @@ export interface GetThreadParams {
   phoneDigits: string
   limit: number
   beforeId?: string
+  scope?: SmsScope
+  agentId?: string | null
 }
 
 export interface GetThreadResult {
@@ -167,14 +179,56 @@ function userAgentId(user: SessionUser): string | null {
   return agentId.length > 0 ? agentId : null
 }
 
-function agentScopeClause(
-  user: SessionUser,
-  alias: string,
-): { clause: string; params: (string | number)[] } {
-  const agentId = userAgentId(user)
-  if (!agentId) {
-    return { clause: '1 = 0', params: [] }
+export function resolveSmsScope(user: SessionUser, scope?: SmsScope): SmsScope {
+  if (scope === 'all' && (user.is_admin || user.is_superuser)) {
+    return 'all'
   }
+  return 'mine'
+}
+
+export async function resolveFilterAgentId(
+  user: SessionUser,
+  scope: SmsScope,
+  agentIdParam?: string | null,
+): Promise<string | null> {
+  if (scope !== 'all') return null
+  const trimmed = agentIdParam?.trim() ?? ''
+  if (trimmed.length === 0) return null
+  const rows = await selectMany<{ agent_id: string }>(
+    db,
+    `SELECT TRIM(cloudtalk_agent_id) AS agent_id
+       FROM users
+      WHERE company_id = ?
+        AND is_deleted = 0
+        AND TRIM(IFNULL(cloudtalk_agent_id, '')) = ?
+      LIMIT 1`,
+    [user.company_id, trimmed],
+  )
+  return rows[0]?.agent_id ?? null
+}
+
+export async function listCloudtalkSalesReps(
+  companyId: number,
+): Promise<SmsSalesRep[]> {
+  const rows = await selectMany<{ agent_id: string; name: string }>(
+    db,
+    `SELECT TRIM(cloudtalk_agent_id) AS agent_id, MIN(name) AS name
+       FROM users
+      WHERE company_id = ?
+        AND is_deleted = 0
+        AND cloudtalk_agent_id IS NOT NULL
+        AND TRIM(cloudtalk_agent_id) != ''
+      GROUP BY TRIM(cloudtalk_agent_id)
+      ORDER BY name`,
+    [companyId],
+  )
+  return rows.map(row => ({ agentId: row.agent_id, name: row.name }))
+}
+
+function agentIdFilterClause(
+  alias: string,
+  agentId: string,
+): { clause: string; params: (string | number)[] } {
   return {
     clause: `(
       TRIM(IFNULL(${alias}.agent, '')) = ?
@@ -193,6 +247,25 @@ function agentScopeClause(
     )`,
     params: [agentId, agentId],
   }
+}
+
+function agentScopeClause(
+  user: SessionUser,
+  alias: string,
+  scope: SmsScope,
+  filterAgentId: string | null = null,
+): { clause: string; params: (string | number)[] } {
+  if (scope === 'all') {
+    if (filterAgentId) {
+      return agentIdFilterClause(alias, filterAgentId)
+    }
+    return { clause: '1 = 1', params: [] }
+  }
+  const agentId = userAgentId(user)
+  if (!agentId) {
+    return { clause: '1 = 0', params: [] }
+  }
+  return agentIdFilterClause(alias, agentId)
 }
 
 const COMPANY_SENDER_SUBQUERY = `(
@@ -221,20 +294,6 @@ AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci`
 
 const COMPANY_LINE_EXCLUSION = `${CUSTOMER_PHONE_SQL} NOT IN ${COMPANY_SENDER_SUBQUERY}`
 
-const OUTBOUND_ECHO_EXCLUSION = `NOT (
-  s.direction = 'inbound'
-  AND (s.agent IS NULL OR TRIM(s.agent) = '')
-  AND EXISTS (
-    SELECT 1 FROM cloudtalk_sms o
-    WHERE o.company_id = s.company_id
-      AND o.direction = 'outbound'
-      AND o.status = 'sent'
-      AND o.text = s.text
-      AND CAST(o.recipient AS CHAR) = CAST(s.recipient AS CHAR)
-      AND ABS(TIMESTAMPDIFF(SECOND, o.created_date, s.created_date)) <= 300
-  )
-)`
-
 interface TotalCountRow {
   total_count: number
 }
@@ -247,6 +306,8 @@ export async function listThreadsForUser(
   params: ListThreadsParams,
 ): Promise<ListThreadsResult> {
   const { user, search, limit, offset } = params
+  const scope = resolveSmsScope(user, params.scope)
+  const filterAgentId = await resolveFilterAgentId(user, scope, params.agentId)
   await expireStalePendingOutbound(user.company_id)
 
   const searchTrimmed = search.trim()
@@ -264,7 +325,7 @@ export async function listThreadsForUser(
   }
   const searchClause = hasSearch ? ` AND (${searchClauseParts.join(' OR ')})` : ''
 
-  const agentScope = agentScopeClause(user, 's')
+  const agentScope = agentScopeClause(user, 's', scope, filterAgentId)
   const baseWhere = `s.company_id = ?${searchClause} AND ${OUTBOUND_ECHO_EXCLUSION} AND ${COMPANY_LINE_EXCLUSION} AND ${agentScope.clause}`
   const baseParams: (string | number)[] = [
     user.company_id,
@@ -359,7 +420,7 @@ export async function listThreadsForUser(
   )
   const totalCount = totalCountRows[0]?.total_count ?? 0
 
-  const unreadCount = await getUnreadThreadCountForUser(user)
+  const unreadCount = await getUnreadThreadCountForUser(user, scope, filterAgentId)
 
   const threads: ThreadSummaryRow[] = dedupedRows.map(r => {
     const phoneDigits = String(r.phone_digits)
@@ -403,17 +464,24 @@ export async function getThreadForUser(
 ): Promise<GetThreadResult> {
   await expireStalePendingOutbound(params.user.company_id)
   const { user, phoneDigits, limit, beforeId } = params
+  const scope = resolveSmsScope(user, params.scope)
+  const filterAgentId = await resolveFilterAgentId(user, scope, params.agentId)
   const variants = phoneVariants(phoneDigits)
   if (variants.length === 0) {
     return { messages: [], hasOlder: false }
   }
 
-  const hasAccess = await userHasMessagesForPhone(user, phoneDigits)
+  const hasAccess = await userHasMessagesForPhone(
+    user,
+    phoneDigits,
+    scope,
+    filterAgentId,
+  )
   if (!hasAccess) {
     return { messages: [], hasOlder: false }
   }
 
-  const agentScope = agentScopeClause(user, 's')
+  const agentScope = agentScopeClause(user, 's', scope, filterAgentId)
   const placeholders = variants.map(() => '?').join(',')
   const beforeClause = beforeId ? ' AND s.id < ?' : ''
   const sql = `
@@ -476,8 +544,13 @@ export async function markThreadReadForUser(
   )
 }
 
-export async function getUnreadThreadCountForUser(user: SessionUser): Promise<number> {
-  const agentScope = agentScopeClause(user, 's')
+export async function getUnreadThreadCountForUser(
+  user: SessionUser,
+  scopeParam?: SmsScope,
+  filterAgentId: string | null = null,
+): Promise<number> {
+  const scope = resolveSmsScope(user, scopeParam)
+  const agentScope = agentScopeClause(user, 's', scope, filterAgentId)
   const sql = `
     SELECT COUNT(DISTINCT ${CUSTOMER_PHONE_SQL}) AS unread_count
       FROM cloudtalk_sms s
@@ -506,12 +579,16 @@ export async function getUnreadThreadCountForUser(user: SessionUser): Promise<nu
 export async function getThreadUnreadCountForUser(
   user: SessionUser,
   phoneDigits: string,
+  scopeParam?: SmsScope,
+  agentIdParam?: string | null,
 ): Promise<number> {
+  const scope = resolveSmsScope(user, scopeParam)
+  const filterAgentId = await resolveFilterAgentId(user, scope, agentIdParam)
   const digits = canonicalPhone10(phoneDigits)
   if (digits.length === 0) return 0
   const variants = phoneVariants(digits)
   const placeholders = variants.map(() => '?').join(',')
-  const agentScope = agentScopeClause(user, 's')
+  const agentScope = agentScopeClause(user, 's', scope, filterAgentId)
   const rows = await selectMany<UnreadCountRow>(
     db,
     `SELECT COUNT(*) AS unread_count
@@ -623,10 +700,13 @@ export async function finalizeOutboundSms(
 export async function userHasMessagesForPhone(
   user: SessionUser,
   phoneDigits: string,
+  scopeParam?: SmsScope,
+  filterAgentId: string | null = null,
 ): Promise<boolean> {
+  const scope = resolveSmsScope(user, scopeParam)
   const variants = phoneVariants(phoneDigits)
   if (variants.length === 0) return false
-  const agentScope = agentScopeClause(user, 's')
+  const agentScope = agentScopeClause(user, 's', scope, filterAgentId)
   const placeholders = variants.map(() => '?').join(',')
   const rows = await selectMany<{ found: number }>(
     db,

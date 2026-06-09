@@ -11,6 +11,7 @@ export interface FetchThreadsParams {
   search: string
   limit: number
   offset: number
+  agentId?: string
 }
 
 export interface FetchThreadsResult {
@@ -27,7 +28,9 @@ export async function fetchThreads(
     search: params.search,
     limit: String(params.limit),
     offset: String(params.offset),
+    scope: params.scope,
   })
+  if (params.agentId) qs.set('agentId', params.agentId)
   const res = await fetch(`/api/cloudtalk/sms/threads?${qs}`, {
     credentials: 'include',
     headers: { Accept: 'application/json' },
@@ -46,10 +49,14 @@ export async function fetchThread(params: {
   phoneDigits: string
   limit?: number
   beforeId?: string
+  scope?: FetchThreadsParams['scope']
+  agentId?: string
 }): Promise<FetchThreadResult> {
   const qs = new URLSearchParams()
   if (params.limit !== undefined) qs.set('limit', String(params.limit))
   if (params.beforeId !== undefined) qs.set('beforeId', params.beforeId)
+  if (params.scope !== undefined) qs.set('scope', params.scope)
+  if (params.agentId) qs.set('agentId', params.agentId)
   const url = qs.toString()
     ? `/api/cloudtalk/sms/thread/${params.phoneDigits}?${qs}`
     : `/api/cloudtalk/sms/thread/${params.phoneDigits}`
