@@ -1036,30 +1036,48 @@ function renderInlineContent(text: string, keyPrefix: string) {
   })
 }
 
+type MessageListItem = {
+  key: string
+  content: string
+  nestedBullets: string[]
+}
+
 function renderMessageContent(content: string) {
   const lines = content.split('\n')
   const elements: React.ReactNode[] = []
-  let listItems: React.ReactNode[] = []
+  let listItems: MessageListItem[] = []
   let listType: 'ul' | 'ol' | null = null
+
+  const renderListItem = (item: MessageListItem) => (
+    <li key={item.key}>
+      {renderInlineContent(item.content, item.key)}
+      {item.nestedBullets.length > 0 ? (
+        <ul className='my-1 list-disc space-y-1 pl-5'>
+          {item.nestedBullets.map((bullet, index) => (
+            <li key={`${item.key}-nested-${index}`}>
+              {renderInlineContent(bullet, `${item.key}-nested-${index}`)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  )
 
   const flushList = () => {
     if (listItems.length === 0 || !listType) return
     if (listType === 'ul') {
       elements.push(
-        <ul
-          key={`list-${elements.length}`}
-          className='list-disc pl-5 my-1 flex flex-col gap-1'
-        >
-          {listItems}
+        <ul key={`list-${elements.length}`} className='my-1 list-disc space-y-1 pl-5'>
+          {listItems.map(renderListItem)}
         </ul>,
       )
     } else {
       elements.push(
         <ol
           key={`list-${elements.length}`}
-          className='list-decimal pl-5 my-1 flex flex-col gap-1'
+          className='my-1 list-decimal space-y-1 pl-5'
         >
-          {listItems}
+          {listItems.map(renderListItem)}
         </ol>,
       )
     }
@@ -1072,6 +1090,7 @@ function renderMessageContent(content: string) {
     const trimmed = line.trim()
 
     if (trimmed === '') {
+      if (listType) continue
       flushList()
       elements.push(<div key={`spacer-${lineIndex}`} className='h-2' />)
       continue
@@ -1081,15 +1100,19 @@ function renderMessageContent(content: string) {
     const numberedMatch = trimmed.match(/^\d+\.\s+(.+)$/)
 
     if (bulletMatch) {
+      if (listType === 'ol' && listItems.length > 0) {
+        listItems[listItems.length - 1].nestedBullets.push(bulletMatch[1])
+        continue
+      }
       if (listType !== 'ul') {
         flushList()
         listType = 'ul'
       }
-      listItems.push(
-        <li key={`li-${lineIndex}`}>
-          {renderInlineContent(bulletMatch[1], `line-${lineIndex}`)}
-        </li>,
-      )
+      listItems.push({
+        key: `li-${lineIndex}`,
+        content: bulletMatch[1],
+        nestedBullets: [],
+      })
       continue
     }
 
@@ -1098,11 +1121,11 @@ function renderMessageContent(content: string) {
         flushList()
         listType = 'ol'
       }
-      listItems.push(
-        <li key={`li-${lineIndex}`}>
-          {renderInlineContent(numberedMatch[1], `line-${lineIndex}`)}
-        </li>,
-      )
+      listItems.push({
+        key: `li-${lineIndex}`,
+        content: numberedMatch[1],
+        nestedBullets: [],
+      })
       continue
     }
 
