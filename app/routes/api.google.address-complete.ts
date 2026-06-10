@@ -46,6 +46,57 @@ function mapAutocompleteResponse(body: unknown): FinalSuggestion[] {
   return results
 }
 
+async function fetchPlacePostalCode(
+  placeId: string,
+  signal: AbortSignal,
+): Promise<string | null> {
+  const gRes = await fetch(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+    {
+      method: 'GET',
+      signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_KEY,
+        'X-Goog-FieldMask': 'addressComponents',
+      },
+    },
+  )
+  if (!gRes.ok) return null
+
+  const gJson: unknown = await gRes.json()
+  if (!isRecord(gJson)) return null
+
+  const components = gJson.addressComponents
+  if (!Array.isArray(components)) return null
+
+  for (const component of components) {
+    if (!isRecord(component)) continue
+    const types = component.types
+    if (!Array.isArray(types) || !types.includes('postal_code')) continue
+    return getString(component.longText) ?? getString(component.shortText) ?? null
+  }
+
+  return null
+}
+
+async function enrichWithPostalCodes(
+  results: FinalSuggestion[],
+  signal: AbortSignal,
+): Promise<FinalSuggestion[]> {
+  return Promise.all(
+    results.map(async result => {
+      if (result.address.zip) return result
+      const zip = await fetchPlacePostalCode(result.place_id, signal)
+      if (!zip) return result
+      return {
+        ...result,
+        address: { ...result.address, zip },
+      }
+    }),
+  )
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const searchParams = new URL(request.url).searchParams
   const q = searchParams.get('q')?.trim()
@@ -74,5 +125,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const gJson: unknown = await gRes.json()
-  return mapAutocompleteResponse(gJson)
+  const results = mapAutocompleteResponse(gJson)
+  return enrichWithPostalCodes(results, request.signal)
 }
