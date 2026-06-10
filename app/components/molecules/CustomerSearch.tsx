@@ -67,6 +67,21 @@ async function fetchCustomerById(customerId: number): Promise<Customer | null> {
   return json.customer
 }
 
+function customerSuggestionDetails(customer: Customer) {
+  const email = customer.email?.trim() ?? ''
+  const phone = customer.phone?.trim() ?? ''
+  const company = customer.company_name?.trim() ?? ''
+  const address = customer.address?.trim() ?? ''
+  return {
+    emailLine: email || 'no email',
+    phoneLine: phone || 'no phone number',
+    hasEmail: email.length > 0,
+    hasPhone: phone.length > 0,
+    company,
+    address,
+  }
+}
+
 const getOldData = (
   currentCustomer: Customer | undefined | null,
   selectedCustomer: number | undefined,
@@ -314,25 +329,55 @@ export function CustomerSearch({
         />
         {error && <CustomerSearchError error={error} className='text-red-500' />}
         {isListOpen && customerSuggestions.length > 0 && (
-          <Command className='z-60 top-full mt-1 w-full h-auto border rounded-md bg-white shadow-md absolute'>
+          <Command
+            shouldFilter={false}
+            className='z-60 top-full mt-1 w-full h-auto border rounded-md bg-white shadow-md absolute'
+          >
             <CommandList className='max-h-80'>
               <CommandGroup heading={isFetching ? 'Searching…' : 'Suggestions'}>
-                {customerSuggestions.map(c => (
-                  <CommandItem
-                    key={c.id}
-                    onSelect={() => {
-                      setIsListOpen(false)
-                      handleFinal(c.id)
-                    }}
-                  >
-                    <div className='flex flex-col'>
-                      <span>{c.name}</span>
-                      {c.address ? (
-                        <span className='text-xs text-gray-500'>{c.address}</span>
-                      ) : null}
-                    </div>
-                  </CommandItem>
-                ))}
+                {customerSuggestions.map(c => {
+                  const details = customerSuggestionDetails(c)
+                  return (
+                    <CommandItem
+                      key={c.id}
+                      value={String(c.id)}
+                      onSelect={() => {
+                        setIsListOpen(false)
+                        handleFinal(c.id)
+                      }}
+                    >
+                      <div className='flex min-w-0 flex-col gap-0.5 py-0.5'>
+                        <span className='font-medium text-gray-900'>{c.name}</span>
+                        <span
+                          className={cn(
+                            'text-xs',
+                            details.hasEmail ? 'text-gray-500' : 'text-gray-400',
+                          )}
+                        >
+                          {details.emailLine}
+                        </span>
+                        <span
+                          className={cn(
+                            'text-xs',
+                            details.hasPhone ? 'text-gray-500' : 'text-gray-400',
+                          )}
+                        >
+                          {details.phoneLine}
+                        </span>
+                        {details.company ? (
+                          <span className='text-xs text-gray-500'>
+                            {details.company}
+                          </span>
+                        ) : null}
+                        {details.address ? (
+                          <span className='text-xs text-gray-500'>
+                            {details.address}
+                          </span>
+                        ) : null}
+                      </div>
+                    </CommandItem>
+                  )
+                })}
               </CommandGroup>
             </CommandList>
           </Command>

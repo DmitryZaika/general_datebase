@@ -5,6 +5,7 @@ import { db } from '~/db.server'
 import { MYSQL_LOCAL_DATETIME_FORMAT } from '~/lib/dateHelpers'
 import {
   notifyDealAssignee,
+  removeActivityDeadlineReminder,
   scheduleActivityDeadlineReminder,
 } from '~/lib/dealNotification.server'
 import {
@@ -249,9 +250,9 @@ async function handleUpdate(
   if (!parsed.ok) return badRequest(parsed.error)
   const { name, rawDeadline, deadlineValue, priority } = parsed.value
 
-  const rows = await selectMany<{ id: number; name: string }>(
+  const rows = await selectMany<{ id: number; name: string; is_completed: number }>(
     db,
-    'SELECT id, name FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
+    'SELECT id, name, is_completed FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
     [Number(activityId), dealId, companyId],
   )
 
@@ -260,6 +261,7 @@ async function handleUpdate(
   }
 
   const oldName = rows[0].name
+  const isCompleted = rows[0].is_completed === 1
 
   await db.execute(
     `UPDATE deal_activities SET name = ?, deadline = ?, priority = ? WHERE id = ? AND deal_id = ? AND company_id = ?`,
@@ -275,7 +277,7 @@ async function handleUpdate(
     dealId,
     userId,
     name,
-    deadlineForReminder(rawDeadline),
+    isCompleted ? null : deadlineForReminder(rawDeadline),
     oldName,
   )
 
@@ -314,12 +316,7 @@ async function handleToggle(
   )
 
   if (newStatus) {
-    await db.execute(
-      `DELETE FROM notifications
-       WHERE deal_id = ? AND notification_type = 'activity_deadline_reminder'
-         AND message = ? AND is_done = 0`,
-      [dealId, rows[0].name.slice(0, 255)],
-    )
+    await removeActivityDeadlineReminder(db, dealId, rows[0].name)
   }
 
   return success()
@@ -353,12 +350,7 @@ async function handleDelete(
     [Number(activityId), dealId, companyId],
   )
 
-  await db.execute(
-    `DELETE FROM notifications
-     WHERE deal_id = ? AND notification_type = 'activity_deadline_reminder'
-       AND message = ? AND is_done = 0`,
-    [dealId, rows[0].name.slice(0, 255)],
-  )
+  await removeActivityDeadlineReminder(db, dealId, rows[0].name)
 
   if (createdBy) {
     await notifyDealAssignee(

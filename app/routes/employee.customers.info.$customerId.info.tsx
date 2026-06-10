@@ -222,7 +222,7 @@ export default function CustomerInfoTab() {
       </div>
 
       <div className='border rounded p-4'>
-        <div className='text-md font-semibold mb-2'>Activity</div>
+        <div className='text-md font-semibold mb-1'>Activity</div>
         <DealActivityPanel
           dealId={0}
           activities={dealActivities}

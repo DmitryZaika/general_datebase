@@ -63,15 +63,12 @@ export function getCallIcon(call: CallEntry): CallIconInfo {
 
 export function getCallStatus(call: CallEntry): Nullable<string> {
   if (call.isVoicemail) return 'Voicemail'
-  if (call.type === 'incoming' && call.talkingTime === 0) return 'Missed'
   if (call.type === 'outgoing' && call.talkingTime === 0) return 'No answer'
   return null
 }
 
 export function getStatusColor(status: string): string {
   switch (status) {
-    case 'Missed':
-      return 'text-red-500'
     case 'Voicemail':
       return 'text-amber-500'
     default:

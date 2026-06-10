@@ -118,6 +118,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
          WHEN n.notification_type = 'activity_deadline_reminder' THEN n.due_at <= UTC_TIMESTAMP()
          ELSE n.due_at <= NOW()
        END
+       AND (
+         n.notification_type != 'activity_deadline_reminder'
+         OR EXISTS (
+           SELECT 1 FROM deal_activities da
+           WHERE da.deal_id = n.deal_id
+             AND da.deleted_at IS NULL
+             AND da.is_completed = 0
+             AND LEFT(da.name, 255) = n.message
+         )
+       )
      ORDER BY n.created_at DESC
      LIMIT 50`,
     [user.id],

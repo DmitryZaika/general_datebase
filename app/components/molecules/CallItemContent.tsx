@@ -38,10 +38,11 @@ export function CallItemContent({
   const [showRecording, setShowRecording] = useState(false)
   const { Icon, color } = getCallIcon(call)
   const status = getCallStatus(call)
+  const detail =
+    status ?? (call.talkingTime > 0 ? formatDuration(call.talkingTime) : null)
 
   if (historyCompact) {
     const startedLabel = formatTimestamp(call.startedAt)
-    const detail = status ?? formatDuration(call.talkingTime)
 
     return (
       <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
@@ -62,14 +63,16 @@ export function CallItemContent({
                 <span className='min-w-0 truncate text-xs text-gray-500'>
                   Agent: {call.agentName}
                 </span>
-                <span
-                  className={cn(
-                    'text-[10px] shrink-0',
-                    status ? getStatusColor(status) : 'text-gray-500',
-                  )}
-                >
-                  {detail}
-                </span>
+                {detail ? (
+                  <span
+                    className={cn(
+                      'text-[10px] shrink-0',
+                      status ? getStatusColor(status) : 'text-gray-500',
+                    )}
+                  >
+                    {detail}
+                  </span>
+                ) : null}
               </div>
               <div className='flex shrink-0 items-center gap-2'>
                 <div className='flex items-center gap-1'>
@@ -102,14 +105,16 @@ export function CallItemContent({
               <span className='min-w-0 truncate text-xs text-gray-500'>
                 Agent: {call.agentName}
               </span>
-              <span
-                className={cn(
-                  'text-[10px] shrink-0',
-                  status ? getStatusColor(status) : 'text-gray-500',
-                )}
-              >
-                {detail}
-              </span>
+              {detail ? (
+                <span
+                  className={cn(
+                    'text-[10px] shrink-0',
+                    status ? getStatusColor(status) : 'text-gray-500',
+                  )}
+                >
+                  {detail}
+                </span>
+              ) : null}
             </div>
             <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
               {startedLabel}
@@ -148,11 +153,11 @@ export function CallItemContent({
             >
               {status}
             </span>
-          ) : (
+          ) : call.talkingTime > 0 ? (
             <span className={cn('text-slate-500', compact ? 'text-[10px]' : 'text-xs')}>
               {formatDuration(call.talkingTime)}
             </span>
-          )}
+          ) : null}
         </div>
 
         <div
