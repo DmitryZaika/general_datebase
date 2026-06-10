@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip
 
 type AiImproveButtonProps = {
   id?: string
+  channel?: 'email' | 'sms'
   getText: () => string
   setText: (value: string) => void
   className?: string
@@ -14,6 +15,7 @@ type AiImproveButtonProps = {
 
 export function AiImproveButton({
   id,
+  channel = 'email',
   getText,
   setText,
   className,
@@ -34,7 +36,7 @@ export function AiImproveButton({
       const response = await fetch('/api/aiImprove/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({ body, channel }),
       })
 
       if (!response.ok) {
@@ -44,7 +46,9 @@ export function AiImproveButton({
 
       const json: { body?: string } = await response.json()
       if (json.body?.trim()) {
-        setText(json.body.trim())
+        const improved =
+          channel === 'sms' ? json.body.replace(/\s+/g, ' ').trim() : json.body.trim()
+        setText(improved)
       }
     } catch (error) {
       alert(

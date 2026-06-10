@@ -40,6 +40,10 @@ import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
 import { CallItemContent } from '~/components/molecules/CallItemContent'
 import {
+  IosTimePicker,
+  isNestedSelectTarget,
+} from '~/components/molecules/IosTimePicker'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -72,6 +76,7 @@ import {
   formatDeadlineLabel,
   formatPickerDeadline,
   formatTimestamp,
+  isDateOnlyDeadline,
   localCalendarDate,
 } from '~/lib/dateHelpers'
 import { buildActivityApiAction } from '~/lib/dealApiHelpers'
@@ -219,6 +224,7 @@ const partitionActivities = (
 interface FormState {
   name: string
   deadline: Date | undefined
+  deadlineHasTime: boolean
   priority: ActivityPriority
 }
 
@@ -226,6 +232,7 @@ type FormAction =
   | { type: 'SET_NAME'; payload: string }
   | { type: 'SET_DEADLINE_DATE'; payload: Date | undefined }
   | { type: 'SET_DEADLINE_TIME'; payload: { hours: number; minutes: number } }
+  | { type: 'CLEAR_DEADLINE_TIME' }
   | { type: 'SET_PRIORITY'; payload: ActivityPriority }
   | { type: 'SET_EDIT'; payload: DealActivity }
   | { type: 'RESET' }
@@ -233,6 +240,7 @@ type FormAction =
 const INITIAL_FORM_STATE: FormState = {
   name: '',
   deadline: undefined,
+  deadlineHasTime: false,
   priority: ActivityPriority.Medium,
 }
 
@@ -260,18 +268,32 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     case 'SET_NAME':
       return { ...state, name: action.payload }
     case 'SET_DEADLINE_DATE': {
-      if (!action.payload) return { ...state, deadline: undefined }
-      const next = new Date(action.payload)
-      if (state.deadline) {
-        next.setHours(state.deadline.getHours(), state.deadline.getMinutes())
+      if (!action.payload) {
+        return { ...state, deadline: undefined, deadlineHasTime: false }
       }
-      return { ...state, deadline: next }
+      const next = new Date(action.payload)
+      if (state.deadline && state.deadlineHasTime) {
+        next.setHours(state.deadline.getHours(), state.deadline.getMinutes())
+        return { ...state, deadline: next, deadlineHasTime: true }
+      }
+      if (state.deadline && !state.deadlineHasTime) {
+        next.setHours(0, 0, 0, 0)
+        return { ...state, deadline: next, deadlineHasTime: false }
+      }
+      next.setHours(9, 0, 0, 0)
+      return { ...state, deadline: next, deadlineHasTime: true }
     }
     case 'SET_DEADLINE_TIME': {
       if (!state.deadline) return state
       const updated = new Date(state.deadline)
       updated.setHours(action.payload.hours, action.payload.minutes)
-      return { ...state, deadline: updated }
+      return { ...state, deadline: updated, deadlineHasTime: true }
+    }
+    case 'CLEAR_DEADLINE_TIME': {
+      if (!state.deadline) return { ...state, deadlineHasTime: false }
+      const updated = new Date(state.deadline)
+      updated.setHours(0, 0, 0, 0)
+      return { ...state, deadline: updated, deadlineHasTime: false }
     }
     case 'SET_PRIORITY':
       return { ...state, priority: action.payload }
@@ -282,6 +304,9 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
       return {
         name: action.payload.name,
         deadline: d,
+        deadlineHasTime: action.payload.deadline
+          ? !isDateOnlyDeadline(action.payload.deadline)
+          : false,
         priority: action.payload.priority,
       }
     }
@@ -306,7 +331,7 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
     const formData = new FormData()
     formData.set('intent', isEditing ? 'update' : 'create')
     formData.set('name', form.name.trim())
-    formData.set('deadline', buildDeadlinePayload(form.deadline))
+    formData.set('deadline', buildDeadlinePayload(form.deadline, form.deadlineHasTime))
     formData.set('priority', form.priority)
     formData.set('csrf', token)
 
@@ -871,124 +896,50 @@ function ActivityItem({
   )
 }
 
-const HOURS_12 = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i))
-const MINUTES_5 = Array.from({ length: 12 }, (_, i) => i * 5)
-
-function to12Hour(h24: number): { hour: number; period: 'AM' | 'PM' } {
-  const period = h24 >= 12 ? ('PM' as const) : ('AM' as const)
-  const hour = h24 % 12 || 12
-  return { hour, period }
-}
-
-function to24Hour(hour: number, period: 'AM' | 'PM'): number {
-  if (period === 'AM') return hour === 12 ? 0 : hour
-  return hour === 12 ? 12 : hour + 12
-}
-
 function DeadlineControls({
   deadline,
+  hasTime,
   onTimeChange,
+  onEnableTime,
   onClearTime,
   onClearDate,
 }: {
   deadline: Date | undefined
+  hasTime: boolean
   onTimeChange: (hours: number, minutes: number) => void
+  onEnableTime: () => void
   onClearTime: () => void
   onClearDate: () => void
 }) {
   if (!deadline) return null
 
-  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0
-  const current = to12Hour(deadline.getHours())
-  const currentMin = deadline.getMinutes()
-  // Preserve any non-5-min value from the saved deadline as an extra option
-  // so it shows as the selected item without silently rounding.
-  const minuteOptions = MINUTES_5.includes(currentMin)
-    ? MINUTES_5
-    : [...MINUTES_5, currentMin].sort((a, b) => a - b)
-
-  const handleHour = (val: string) => {
-    const h24 = to24Hour(Number(val), current.period)
-    onTimeChange(h24, currentMin)
-  }
-
-  const handleMinute = (val: string) => {
-    const h24 = to24Hour(current.hour, current.period)
-    onTimeChange(h24, Number(val))
-  }
-
-  const handlePeriod = (val: string) => {
-    const h24 = to24Hour(current.hour, val as 'AM' | 'PM')
-    onTimeChange(h24, currentMin)
-  }
-
   return (
-    <div className='px-3 pb-3 border-t pt-2 space-y-2'>
+    <div className='space-y-2 border-t px-2 pb-3 pt-2'>
       {hasTime ? (
-        <div className='flex items-center gap-1.5'>
-          <Clock className='h-3.5 w-3.5 text-gray-600 shrink-0' />
-          <Select value={String(current.hour)} onValueChange={handleHour}>
-            <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {HOURS_12.map(h => (
-                <SelectItem key={h} value={String(h)}>
-                  {h}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className='text-sm font-medium text-gray-500'>:</span>
-          <Select value={String(currentMin)} onValueChange={handleMinute}>
-            <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {minuteOptions.map(m => (
-                <SelectItem key={m} value={String(m)}>
-                  {String(m).padStart(2, '0')}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={current.period} onValueChange={handlePeriod}>
-            <SelectTrigger className='w-[62px] h-7 text-sm px-2'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='AM'>AM</SelectItem>
-              <SelectItem value='PM'>PM</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant='ghost'
-            size='icon'
-            type='button'
-            className='h-7 w-7 shrink-0 text-gray-400 hover:text-red-500'
-            onClick={onClearTime}
-          >
-            <X className='h-3.5 w-3.5' />
-          </Button>
-        </div>
+        <IosTimePicker
+          hours24={deadline.getHours()}
+          minutes={deadline.getMinutes()}
+          onChange={onTimeChange}
+          onClear={onClearTime}
+        />
       ) : (
         <Button
-          variant='ghost'
+          variant='outline'
           type='button'
-          className='h-7 text-xs text-gray-500 hover:text-gray-700 px-2'
-          onClick={() => onTimeChange(9, 0)}
+          className='h-8 w-full text-xs text-zinc-600'
+          onClick={onEnableTime}
         >
-          <Clock className='h-3 w-3 mr-1.5' />
+          <Clock className='mr-1.5 h-3.5 w-3.5' />
           Add time
         </Button>
       )}
       <Button
         variant='ghost'
         type='button'
-        className='h-6 text-xs text-red-400 hover:text-red-600 px-2 w-full'
+        className='h-6 w-full px-2 text-xs text-red-400 hover:text-red-600'
         onClick={onClearDate}
       >
-        <X className='h-3 w-3 mr-1' />
+        <X className='mr-1 h-3 w-3' />
         Clear deadline
       </Button>
     </div>
@@ -1084,6 +1035,7 @@ function ActivityForm({
 
       <div className='flex gap-2'>
         <Popover
+          modal={false}
           open={deadlineOpen}
           onOpenChange={open => {
             setDeadlineOpen(open)
@@ -1101,11 +1053,22 @@ function ActivityForm({
             >
               <CalendarIcon className='mr-1.5 h-3.5 w-3.5 shrink-0' />
               <span className='truncate'>
-                {form.deadline ? formatPickerDeadline(form.deadline) : 'Deadline'}
+                {form.deadline
+                  ? formatPickerDeadline(form.deadline, form.deadlineHasTime)
+                  : 'Deadline'}
               </span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className='w-auto p-0' align='start'>
+          <PopoverContent
+            className='w-auto p-0'
+            align='start'
+            onInteractOutside={event => {
+              if (isNestedSelectTarget(event.target)) event.preventDefault()
+            }}
+            onPointerDownOutside={event => {
+              if (isNestedSelectTarget(event.target)) event.preventDefault()
+            }}
+          >
             <Calendar
               key={deadlineCalendarKey}
               mode='single'
@@ -1115,15 +1078,17 @@ function ActivityForm({
             />
             <DeadlineControls
               deadline={form.deadline}
+              hasTime={form.deadlineHasTime}
               onTimeChange={(hours, minutes) =>
                 dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours, minutes } })
               }
-              onClearTime={() =>
+              onEnableTime={() =>
                 dispatch({
                   type: 'SET_DEADLINE_TIME',
-                  payload: { hours: 0, minutes: 0 },
+                  payload: { hours: 9, minutes: 0 },
                 })
               }
+              onClearTime={() => dispatch({ type: 'CLEAR_DEADLINE_TIME' })}
               onClearDate={() => {
                 dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
                 setDeadlineCalendarKey(k => k + 1)

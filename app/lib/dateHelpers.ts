@@ -83,15 +83,15 @@ export const formatDeadlineLabel = (iso: string): DeadlineLabel => {
   }
 }
 
-export const formatPickerDeadline = (date: Date): string => {
-  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
+export const formatPickerDeadline = (date: Date, hasTime = false): string => {
   return hasTime ? format(date, 'MMM d, yyyy h:mm a') : format(date, 'MMM d, yyyy')
 }
 
-// Build the deadline form payload. Timed → ISO UTC; date-only → "YYYY-MM-DD".
-// The server's toMySQLDatetime accepts both shapes.
-export const buildDeadlinePayload = (deadline: Date | undefined): string => {
+export const buildDeadlinePayload = (
+  deadline: Date | undefined,
+  hasTime = false,
+): string => {
   if (!deadline) return ''
-  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0
-  return hasTime ? deadline.toISOString() : format(deadline, 'yyyy-MM-dd')
+  if (!hasTime) return format(deadline, 'yyyy-MM-dd')
+  return format(deadline, 'yyyy-MM-dd HH:mm:ss')
 }

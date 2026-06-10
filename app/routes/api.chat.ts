@@ -171,14 +171,15 @@ const PRICE_LIST_RULES = `How to use this context:
 1. You are in Price lists mode. Use ONLY the supplier documents below.
 2. These documents come from supplier files on the Suppliers page. They may be PDFs or images.
 3. Only state a dollar price if an exact price appears in the documents. Never calculate, estimate, or invent a price.
-4. Many supplier documents show color groups or levels instead of prices. When one SOURCE from a supplier lists the product with a group or level and size but no dollar amount, check every other SOURCE from that same supplier for the actual price before answering.
-5. Only if no SOURCE from that supplier contains a dollar price should you say the price is not specified and state the level or group and size. Example: "The price is not specified. The level is Group 7. The size is 126x63."
-6. When citing a dollar price, use the SOURCE that contains the price, not the color group document.
-7. If the requested color name is close but not exact (for example the user asks for "Adonia" and the document lists "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say clearly that the name was not an exact match, give the exact product name from the document, then state the price and slab size. Example: "There is no exact match for "Adonia", but Calacatta Adonia is listed at $21.47 per sqft for a 130×79 slab."
-8. Only say you could not find the product when there is no reasonable close match in the documents from that supplier.
-9. Be brief and direct. Do not guess or use outside knowledge.
-10. Each document is labeled with a SOURCE number. After your answer, add a final line containing ONLY the marker in the exact form [[SOURCE:n]] or [[SOURCE:n,m]] when multiple documents were used (use a colon, no spaces), where n is the SOURCE number of the document you used. If you could not find the product, use [[SOURCE:none]]. Never describe or mention this marker in your prose.
-11. Whenever you state an exact dollar price AND a slab size in inches (whether per sqft, per slab, or other wording), do NOT ask about special orders in your prose. Always add the marker [[SPECIAL_ORDER:price=X,length=Y,width=Z]] on its own line at the end, where X is the price per sqft (convert from slab price if the document lists per slab), Y is length in inches, Z is width in inches. The app adds the special order question automatically. Never describe or mention this marker in your prose.`
+4. Some supplier tables list many products in a Group N block with no price on each row, and one price at the bottom of that block. That bottom price is the Group N price for every product listed above it in the same block unless a row shows its own price. When a GROUP N SLAB PRICE line appears in the context, use it for products in that group.
+5. Many supplier documents show color groups or levels instead of prices. When one SOURCE from a supplier lists the product with a group or level and size but no dollar amount on its row, check the GROUP price line and every other SOURCE from that same supplier before answering.
+6. Only if no SOURCE from that supplier contains a dollar price should you say the price is not specified and state the level or group and size. Example: "The price is not specified. The level is Group 7. The size is 126x63."
+7. When citing a dollar price, use the SOURCE that contains the price, not the color group document.
+8. If the requested color name is close but not exact (for example the user asks for "Adonia" and the document lists "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say clearly that the name was not an exact match, give the exact product name from the document, then state the price and slab size. Example: "There is no exact match for "Adonia", but Calacatta Adonia is listed at $21.47 per sqft for a 130×79 slab."
+9. Only say you could not find the product when there is no reasonable close match in the documents from that supplier.
+10. Be brief and direct. Do not guess or use outside knowledge.
+11. Each document is labeled with a SOURCE number. After your answer, add a final line containing ONLY the marker in the exact form [[SOURCE:n]] or [[SOURCE:n,m]] when multiple documents were used (use a colon, no spaces), where n is the SOURCE number of the document you used. If you could not find the product, use [[SOURCE:none]]. Never describe or mention this marker in your prose.
+12. Whenever you state an exact dollar price AND a slab size in inches (whether per sqft, per slab, or other wording), do NOT ask about special orders in your prose. Always add the marker [[SPECIAL_ORDER:price=X,length=Y,width=Z]] on its own line at the end, where X is the price per sqft (convert from slab price if the document lists per slab), Y is length in inches, Z is width in inches. The app adds the special order question automatically. Never describe or mention this marker in your prose.`
 
 async function getCompanyTaxRate(companyId: number): Promise<number> {
   const rows = await selectMany<{ state_taxes: number | string | null }>(
@@ -452,14 +453,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             }
 
             messages = result.messages
-            const historyBeforeQuery = result.messages.slice(0, -1)
-            if (
-              shouldRebuildPriceListContext(
-                historyBeforeQuery,
-                query,
-                specialOrderOffer,
-              )
-            ) {
+            if (shouldRebuildPriceListContext(query, specialOrderOffer)) {
               const priceListData = await buildSupplierPriceListContext(
                 companyId,
                 query,
@@ -496,14 +490,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             messages = result.messages
             chatHistoryId = result.id
             if (mode === 'priceLists') {
-              const historyBeforeQuery = result.messages.slice(0, -1)
-              if (
-                shouldRebuildPriceListContext(
-                  historyBeforeQuery,
-                  query,
-                  specialOrderOffer,
-                )
-              ) {
+              if (shouldRebuildPriceListContext(query, specialOrderOffer)) {
                 const priceListData = await buildSupplierPriceListContext(
                   companyId,
                   query,

@@ -303,13 +303,10 @@ export function isPriceListFollowUp(query: string): boolean {
 }
 
 export function shouldRebuildPriceListContext(
-  historyBeforeQuery: ChatHistoryMessage[],
   query: string,
   specialOrderOffer: SpecialOrderOffer | null,
 ): boolean {
   if (specialOrderOffer) return false
-  if (!hasExistingPriceListContext(historyBeforeQuery)) return true
   if (isPriceListFollowUp(query)) return false
-  if (looksLikeNewPriceQuery(query)) return true
-  return false
+  return true
 }

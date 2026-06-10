@@ -159,6 +159,7 @@ export function SmsComposer(props: SmsComposerProps) {
         />
         <SmsEmojiPicker onPick={handleEmojiPick} />
         <AiImproveButton
+          channel='sms'
           getText={() => text}
           setText={value => {
             setText(value)

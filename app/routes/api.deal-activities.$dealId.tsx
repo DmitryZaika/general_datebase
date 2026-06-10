@@ -53,15 +53,23 @@ function toMySQLDatetime(dateString: string): Nullable<string> {
     return `${y}-${mo}-${d} 00:00:00`
   }
 
-  const parsed = new Date(dateString)
-  if (!Number.isNaN(parsed.getTime()) && dateString.includes('T')) {
-    return `${parsed.getUTCFullYear()}-${pad2(parsed.getUTCMonth() + 1)}-${pad2(parsed.getUTCDate())} ${pad2(parsed.getUTCHours())}:${pad2(parsed.getUTCMinutes())}:${pad2(parsed.getUTCSeconds())}`
+  const spaceFull = dateString.match(
+    /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/,
+  )
+  if (spaceFull) {
+    const [, y, mo, d, h, mi, s] = spaceFull
+    return `${y}-${mo}-${d} ${h}:${mi}:${s}`
   }
 
   const full = dateString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
   if (full) {
     const [, y, mo, d, h, mi, s] = full
     return `${y}-${mo}-${d} ${h}:${mi}:${s}`
+  }
+
+  const parsed = new Date(dateString)
+  if (!Number.isNaN(parsed.getTime()) && dateString.includes('T')) {
+    return `${parsed.getUTCFullYear()}-${pad2(parsed.getUTCMonth() + 1)}-${pad2(parsed.getUTCDate())} ${pad2(parsed.getUTCHours())}:${pad2(parsed.getUTCMinutes())}:${pad2(parsed.getUTCSeconds())}`
   }
 
   return null
