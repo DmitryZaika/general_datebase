@@ -6,6 +6,7 @@ import {
   getDealEmailsWithReads,
 } from '~/crud/emails'
 import { db } from '~/db.server'
+import { MYSQL_LOCAL_DATETIME_FORMAT } from '~/lib/dateHelpers'
 import { fetchNotesWithComments } from '~/lib/noteHelpers.server'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
@@ -119,7 +120,7 @@ export function createDealEditLoader(
         selectMany<DealActivity>(
           db,
           `SELECT id, deal_id, company_id, name,
-                  DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline,
+                  DATE_FORMAT(deadline, '${MYSQL_LOCAL_DATETIME_FORMAT}') AS deadline,
                   priority, is_completed,
                   DATE_FORMAT(completed_at, '%Y-%m-%dT%H:%i:%sZ') AS completed_at,
                   DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,

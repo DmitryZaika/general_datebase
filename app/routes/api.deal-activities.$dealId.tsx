@@ -2,11 +2,11 @@ import type { ResultSetHeader } from 'mysql2'
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { data, redirect } from 'react-router'
 import { db } from '~/db.server'
+import { MYSQL_LOCAL_DATETIME_FORMAT } from '~/lib/dateHelpers'
 import {
   notifyDealAssignee,
   scheduleActivityDeadlineReminder,
 } from '~/lib/dealNotification.server'
-import type { Nullable } from '~/types/utils'
 import {
   badRequest,
   handleAuthError,
@@ -77,7 +77,11 @@ function toMySQLDatetime(dateString: string): Nullable<string> {
 
 function deadlineForReminder(rawDeadline: Nullable<string>): Nullable<string> {
   if (!rawDeadline) return null
-  return rawDeadline.includes('T') ? rawDeadline : null
+  if (rawDeadline.includes('T')) return rawDeadline
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rawDeadline)) {
+    return rawDeadline.replace(' ', 'T')
+  }
+  return null
 }
 
 interface ActivityInput {
@@ -133,7 +137,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const activities = await selectMany<DealActivity>(
       db,
       `SELECT id, deal_id, company_id, name,
-              DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline,
+              DATE_FORMAT(deadline, '${MYSQL_LOCAL_DATETIME_FORMAT}') AS deadline,
               priority, is_completed,
               DATE_FORMAT(completed_at, '%Y-%m-%dT%H:%i:%sZ') AS completed_at,
               DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,

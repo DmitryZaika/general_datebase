@@ -280,8 +280,8 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
         next.setHours(0, 0, 0, 0)
         return { ...state, deadline: next, deadlineHasTime: false }
       }
-      next.setHours(9, 0, 0, 0)
-      return { ...state, deadline: next, deadlineHasTime: true }
+      next.setHours(0, 0, 0, 0)
+      return { ...state, deadline: next, deadlineHasTime: false }
     }
     case 'SET_DEADLINE_TIME': {
       if (!state.deadline) return state
@@ -899,6 +899,7 @@ function ActivityItem({
 function DeadlineControls({
   deadline,
   hasTime,
+  openTimeOnMount,
   onTimeChange,
   onEnableTime,
   onClearTime,
@@ -906,6 +907,7 @@ function DeadlineControls({
 }: {
   deadline: Date | undefined
   hasTime: boolean
+  openTimeOnMount: boolean
   onTimeChange: (hours: number, minutes: number) => void
   onEnableTime: () => void
   onClearTime: () => void
@@ -921,6 +923,7 @@ function DeadlineControls({
           minutes={deadline.getMinutes()}
           onChange={onTimeChange}
           onClear={onClearTime}
+          openTimeOnMount={openTimeOnMount}
         />
       ) : (
         <Button
@@ -963,6 +966,7 @@ function ActivityForm({
   const loadedEditActivityIdRef = useRef<Nullable<number>>(null)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
   const [deadlineCalendarKey, setDeadlineCalendarKey] = useState(0)
+  const [openTimeOnMount, setOpenTimeOnMount] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -975,6 +979,12 @@ function ActivityForm({
     dispatch({ type: 'SET_EDIT', payload: editingActivity })
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [editingActivity])
+
+  useEffect(() => {
+    if (!openTimeOnMount) return
+    const id = window.setTimeout(() => setOpenTimeOnMount(false), 0)
+    return () => window.clearTimeout(id)
+  }, [openTimeOnMount])
 
   const handleCancel = () => {
     dispatch({ type: 'RESET' })
@@ -1062,10 +1072,14 @@ function ActivityForm({
           <PopoverContent
             className='w-auto p-0'
             align='start'
+            onOpenAutoFocus={event => event.preventDefault()}
             onInteractOutside={event => {
               if (isNestedSelectTarget(event.target)) event.preventDefault()
             }}
             onPointerDownOutside={event => {
+              if (isNestedSelectTarget(event.target)) event.preventDefault()
+            }}
+            onFocusOutside={event => {
               if (isNestedSelectTarget(event.target)) event.preventDefault()
             }}
           >
@@ -1079,19 +1093,25 @@ function ActivityForm({
             <DeadlineControls
               deadline={form.deadline}
               hasTime={form.deadlineHasTime}
+              openTimeOnMount={openTimeOnMount}
               onTimeChange={(hours, minutes) =>
                 dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours, minutes } })
               }
-              onEnableTime={() =>
+              onEnableTime={() => {
                 dispatch({
                   type: 'SET_DEADLINE_TIME',
                   payload: { hours: 9, minutes: 0 },
                 })
-              }
-              onClearTime={() => dispatch({ type: 'CLEAR_DEADLINE_TIME' })}
+                setOpenTimeOnMount(true)
+              }}
+              onClearTime={() => {
+                dispatch({ type: 'CLEAR_DEADLINE_TIME' })
+                setOpenTimeOnMount(false)
+              }}
               onClearDate={() => {
                 dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
                 setDeadlineCalendarKey(k => k + 1)
+                setOpenTimeOnMount(false)
                 setDeadlineOpen(false)
               }}
             />

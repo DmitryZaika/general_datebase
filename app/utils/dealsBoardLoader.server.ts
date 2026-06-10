@@ -1,4 +1,5 @@
 import type { Pool } from 'mysql2/promise'
+import { MYSQL_LOCAL_DATETIME_FORMAT } from '~/lib/dateHelpers'
 import { selectMany } from '~/utils/queryHelpers'
 
 export type DealsBoardMaps = {
@@ -100,7 +101,7 @@ export async function loadDealsBoardMaps(
       priority: string
     }>(
       db,
-      `SELECT id, deal_id, name, priority, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline
+      `SELECT id, deal_id, name, priority, DATE_FORMAT(deadline, '${MYSQL_LOCAL_DATETIME_FORMAT}') AS deadline
        FROM deal_activities
        WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ? AND deal_id IN (${inList})
        ORDER BY

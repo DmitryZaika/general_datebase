@@ -1,4 +1,5 @@
 import { db } from '~/db.server'
+import { MYSQL_LOCAL_DATETIME_FORMAT } from '~/lib/dateHelpers'
 import { selectMany } from '~/utils/queryHelpers'
 
 export interface CustomerDealNotePreview {
@@ -80,7 +81,7 @@ export async function findCustomerDealsForUser(
   )
   const activities = await selectMany<CustomerDealActivityPreview>(
     db,
-    `SELECT id, deal_id, name, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') deadline, priority, is_completed
+    `SELECT id, deal_id, name, DATE_FORMAT(deadline, '${MYSQL_LOCAL_DATETIME_FORMAT}') deadline, priority, is_completed
        FROM deal_activities
       WHERE deal_id IN (?) AND company_id = ? AND deleted_at IS NULL
       ORDER BY is_completed ASC, deadline IS NULL ASC, deadline ASC, created_at DESC`,
