@@ -119,6 +119,15 @@ export function useChecklistQueue({
 
   const isProcessingRef = useRef(false)
   const hasMigratedRef = useRef(false)
+  const onSuccessRef = useRef(onSuccess)
+  const onErrorRef = useRef(onError)
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const processQueueRef = useRef<(() => Promise<void>) | null>(null)
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess
+    onErrorRef.current = onError
+  }, [onSuccess, onError])
 
   const refreshQueue = useCallback(async () => {
     if (!isIndexedDBAvailable()) return
@@ -142,9 +151,7 @@ export function useChecklistQueue({
           hasMigratedRef.current = true
           return refreshQueue()
         })
-        .catch(error => {
-          console.error('[Queue] Migration failed:', error)
-        })
+        .catch(() => undefined)
     } else {
       refreshQueue()
     }
@@ -153,6 +160,11 @@ export function useChecklistQueue({
   const processQueue = useCallback(async () => {
     if (isProcessingRef.current || !isIndexedDBAvailable() || !navigator.onLine) {
       return
+    }
+
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
     }
 
     isProcessingRef.current = true
@@ -169,8 +181,11 @@ export function useChecklistQueue({
         if (!navigator.onLine) break
         if (submission.status === 'syncing') continue
 
+        const submissionId = submission.id
+        if (submissionId === undefined) continue
+
         if (submission.attempts >= MAX_RETRY_ATTEMPTS) {
-          await updateSubmission(submission.id!, {
+          await updateSubmission(submissionId, {
             status: 'failed',
             error: `Max retry attempts (${MAX_RETRY_ATTEMPTS}) reached`,
           })
@@ -185,45 +200,78 @@ export function useChecklistQueue({
         }
 
         try {
-          await updateSubmission(submission.id!, {
+          await updateSubmission(submissionId, {
             status: 'syncing',
             attempts: submission.attempts + 1,
             lastAttempt: Date.now(),
           })
 
           await submitChecklistAPI(submission.data, submission.companyId)
-          await removeFromQueue(submission.id!)
+          await removeFromQueue(submissionId)
 
           if (
             typeof window !== 'undefined' &&
             window.location.pathname.includes('/checklist')
           ) {
-            onSuccess?.()
+            onSuccessRef.current?.()
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           const isValidation = isValidationError(errorMessage)
 
           if (isValidation) {
-            await removeFromQueue(submission.id!)
+            await removeFromQueue(submissionId)
           } else {
-            await updateSubmission(submission.id!, {
+            await updateSubmission(submissionId, {
               status: 'pending',
               error: errorMessage,
             })
           }
 
-          onError?.(error instanceof Error ? error : new Error(errorMessage))
+          onErrorRef.current?.(error instanceof Error ? error : new Error(errorMessage))
         }
       }
-    } catch (error) {
-      console.error('[Queue] Queue processing failed:', error)
+    } catch {
+      return
     } finally {
       isProcessingRef.current = false
       setIsProcessing(false)
-      await refreshQueue()
+
+      const remaining = await getAllPending()
+      setPendingCount(remaining.length)
+      setPendingSubmissions(remaining)
+
+      const hasRetryable = remaining.some(
+        submission =>
+          submission.status !== 'failed' && submission.attempts < MAX_RETRY_ATTEMPTS,
+      )
+
+      if (
+        hasRetryable &&
+        typeof navigator !== 'undefined' &&
+        navigator.onLine &&
+        !retryTimeoutRef.current
+      ) {
+        retryTimeoutRef.current = setTimeout(() => {
+          retryTimeoutRef.current = null
+          processQueueRef.current?.()
+        }, RETRY_DELAY)
+      }
     }
-  }, [onSuccess, onError, refreshQueue])
+  }, [])
+
+  useEffect(() => {
+    processQueueRef.current = processQueue
+  }, [processQueue])
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof navigator === 'undefined') return

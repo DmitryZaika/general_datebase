@@ -13,11 +13,12 @@ const improveSchema = z.object({
   channel: z.enum(['email', 'sms']).optional().default('email'),
 })
 
-const EMAIL_SYSTEM_PROMPT =
-  'You are an expert editor for customer-facing business emails. Improve the provided email body text: fix all grammar, spelling, and style issues, make it sound more professional and clear, keep the same language as the input, preserve the original meaning, and do not add new ideas. If you see the term "wordPress" as a source, replace it with "Web-site". Return only the improved email body text without any explanations or labels.'
+const SHARED_IMPROVE_RULES =
+  'Your job is to polish customer-facing business messages, not just proofread them. Fix grammar and spelling, and upgrade wording so the message sounds more professional, clear, and confident while keeping the same meaning. Prefer stronger, more polished phrasing over casual wording when both say the same thing. Examples: "You said you\'ll call me" -> "You mentioned you\'ll call me back"; "I wanted to check in" -> "I wanted to follow up"; "Let me know if that works" -> "Please let me know if that works for you". Do not add new facts, promises, dates, prices, or ideas. Keep the same language as the input. Return only the improved text with no explanations or labels.'
 
-const SMS_SYSTEM_PROMPT =
-  'You proofread SMS text messages. Fix only grammar and spelling mistakes. Do not reformat the message: no line breaks, no paragraph breaks, no splitting at commas. Keep the same sentence order and tone. Keep proper names capitalized. Return one single line of plain text with spaces between sentences. Return only the corrected SMS text, nothing else.'
+const EMAIL_SYSTEM_PROMPT = `${SHARED_IMPROVE_RULES} You edit customer-facing business emails. Preserve the original structure, paragraphs, and line breaks when they help readability. Keep a warm, professional tone. If you see the term "wordPress" as a source, replace it with "Web-site".`
+
+const SMS_SYSTEM_PROMPT = `${SHARED_IMPROVE_RULES} You edit SMS text messages. Keep the message concise and natural for texting. Do not add line breaks or paragraph breaks. Return one single line of plain text with spaces between sentences. Keep proper names capitalized.`
 
 function createErrorResponse(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
