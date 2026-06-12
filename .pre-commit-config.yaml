@@ -6,7 +6,7 @@ repos:
   - repo: local
     hooks:
       - id: ts-build
-        name: npm run build
-        entry: npm run build
+        name: bun run build
+        entry: bun run build
         language: system
         pass_filenames: false
