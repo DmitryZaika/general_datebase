@@ -94,3 +94,14 @@ export function parseAddressFromAutocompleteText(text: string): ParsedAddress {
 
   return { street, city, state, zip }
 }
+
+export function stripCountryFromAddressText(address: string): string {
+  return address.replace(/,?\s*USA\s*$/i, '')
+}
+
+export function replaceZipInAddressText(address: string, zipCode: string): string {
+  const withoutCountry = stripCountryFromAddressText(address).trim()
+  if (!zipCode) return withoutCountry
+  if (withoutCountry.includes(zipCode)) return withoutCountry
+  return `${withoutCountry}, ${zipCode}`
+}
