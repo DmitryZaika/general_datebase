@@ -60,7 +60,7 @@ const DialogContent = React.forwardRef<
 
       <DialogPrimitive.Content
         ref={ref}
-        className={cn(dialogVariants({ position, className }))}
+        className={cn(dialogVariants({ position }), className)}
         {...props}
       >
         {!hideClose && (

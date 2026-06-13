@@ -1491,7 +1491,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   return (
     <div
       ref={scrollRef}
-      className='flex flex-col flex-1 min-h-0 p-4 overflow-y-auto text-wrap whitespace-pre-wrap'
+      className='absolute inset-0 overflow-y-auto overscroll-y-contain touch-pan-y p-4 text-wrap whitespace-pre-wrap'
     >
       <div ref={contentRef} className='flex flex-col'>
         <AnimatePresence mode='sync' onExitComplete={onClearAnimationComplete}>
@@ -1791,10 +1791,9 @@ export function Chat({
   }, [])
 
   const scrollMessagesToBottom = useCallback(
-    (smooth = true) => {
+    (smooth = false) => {
       const container = messagesScrollRef.current
-      if (!container) return
-      stickToBottomRef.current = true
+      if (!container || !stickToBottomRef.current) return
 
       if (!smooth) {
         stopSmoothScroll()
@@ -1814,12 +1813,15 @@ export function Chat({
   )
 
   const triggerSmoothScrollFollow = useCallback(() => {
+    stickToBottomRef.current = true
     scrollMessagesToBottom(true)
   }, [scrollMessagesToBottom])
 
   useLayoutEffect(() => {
     if (!open || isClearingChat) return
-    scrollMessagesToBottom(true)
+    if (stickToBottomRef.current) {
+      scrollMessagesToBottom(false)
+    }
   }, [
     answer,
     dismissingQuoteSkeletonIndex,
@@ -1846,9 +1848,14 @@ export function Chat({
         SCROLL_STICK_THRESHOLD
     }
 
+    const onUserScrollIntent = () => {
+      stickToBottomRef.current = false
+      stopSmoothScroll()
+    }
+
     const onContentResize = () => {
       if (stickToBottomRef.current && !isClearingChat) {
-        scrollMessagesToBottom(true)
+        scrollMessagesToBottom(false)
       }
     }
 
@@ -1856,11 +1863,17 @@ export function Chat({
     const observer = new ResizeObserver(onContentResize)
     observer.observe(content)
     container.addEventListener('scroll', onScroll, { passive: true })
+    container.addEventListener('touchstart', onUserScrollIntent, { passive: true })
+    container.addEventListener('touchmove', onUserScrollIntent, { passive: true })
+    container.addEventListener('wheel', onUserScrollIntent, { passive: true })
     return () => {
       observer.disconnect()
       container.removeEventListener('scroll', onScroll)
+      container.removeEventListener('touchstart', onUserScrollIntent)
+      container.removeEventListener('touchmove', onUserScrollIntent)
+      container.removeEventListener('wheel', onUserScrollIntent)
     }
-  }, [isClearingChat, open, scrollMessagesToBottom])
+  }, [isClearingChat, open, scrollMessagesToBottom, stopSmoothScroll])
 
   useEffect(() => stopSmoothScroll, [stopSmoothScroll])
 
@@ -2591,7 +2604,7 @@ export function Chat({
         {triggerButton}
         <DialogContent
           hideClose
-          className='h-full p-0 gap-0'
+          className='flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden p-0 gap-0'
           position='br'
           onMouseEnter={event => event.stopPropagation()}
           onPointerEnter={event => event.stopPropagation()}
@@ -2605,7 +2618,7 @@ export function Chat({
         >
           <div
             data-sidebar-chat-panel
-            className='h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-hidden'
+            className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-white border-l border-gray-300 shadow-lg'
             onMouseLeave={event => {
               const next = event.relatedTarget
               if (
@@ -2638,7 +2651,7 @@ export function Chat({
             >
               <span className='text-lg font-bold'>Chat</span>
             </DialogFullHeader>
-            <div className='flex flex-col flex-1 min-h-0'>
+            <div className='relative min-h-0 flex-1 overflow-hidden'>
               <ChatMessages
                 messages={chatMessagesList}
                 isThinking={isThinking && !answer}
