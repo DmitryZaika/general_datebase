@@ -6,6 +6,7 @@ import {
   fetchCustomerByPhone,
   getThreadForUser,
   getThreadUnreadCountForUser,
+  markThreadReadForUser,
   type SmsScope,
   toApiSmsMessage,
 } from '~/utils/cloudtalkSmsService.server'
@@ -37,8 +38,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     })
     const customer = await fetchCustomerByPhone(user.company_id, phoneDigits)
 
-    // Empty thread: return a non-null thread so the pane renders a composer for a
-    // brand-new conversation; the first send creates it.
+    if (scope === 'mine') {
+      await markThreadReadForUser({ user, phoneDigits })
+    }
+
     if (result.messages.length === 0) {
       return data({
         thread: {
@@ -53,12 +56,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       })
     }
 
-    const unreadCount = await getThreadUnreadCountForUser(
-      user,
-      phoneDigits,
-      scope,
-      agentId,
-    )
+    const unreadCount =
+      scope === 'mine'
+        ? 0
+        : await getThreadUnreadCountForUser(user, phoneDigits, scope, agentId)
 
     return data({
       thread: {

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   type LoaderFunctionArgs,
   data as routerData,
@@ -9,11 +9,7 @@ import {
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { SmsConversationPane } from '~/components/organisms/SmsPage/SmsConversationPane'
 import { SmsLinkCustomerDialog } from '~/components/organisms/SmsPage/SmsLinkCustomerDialog'
-import {
-  fetchThread,
-  markThreadRead,
-  sendSms,
-} from '~/components/organisms/SmsPage/service'
+import { fetchThread, sendSms } from '~/components/organisms/SmsPage/service'
 import type { SmsMessage, SmsThread } from '~/components/organisms/SmsPage/types'
 import { useCloudtalkReadOnly } from '~/hooks/useCloudtalkReadOnly'
 import type { Nullable } from '~/types/utils'
@@ -54,7 +50,6 @@ export default function CloudTalkThread() {
   const [messageLimit, setMessageLimit] = useState(INITIAL_MESSAGE_PAGE)
   const [isFetchingOlder, setIsFetchingOlder] = useState(false)
   const [switchingPhone, setSwitchingPhone] = useState<Nullable<string>>(null)
-  const lastMarkedPhoneRef = useRef<Nullable<string>>(null)
 
   useEffect(() => {
     setMessageLimit(INITIAL_MESSAGE_PAGE)
@@ -81,20 +76,13 @@ export default function CloudTalkThread() {
     refetchIntervalInBackground: false,
   })
 
-  // Fire mark-read at most once per phone, only when there's actually
-  // something unread — guards against React-Router re-firing on every render.
   useEffect(() => {
     if (readOnly) return
     if (!phoneDigits) return
-    if (lastMarkedPhoneRef.current === phoneDigits) return
-    const t = threadQuery.data?.thread
-    if (!t || t.unreadCount === 0) return
-    lastMarkedPhoneRef.current = phoneDigits
-    void markThreadRead(phoneDigits, csrfToken).then(() => {
-      queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
-      queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-unread-count'] })
-    })
-  }, [readOnly, phoneDigits, threadQuery.data, queryClient, csrfToken])
+    if (!threadQuery.data?.thread) return
+    queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
+    queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-unread-count'] })
+  }, [readOnly, phoneDigits, threadQuery.data?.thread, queryClient])
 
   const handleSend = useCallback(
     async (text: string) => {
