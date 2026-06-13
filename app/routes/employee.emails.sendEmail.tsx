@@ -459,6 +459,7 @@ function EmailFormFields({
   onFilesDrop,
   toLabels,
   onToLabelsChange,
+  onSubmitShortcut,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
@@ -469,6 +470,7 @@ function EmailFormFields({
   onFilesDrop?: (files: File[]) => void
   toLabels: Record<string, string>
   onToLabelsChange: (labels: Record<string, string>) => void
+  onSubmitShortcut?: () => void
 }) {
   const bodyText = form.watch('text')
   const customVariables = getUnfilledCustomVariables(bodyText)
@@ -524,6 +526,7 @@ function EmailFormFields({
             field={field}
             className='mb-4'
             onFilesDrop={onFilesDrop}
+            onSubmitShortcut={onSubmitShortcut}
           />
         )}
       />
@@ -1035,6 +1038,12 @@ export default function DealEmailDialog() {
         <FormProvider {...form}>
           <Form
             onSubmit={form.handleSubmit(fullSubmit)}
+            onKeyDown={event => {
+              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault()
+                void form.handleSubmit(fullSubmit)()
+              }
+            }}
             className='flex-1 flex flex-col'
           >
             <AuthenticityTokenInput />
@@ -1051,6 +1060,9 @@ export default function DealEmailDialog() {
               }}
               toLabels={toLabels}
               onToLabelsChange={setToLabels}
+              onSubmitShortcut={() => {
+                void form.handleSubmit(fullSubmit)()
+              }}
             />
             {form.watch('attachments').length > 0 ? (
               <div className='flex flex-wrap gap-2'>

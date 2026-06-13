@@ -87,7 +87,7 @@ describe('computeMonthlyCountsBySalesRep', () => {
     ])
   })
 
-  it('counts all customers for the all tab', () => {
+  it('counts call-in, walk-in, and leads for the all tab', () => {
     const customers = [
       {
         source: 'check-in',
@@ -110,6 +110,20 @@ describe('computeMonthlyCountsBySalesRep', () => {
         created_date: '2026-06-04T10:00:00.000Z',
         invalid_lead: null,
       },
+      {
+        source: 'other',
+        sales_rep: 3,
+        sales_rep_name: 'Cara',
+        created_date: '2026-06-05T10:00:00.000Z',
+        invalid_lead: null,
+      },
+      {
+        source: 'check-list',
+        sales_rep: 4,
+        sales_rep_name: 'Dan',
+        created_date: '2026-06-06T10:00:00.000Z',
+        invalid_lead: null,
+      },
     ]
 
     expect(computeMonthlyCountsBySalesRep(customers, 'all', referenceDate)).toEqual([
@@ -121,7 +135,7 @@ describe('computeMonthlyCountsBySalesRep', () => {
 
 describe('getMonthlyCountLabel', () => {
   it('returns the label for supported tabs', () => {
-    expect(getMonthlyCountLabel('all')).toBe('Total customers this month:')
+    expect(getMonthlyCountLabel('all')).toBe('Customers this month:')
     expect(getMonthlyCountLabel('call-in')).toBe('Call-ins this month:')
     expect(getMonthlyCountLabel('leads')).toBe('Leads this month:')
     expect(getMonthlyCountLabel('other')).toBeNull()

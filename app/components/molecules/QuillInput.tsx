@@ -6,17 +6,23 @@ export function QuillInput({
   field,
   className,
   onFilesDrop,
+  onSubmitShortcut,
 }: {
   name: string
   field: object & { onChange: (value: string) => void; value: string }
   className?: string
   onFilesDrop?: (files: File[]) => void
+  onSubmitShortcut?: () => void
 }) {
   return (
     <FormItem className={className}>
       <FormLabel>{name}</FormLabel>
       <FormControl>
-        <QuillEditor {...field} onFilesDrop={onFilesDrop} />
+        <QuillEditor
+          {...field}
+          onFilesDrop={onFilesDrop}
+          onSubmitShortcut={onSubmitShortcut}
+        />
       </FormControl>
       <FormMessage />
     </FormItem>

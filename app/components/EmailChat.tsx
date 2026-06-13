@@ -1719,6 +1719,17 @@ export function EmailChat(props: EmailChatProps) {
                     textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
                   }
                 }}
+                onKeyDown={e => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault()
+                    if (
+                      !isSending &&
+                      (messageText.trim() !== '' || attachments.length > 0)
+                    ) {
+                      void handleSend()
+                    }
+                  }
+                }}
                 placeholder='Send a message'
                 rows={1}
                 className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border-none bg-transparent px-1 sm:px-4 py-2 text-base md:text-sm outline-none resize-none overflow-y-auto'

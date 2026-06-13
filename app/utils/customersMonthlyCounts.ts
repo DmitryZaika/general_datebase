@@ -18,6 +18,8 @@ const TAB_SOURCE: Record<string, string> = {
   'call-in': 'call-in',
 }
 
+const ALL_TAB_SOURCES = new Set(['check-in', 'call-in', 'leads'])
+
 const TAB_LABEL: Record<string, string> = {
   all: 'Customers this month:',
   walkin: 'Walk-ins this month:',
@@ -43,7 +45,11 @@ export function computeMonthlyCountsBySalesRep(
   const counts = new Map<number, { salesRepName: string; count: number }>()
 
   for (const customer of customers) {
-    if (tab !== 'all' && customer.source !== source) continue
+    if (tab === 'all') {
+      if (!ALL_TAB_SOURCES.has(customer.source)) continue
+    } else if (customer.source !== source) {
+      continue
+    }
     if (!customer.sales_rep) continue
     if (excludeInvalid && customer.invalid_lead) continue
 
