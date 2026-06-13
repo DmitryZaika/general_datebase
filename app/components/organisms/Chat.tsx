@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+import { useIsMobile } from '~/hooks/use-mobile'
 import '~/styles/instructions.css'
 import { stripChatResponseMarkersTrimmed } from '~/utils/chatAnswerHelpers'
 import { DONE_KEY } from '~/utils/constants'
@@ -187,7 +188,6 @@ const QUOTE_LINE_VARIANTS: Variants = {
 const FORM_EXPAND_EASE = [0.22, 1, 0.36, 1] as const
 const FORM_EXPAND_DURATION = 0.45
 const SKELETON_EXIT_DURATION = 0.4
-const SCROLL_STICK_THRESHOLD = 64
 const SCROLL_SMOOTH_MIN_STEP = 5
 const SCROLL_SMOOTH_MAX_STEP = 30
 
@@ -1491,7 +1491,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   return (
     <div
       ref={scrollRef}
-      className='absolute inset-0 overflow-y-auto overscroll-y-contain touch-pan-y p-4 text-wrap whitespace-pre-wrap'
+      className='min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 text-wrap whitespace-pre-wrap'
     >
       <div ref={contentRef} className='flex flex-col'>
         <AnimatePresence mode='sync' onExitComplete={onClearAnimationComplete}>
@@ -1620,6 +1620,7 @@ export function Chat({
   onSidebarHoverCollapse?: (event: React.MouseEvent) => void
 }) {
   const isSidebarVariant = variant === 'sidebar'
+  const isMobile = useIsMobile()
   const location = useLocation()
   const instructionsPath = location.pathname.startsWith('/admin')
     ? '/admin/instructions'
@@ -1649,7 +1650,7 @@ export function Chat({
   const responseFinishedRef = useRef(false)
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const messagesContentRef = useRef<HTMLDivElement | null>(null)
-  const stickToBottomRef = useRef(true)
+  const autoScrollFollowRef = useRef(false)
   const smoothScrollActiveRef = useRef(false)
   const scrollAnimationFrameRef = useRef<number | null>(null)
   const [carouselImages, setCarouselImages] = useState<InstructionCarouselImage[]>([])
@@ -1793,7 +1794,7 @@ export function Chat({
   const scrollMessagesToBottom = useCallback(
     (smooth = false) => {
       const container = messagesScrollRef.current
-      if (!container || !stickToBottomRef.current) return
+      if (!container || !autoScrollFollowRef.current) return
 
       if (!smooth) {
         stopSmoothScroll()
@@ -1813,13 +1814,18 @@ export function Chat({
   )
 
   const triggerSmoothScrollFollow = useCallback(() => {
-    stickToBottomRef.current = true
+    autoScrollFollowRef.current = true
     scrollMessagesToBottom(true)
   }, [scrollMessagesToBottom])
 
+  const stopAutoScrollFollow = useCallback(() => {
+    autoScrollFollowRef.current = false
+    stopSmoothScroll()
+  }, [stopSmoothScroll])
+
   useLayoutEffect(() => {
     if (!open || isClearingChat) return
-    if (stickToBottomRef.current) {
+    if (autoScrollFollowRef.current) {
       scrollMessagesToBottom(false)
     }
   }, [
@@ -1842,38 +1848,28 @@ export function Chat({
     const content = messagesContentRef.current
     if (!container || !content) return
 
-    const onScroll = () => {
-      stickToBottomRef.current =
-        container.scrollHeight - container.scrollTop - container.clientHeight <=
-        SCROLL_STICK_THRESHOLD
-    }
-
     const onUserScrollIntent = () => {
-      stickToBottomRef.current = false
-      stopSmoothScroll()
+      stopAutoScrollFollow()
     }
 
     const onContentResize = () => {
-      if (stickToBottomRef.current && !isClearingChat) {
+      if (autoScrollFollowRef.current && !isClearingChat) {
         scrollMessagesToBottom(false)
       }
     }
 
-    onScroll()
     const observer = new ResizeObserver(onContentResize)
     observer.observe(content)
-    container.addEventListener('scroll', onScroll, { passive: true })
     container.addEventListener('touchstart', onUserScrollIntent, { passive: true })
     container.addEventListener('touchmove', onUserScrollIntent, { passive: true })
     container.addEventListener('wheel', onUserScrollIntent, { passive: true })
     return () => {
       observer.disconnect()
-      container.removeEventListener('scroll', onScroll)
       container.removeEventListener('touchstart', onUserScrollIntent)
       container.removeEventListener('touchmove', onUserScrollIntent)
       container.removeEventListener('wheel', onUserScrollIntent)
     }
-  }, [isClearingChat, open, scrollMessagesToBottom, stopSmoothScroll])
+  }, [isClearingChat, open, scrollMessagesToBottom, stopAutoScrollFollow])
 
   useEffect(() => stopSmoothScroll, [stopSmoothScroll])
 
@@ -1993,7 +1989,11 @@ export function Chat({
       streamingSpecialOrderOfferRef.current = null
       setAnswer('')
       setIsThinking(true)
-      triggerSmoothScrollFollow()
+      if (priceListMode) {
+        triggerSmoothScrollFollow()
+      } else {
+        stopAutoScrollFollow()
+      }
       setPriceListStatus(
         priceListMode
           ? activeSpecialOrder
@@ -2087,6 +2087,7 @@ export function Chat({
       isThinking,
       messages.length,
       priceListMode,
+      stopAutoScrollFollow,
       triggerSmoothScrollFollow,
     ],
   )
@@ -2226,11 +2227,12 @@ export function Chat({
   }, [])
 
   const closePriceListMode = useCallback(() => {
+    stopAutoScrollFollow()
     setPriceListMode(false)
     setPriceListFormOpen(false)
     setPriceListColor('')
     setPriceListSupplier('')
-  }, [])
+  }, [stopAutoScrollFollow])
 
   const enablePriceListMode = useCallback(() => {
     setPriceListMode(true)
@@ -2256,12 +2258,13 @@ export function Chat({
   }, [removeAiDesignImage, triggerSmoothScrollFollow])
 
   const closeAiDesignMode = useCallback(() => {
+    stopAutoScrollFollow()
     setAiDesignFormOpen(false)
     setAiDesignStones([])
     setAiDesignSurfaces(['countertops'])
     setAiDesignExtraInstructions('')
     removeAiDesignImage()
-  }, [removeAiDesignImage])
+  }, [removeAiDesignImage, stopAutoScrollFollow])
 
   const setAiDesignImageFromFile = useCallback((file: File | null | undefined) => {
     if (!file?.type.startsWith('image/')) return
@@ -2604,6 +2607,7 @@ export function Chat({
         {triggerButton}
         <DialogContent
           hideClose
+          disablePortal={isSidebarVariant && isMobile}
           className='flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden p-0 gap-0'
           position='br'
           onMouseEnter={event => event.stopPropagation()}
@@ -2651,7 +2655,7 @@ export function Chat({
             >
               <span className='text-lg font-bold'>Chat</span>
             </DialogFullHeader>
-            <div className='relative min-h-0 flex-1 overflow-hidden'>
+            <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
               <ChatMessages
                 messages={chatMessagesList}
                 isThinking={isThinking && !answer}
