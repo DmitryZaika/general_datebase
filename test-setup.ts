@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 import mysql from 'mysql2/promise'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { TEST_DB_CONFIG } from './tests/testDatabase'
+import { type MysqlData, TEST_DB_CONFIG } from './tests/testDatabase'
 
 // Load environment variables
 dotenv.config()
@@ -29,7 +29,7 @@ vi.mock('~/db.server', () => {
 
   return {
     db: {
-      execute: async (sql: string, params: unknown[]) => {
+      execute: async (sql: string, params: MysqlData[]) => {
         const connection = await getTestConnection()
         return await connection.execute(sql, params)
       },

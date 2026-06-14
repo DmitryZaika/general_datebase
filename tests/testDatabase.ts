@@ -5,6 +5,8 @@ import type { User } from '~/utils/session.server'
 
 dotenv.config()
 
+export type MysqlData = string | number | boolean | null | Date
+
 export const TEST_DB_CONFIG = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
@@ -70,7 +72,7 @@ export class DatabaseTestHelper {
 
   static async insertTestData(
     table: string,
-    data: Record<string, unknown>,
+    data: Record<string, MysqlData>,
   ): Promise<number> {
     const connection = await DatabaseTestHelper.connect()
     const columns = Object.keys(data).join(', ')
@@ -89,11 +91,11 @@ export class DatabaseTestHelper {
 
   static async selectFromTable(
     table: string,
-    where?: Record<string, unknown>,
+    where?: Record<string, MysqlData>,
   ): Promise<mysql.RowDataPacket[]> {
     const connection = await DatabaseTestHelper.connect()
     let sql = `SELECT * FROM ${table}`
-    let params: unknown[] = []
+    let params: MysqlData[] = []
 
     if (where) {
       const conditions = Object.keys(where)

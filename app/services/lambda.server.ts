@@ -37,6 +37,7 @@ export async function syncCustomerToCloudTalk(
 export async function fetchTemplateVariableData(
   userId: number,
   dealId: number | null,
+  companyId: number,
   customerId: number | null,
 ): Promise<TemplateVariableData> {
   // 1. Build the optional query parameters
@@ -47,8 +48,8 @@ export async function fetchTemplateVariableData(
   // 2. Append the query string to the path if parameters exist
   const queryString = params.toString()
   const path = queryString
-    ? `template/variables/${userId}?${queryString}`
-    : `template/variables/${userId}`
+    ? `template/variables/${companyId}/${userId}?${queryString}`
+    : `template/variables/${companyId}/${userId}`
 
   // 3. Make the request
   const response = await fetchFromLambda(path, 'GET')
@@ -65,6 +66,7 @@ export async function fetchTemplateVariableData(
 export async function replaceTemplateVariables(
   userId: number,
   dealId: number | null,
+  companyId: number,
   customerId: number | null,
   template: string,
 ): Promise<string> {
@@ -76,8 +78,8 @@ export async function replaceTemplateVariables(
   // 2. Append the query string to the path if parameters exist
   const queryString = params.toString()
   const path = queryString
-    ? `template/complete/${userId}?${queryString}`
-    : `template/complete/${userId}`
+    ? `template/complete/${companyId}/${userId}?${queryString}`
+    : `template/complete/${companyId}/${userId}`
 
   // 3. Make the request
   const response = await fetchFromLambda(path, 'POST', { template })
