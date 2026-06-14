@@ -25,6 +25,11 @@ export function parseStoredLocalDatetime(value: unknown): Date {
 
   const trimmed = toDatetimeString(value).trim()
   if (!trimmed) return new Date(Number.NaN)
+
+  if (/[zZ]$/.test(trimmed) || /[+-]\d{2}:\d{2}$/.test(trimmed)) {
+    return new Date(trimmed)
+  }
+
   const dateOnly = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (dateOnly) {
     return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
