@@ -37,6 +37,20 @@ export function formatPhoneForDisplay(phone: Nullable<string> | undefined): stri
   return phone
 }
 
+// Canonical dashed US format for customers.phone / phone_2 columns.
+export function formatPhoneForStorage(phoneDigits: string): Nullable<string> {
+  const digits = phoneDigitsOnly(phoneDigits)
+  if (!PHONE_DIGITS_REGEX.test(digits)) return null
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    const local = digits.slice(1)
+    return `${local.slice(0, 3)}-${local.slice(3, 6)}-${local.slice(6)}`
+  }
+  return null
+}
+
 // Returns both 10-digit and 11-digit forms — BIGINT phone columns drop any
 // leading "1", so equality checks need to test both.
 export function phoneVariants(digits: string): string[] {

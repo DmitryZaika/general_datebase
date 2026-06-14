@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatPhoneForDisplay,
+  formatPhoneForStorage,
   formatPhoneInput,
   normalizeToE164,
   phoneDigitsOnly,
@@ -76,6 +77,22 @@ describe('formatPhoneForDisplay', () => {
   it('returns input unchanged for unparseable lengths (e.g. international)', () => {
     expect(formatPhoneForDisplay('+442071838750')).toBe('+442071838750')
     expect(formatPhoneForDisplay('1456')).toBe('1456')
+  })
+})
+
+describe('formatPhoneForStorage', () => {
+  it('formats 10-digit US numbers as XXX-XXX-XXXX', () => {
+    expect(formatPhoneForStorage('3173161456')).toBe('317-316-1456')
+  })
+
+  it('formats 11-digit US numbers starting with 1', () => {
+    expect(formatPhoneForStorage('13173161456')).toBe('317-316-1456')
+  })
+
+  it('returns null for invalid lengths', () => {
+    expect(formatPhoneForStorage('317316145')).toBeNull()
+    expect(formatPhoneForStorage('442071838750')).toBeNull()
+    expect(formatPhoneForStorage('1456')).toBeNull()
   })
 })
 
