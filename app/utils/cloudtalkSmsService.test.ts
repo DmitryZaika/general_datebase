@@ -274,6 +274,143 @@ describe('listThreadsForUser', () => {
     expect(result.threads).toHaveLength(0)
   })
 
+  test('shows inbound SMS to cloudtalk phone when user has no agent id', async () => {
+    const company = await factory.company()
+    const customerPhone = '3178351004'
+    const companyPhone = '3176767938'
+    const user = await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      cloudtalk_agent_id: null,
+      cloudtalk_phone_number: companyPhone,
+    })
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'Customer hello',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      agent: '540273',
+      text: 'Rep reply',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: '5125559090',
+      recipient: '5550000001',
+      text: 'other line',
+    })
+
+    const threads = await listThreadsForUser({
+      user,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+    expect(threads.threads).toHaveLength(1)
+    expect(threads.threads[0].phoneDigits).toBe(customerPhone)
+    expect(threads.threads[0].messageCount).toBe(2)
+
+    const thread = await getThreadForUser({
+      user,
+      phoneDigits: customerPhone,
+      limit: 30,
+    })
+    expect(thread.messages).toHaveLength(2)
+    expect(thread.messages.map(m => m.text)).toContain('Customer hello')
+    expect(thread.messages.map(m => m.text)).toContain('Rep reply')
+  })
+
+  test('shows inbound SMS to cloudtalk phone when user has agent id and cloudtalk phone', async () => {
+    const company = await factory.company()
+    const customerPhone = '8594208636'
+    const otherCustomerPhone = '3178351004'
+    const companyPhone = '3176767938'
+    const user = await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      cloudtalk_agent_id: TEST_AGENT,
+      cloudtalk_phone_number: companyPhone,
+    })
+
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: otherCustomerPhone,
+      sender_user_id: user.id,
+      agent: TEST_AGENT,
+      text: 'other number thread',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'New message',
+    })
+
+    const threads = await listThreadsForUser({
+      user,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+
+    expect(threads.threads).toHaveLength(2)
+    expect(threads.threads.map(t => t.phoneDigits).sort()).toEqual(
+      [customerPhone, otherCustomerPhone].sort(),
+    )
+
+    const thread = await getThreadForUser({
+      user,
+      phoneDigits: customerPhone,
+      limit: 30,
+    })
+    expect(thread.messages).toHaveLength(1)
+    expect(thread.messages[0].text).toBe('New message')
+    expect(thread.messages[0].direction).toBe('inbound')
+  })
+
+  test('splits threads when the same customer has two phone numbers', async () => {
+    const company = await factory.company()
+    const customerPhoneA = '8594208636'
+    const customerPhoneB = '3178351004'
+    const companyPhone = '3176767938'
+    const user = await factory.user({
+      company_id: company.id,
+      is_employee: true,
+      cloudtalk_agent_id: null,
+      cloudtalk_phone_number: companyPhone,
+    })
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhoneA,
+      recipient: companyPhone,
+      text: 'from A',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhoneB,
+      recipient: companyPhone,
+      text: 'from B',
+    })
+
+    const threads = await listThreadsForUser({
+      user,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+
+    expect(threads.threads).toHaveLength(2)
+    const byPhone = Object.fromEntries(threads.threads.map(t => [t.phoneDigits, t]))
+    expect(byPhone[customerPhoneA]?.lastMessageText).toBe('from A')
+    expect(byPhone[customerPhoneB]?.lastMessageText).toBe('from B')
+  })
+
   test('scope all lets admins without agent id see every company thread', async () => {
     const company = await factory.company()
     const admin = await factory.user({

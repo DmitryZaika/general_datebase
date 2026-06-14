@@ -6,7 +6,7 @@ import {
   handleAuthError,
   requireEmployeeWithCsrf,
 } from '~/utils/apiResponse.server'
-import { normalizeToE164, PHONE_DIGITS_REGEX } from '~/utils/phone'
+import { formatPhoneForStorage, PHONE_DIGITS_REGEX } from '~/utils/phone'
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
@@ -19,10 +19,11 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!PHONE_DIGITS_REGEX.test(phoneDigits)) return badRequest('invalid_phone')
     if (name.length < 1) return badRequest('empty_name')
 
-    const e164 = normalizeToE164(phoneDigits)
+    const formatted = formatPhoneForStorage(phoneDigits)
+    if (!formatted) return badRequest('invalid_phone')
     const [result] = await db.execute(
       `INSERT INTO customers (company_id, name, phone) VALUES (?, ?, ?)`,
-      [user.company_id, name, e164 ?? phoneDigits],
+      [user.company_id, name, formatted],
     )
     const customerId = (result as { insertId: number }).insertId
     return data({ customerId, customerName: name })

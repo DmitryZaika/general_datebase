@@ -179,6 +179,13 @@ function userAgentId(user: SessionUser): string | null {
   return agentId.length > 0 ? agentId : null
 }
 
+function userCloudtalkPhone(user: SessionUser): string | null {
+  const phone = user.cloudtalk_phone_number?.trim() ?? ''
+  if (phone.length === 0) return null
+  const digits = canonicalPhone10(phone)
+  return digits.length >= 10 ? digits : null
+}
+
 export function resolveSmsScope(user: SessionUser, scope?: SmsScope): SmsScope {
   if (scope === 'all' && (user.is_admin || user.is_superuser)) {
     return 'all'
@@ -249,6 +256,54 @@ function agentIdFilterClause(
   }
 }
 
+function phoneNumberFilterClause(
+  alias: string,
+  phoneDigits: string,
+): { clause: string; params: (string | number)[] } {
+  const variants = phoneVariants(phoneDigits)
+  if (variants.length === 0) {
+    return { clause: '1 = 0', params: [] }
+  }
+  const placeholders = variants.map(() => '?').join(',')
+  const inboundToPhone = `link.direction = 'inbound'
+            AND (link.agent IS NULL OR TRIM(link.agent) = '')
+            AND CAST(link.recipient AS CHAR) IN (${placeholders})`
+  const threadLinkMatch = `(
+              CAST(link.sender AS CHAR) = CAST(${alias}.sender AS CHAR)
+              OR CAST(link.recipient AS CHAR) = CAST(${alias}.sender AS CHAR)
+              OR CAST(link.sender AS CHAR) = CAST(${alias}.recipient AS CHAR)
+              OR CAST(link.recipient AS CHAR) = CAST(${alias}.recipient AS CHAR)
+            )`
+  return {
+    clause: `(
+      (
+        ${alias}.direction = 'inbound'
+        AND (${alias}.agent IS NULL OR TRIM(${alias}.agent) = '')
+        AND CAST(${alias}.recipient AS CHAR) IN (${placeholders})
+      )
+      OR (
+        TRIM(IFNULL(${alias}.agent, '')) = ''
+        AND EXISTS (
+          SELECT 1 FROM cloudtalk_sms link
+          WHERE link.company_id = ${alias}.company_id
+            AND ${inboundToPhone}
+            AND (
+              CAST(link.sender AS CHAR) = CAST(${alias}.sender AS CHAR)
+              OR CAST(link.recipient AS CHAR) = CAST(${alias}.sender AS CHAR)
+            )
+        )
+      )
+      OR EXISTS (
+        SELECT 1 FROM cloudtalk_sms link
+        WHERE link.company_id = ${alias}.company_id
+          AND ${inboundToPhone}
+          AND ${threadLinkMatch}
+      )
+    )`,
+    params: [...variants, ...variants, ...variants],
+  }
+}
+
 function agentScopeClause(
   user: SessionUser,
   alias: string,
@@ -261,11 +316,31 @@ function agentScopeClause(
     }
     return { clause: '1 = 1', params: [] }
   }
+
+  const clauses: string[] = []
+  const params: (string | number)[] = []
+
   const agentId = userAgentId(user)
-  if (!agentId) {
+  if (agentId) {
+    const agentFilter = agentIdFilterClause(alias, agentId)
+    clauses.push(agentFilter.clause)
+    params.push(...agentFilter.params)
+  }
+
+  const phoneDigits = userCloudtalkPhone(user)
+  if (phoneDigits) {
+    const phoneFilter = phoneNumberFilterClause(alias, phoneDigits)
+    clauses.push(phoneFilter.clause)
+    params.push(...phoneFilter.params)
+  }
+
+  if (clauses.length === 0) {
     return { clause: '1 = 0', params: [] }
   }
-  return agentIdFilterClause(alias, agentId)
+  if (clauses.length === 1) {
+    return { clause: clauses[0], params }
+  }
+  return { clause: `(${clauses.join(' OR ')})`, params }
 }
 
 const COMPANY_SENDER_SUBQUERY = `(

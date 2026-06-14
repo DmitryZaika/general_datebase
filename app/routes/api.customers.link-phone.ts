@@ -9,7 +9,7 @@ import {
   requireEmployeeWithCsrf,
 } from '~/utils/apiResponse.server'
 import { syncCustomerToCloudTalk } from '~/utils/cloudtalkContactSync.server'
-import { normalizeToE164, PHONE_DIGITS_REGEX } from '~/utils/phone'
+import { formatPhoneForStorage, PHONE_DIGITS_REGEX } from '~/utils/phone'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 
@@ -38,11 +38,12 @@ export async function action({ request }: ActionFunctionArgs) {
     const customer = rows[0]
     if (!customer) return notFound('customer_not_found')
 
-    const e164 = normalizeToE164(phoneDigits)
+    const formatted = formatPhoneForStorage(phoneDigits)
+    if (!formatted) return badRequest('invalid_phone')
     const phoneColumn = customer.phone ? 'phone_2' : 'phone'
     await db.execute(
       `UPDATE customers SET ${phoneColumn} = ? WHERE id = ? AND company_id = ?`,
-      [e164 ?? phoneDigits, customerId, user.company_id],
+      [formatted, customerId, user.company_id],
     )
 
     // Eagerly upsert into cloudtalk_contacts so subsequent fetchCustomerByPhone

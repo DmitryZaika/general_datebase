@@ -32,6 +32,7 @@ const SMS_TEST_SCHEMA_DDL = [
     is_superuser TINYINT(1) DEFAULT 0,
     company_id INT NULL,
     cloudtalk_agent_id VARCHAR(64) NULL,
+    cloudtalk_phone_number VARCHAR(20) NULL,
     pined_bar INT DEFAULT 0,
     is_deleted TINYINT(1) DEFAULT 0,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -98,6 +99,7 @@ const SMS_TEST_TABLES = [
 
 export interface SmsTestUser extends SessionUser {
   cloudtalk_agent_id: Nullable<string>
+  cloudtalk_phone_number: Nullable<string>
 }
 
 export class DatabaseTestHelper {
@@ -266,6 +268,7 @@ interface UserOverrides {
   is_superuser?: boolean
   company_id?: number
   cloudtalk_agent_id?: Nullable<string>
+  cloudtalk_phone_number?: Nullable<string>
 }
 
 interface SmsInboundOverrides {
@@ -367,6 +370,7 @@ export class TestDataFactory {
       is_superuser: overrides.is_superuser ? 1 : 0,
       company_id: overrides.company_id ?? 1,
       cloudtalk_agent_id: overrides.cloudtalk_agent_id ?? null,
+      cloudtalk_phone_number: overrides.cloudtalk_phone_number ?? null,
     })
     return {
       id,
@@ -379,6 +383,7 @@ export class TestDataFactory {
       company_id: overrides.company_id ?? 1,
       pined_bar: 0,
       cloudtalk_agent_id: overrides.cloudtalk_agent_id ?? null,
+      cloudtalk_phone_number: overrides.cloudtalk_phone_number ?? null,
     }
   }
 
