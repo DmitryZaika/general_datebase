@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import type { ActionFunctionArgs } from 'react-router'
 import { z } from 'zod'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -45,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       messages: [
         {
           role: 'system',

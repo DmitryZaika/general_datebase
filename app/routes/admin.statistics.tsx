@@ -16,6 +16,7 @@ import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
+import { parseStoredLocalDatetime } from '~/lib/dateHelpers'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
@@ -73,6 +74,7 @@ type CustomersTableDeal = {
   amount: number | null
   status: string | null
   lost_reason: string | null
+  is_won: number | null
 }
 
 type ConversionMetrics = {
@@ -384,6 +386,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               d.amount,
               d.status,
               d.lost_reason,
+              d.is_won,
               COALESCE(u.name, u2.name, '') as sales_rep_name
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
@@ -607,13 +610,20 @@ export default function AdminStatistics() {
   const navigate = useNavigate()
   const location = useLocation()
   const [from, setFrom] = useState<Date | undefined>(
-    fromDate ? new Date(fromDate) : undefined,
+    fromDate ? parseStoredLocalDatetime(fromDate) : undefined,
   )
-  const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
+  const [to, setTo] = useState<Date | undefined>(
+    toDate ? parseStoredLocalDatetime(toDate) : undefined,
+  )
   const [customersPage, setCustomersPage] = useState(1)
   const customersPageSize = 500
   const [highlightCustomerId, setHighlightCustomerId] = useState<number | null>(null)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    setFrom(fromDate ? parseStoredLocalDatetime(fromDate) : undefined)
+    setTo(toDate ? parseStoredLocalDatetime(toDate) : undefined)
+  }, [fromDate, toDate])
 
   useEffect(() => {
     return () => {
@@ -933,7 +943,16 @@ export default function AdminStatistics() {
         const createdDate = new Date(customer.created_date)
         const deal = dealByCustomer.get(customer.id)
         const isInvalid = customer.invalid_lead && customer.invalid_lead !== ''
-        const status = isInvalid ? 'Invalid' : deal?.status || ''
+        let status = ''
+        if (isInvalid) {
+          status = 'Invalid'
+        } else if (deal?.is_won === 1) {
+          status = 'Won'
+        } else if (deal?.is_won === 0) {
+          status = 'Lost'
+        } else {
+          status = deal?.status || ''
+        }
         const lostReason = isInvalid
           ? customer.invalid_lead || ''
           : deal?.lost_reason || ''

@@ -8,6 +8,7 @@ import {
   sanitizeCallNoteContent,
   VOICEMAIL_NO_ANSWER_NOTE,
 } from '~/lib/callAiHelpers'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -107,12 +108,12 @@ Do not include plumbing unless the customer asked about it or raised it as part 
 Never include a Next steps discussed bullet or any task list (send link, send photos, quotes, callbacks, follow-ups, website, inventory, or agreed call-back dates). Notes are job facts only—tasks are handled separately as CRM activities. No filler such as "no details discussed".`
 
     const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       messages: [
         { role: 'system', content: systemContent },
         { role: 'user', content: transcript },
       ],
-      ...(isVoicemail ? { max_tokens: 180 } : {}),
+      ...(isVoicemail ? { max_completion_tokens: 180 } : {}),
     })
 
     const content = completion.choices[0]?.message?.content ?? ''

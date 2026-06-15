@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Edit, Search, Trash } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -14,6 +15,13 @@ function detectSearchType(term: string): 'name' | 'phone' | 'email' {
   if (digits.length >= 4) return 'phone'
   return 'name'
 }
+
+const RESULTS_PANEL_VARIANTS = {
+  hidden: { opacity: 0, y: -10 },
+  visible: { opacity: 1, y: 0 },
+}
+
+const RESULTS_PANEL_TRANSITION = { duration: 0.2, ease: 'easeOut' as const }
 
 export function FindCustomer({
   className,
@@ -120,9 +128,18 @@ export function FindCustomer({
         </div>
       </div>
 
-      {isInputFocused && customers.length > 0 && (
-        <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
-          {displayCustomers.map(customer => {
+      <AnimatePresence initial={false}>
+        {isInputFocused && customers.length > 0 && (
+          <motion.div
+            key='customer-search-results'
+            variants={RESULTS_PANEL_VARIANTS}
+            initial='hidden'
+            animate='visible'
+            exit='hidden'
+            transition={RESULTS_PANEL_TRANSITION}
+            className='absolute z-50 w-full mt-2 origin-top bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'
+          >
+            {displayCustomers.map(customer => {
             const emailTrim = customer.email?.trim() ?? ''
             const phoneTrim = customer.phone?.trim() ?? ''
             const emailLine = emailTrim || 'no email'
@@ -230,8 +247,9 @@ export function FindCustomer({
               </Button>
             </div>
           )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import {
   resolveIsVoicemail,
   VOICEMAIL_GREETING_ACTIVITY_NAME,
 } from '~/lib/callAiHelpers'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -2091,7 +2092,7 @@ ${callReference}`
 
   try {
     const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -2100,7 +2101,7 @@ ${callReference}`
         },
         { role: 'user', content: transcript },
       ],
-      ...(isVoicemail ? { max_tokens: 250 } : {}),
+      ...(isVoicemail ? { max_completion_tokens: 250 } : {}),
     })
 
     const rawContent = completion.choices[0]?.message?.content ?? '{}'

@@ -2840,9 +2840,9 @@ export function Chat({
 													Price lists
 												</DropdownMenuItem>
 												{/* <DropdownMenuItem onClick={enableAiDesignMode}>
-                          <Sparkles className='size-4' />
-                          AI Design
-                        </DropdownMenuItem> */}
+													<Sparkles className="size-4" />
+													AI Design
+												</DropdownMenuItem> */}
 											</DropdownMenuContent>
 										</DropdownMenu>
 										<Input

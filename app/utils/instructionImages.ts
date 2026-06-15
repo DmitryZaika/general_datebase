@@ -358,6 +358,21 @@ function imagesFrom(instructions: InstructionSlim[]): string[] {
   return urls
 }
 
+export function collectImagesForMatchedInstructions(
+  instructions: InstructionSlim[],
+  matched: MatchedInstruction[],
+): string[] {
+  if (matched.length === 0) return []
+
+  const byId = new Map(instructions.map(instruction => [instruction.id, instruction]))
+  const picked: InstructionSlim[] = []
+  for (const match of matched) {
+    const instruction = byId.get(match.id)
+    if (instruction) picked.push(instruction)
+  }
+  return imagesFrom(picked)
+}
+
 export function collectRelatedInstructionImages(
   instructions: InstructionSlim[],
   query: string,

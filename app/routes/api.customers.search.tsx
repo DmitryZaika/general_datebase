@@ -52,7 +52,36 @@ function matchesNameFuzzy(name: string, term: string) {
 export const customerSchema = z.object({
   term: z.string(),
   searchType: z.enum(['name', 'phone', 'email', 'company']).prefault('name'),
+  ownOnly: z
+    .enum(['0', '1'])
+    .optional()
+    .transform(v => v === '1'),
 })
+
+function salesRepScopeClause(ownOnly: boolean): string {
+  return ownOnly ? ' AND (c.sales_rep IS NULL OR c.sales_rep = ?)' : ''
+}
+
+function pushSalesRepScopeParam(
+  params: Array<string | number>,
+  ownOnly: boolean,
+  userId: number,
+): void {
+  if (ownOnly) params.push(userId)
+}
+
+function buildScopedParams(
+  joinUserId: number,
+  companyId: number,
+  ownOnly: boolean,
+  scopeUserId: number,
+  rest: Array<string | number>,
+): Array<string | number> {
+  const params: Array<string | number> = [joinUserId, companyId]
+  pushSalesRepScopeParam(params, ownOnly, scopeUserId)
+  params.push(...rest)
+  return params
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user: User = await getEmployeeUser(request)
@@ -60,11 +89,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const customerData = {
     term: url.searchParams.get('term'),
     searchType: url.searchParams.get('searchType') || 'name',
+    ownOnly: url.searchParams.get('ownOnly') ?? '0',
   }
   let term: string
   let searchType: 'name' | 'phone' | 'email' | 'company'
+  let ownOnly = false
   try {
-    ;({ term, searchType } = customerSchema.parse(customerData))
+    const parsed = customerSchema.parse(customerData)
+    term = parsed.term
+    searchType = parsed.searchType
+    ownOnly = parsed.ownOnly ?? false
   } catch (error) {
     posthogClient.captureException(error)
     return data({ error: 'Invalid search parameters' }, { status: 422 })
@@ -74,6 +108,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const like = `%${term}%`
     const prefixLike = `${term}%`
     const prefetchedLimit = 100
+    const repScope = salesRepScopeClause(ownOnly)
 
     let customers: Customer[] = []
 
@@ -111,7 +146,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
          ${LATEST_DEAL_SELECT}
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
-         WHERE c.company_id = ? AND c.deleted_at IS NULL
+         WHERE c.company_id = ? AND c.deleted_at IS NULL${repScope}
            AND ${whereCondition}
          ORDER BY
            CASE
@@ -126,16 +161,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
            END,
            c.name ASC
          LIMIT ${prefetchedLimit}`,
-        [
-          user.id,
-          user.company_id,
+        buildScopedParams(user.id, user.company_id, ownOnly, user.id, [
           ...nameParams,
           prefixLike,
           like,
           user.id,
           prefixLike,
           like,
-        ],
+        ]),
       )
     } else if (searchType === 'phone') {
       const digits = term.replace(/\D/g, '')
@@ -152,7 +185,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
            ${LATEST_DEAL_SELECT}
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
-           WHERE c.company_id = ? AND c.deleted_at IS NULL
+           WHERE c.company_id = ? AND c.deleted_at IS NULL${repScope}
              AND (c.phone LIKE ? OR c.phone_2 LIKE ?)
            ORDER BY
              CASE
@@ -167,9 +200,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
              END,
              c.name ASC
            LIMIT 15`,
-          [
-            user.id,
-            user.company_id,
+          buildScopedParams(user.id, user.company_id, ownOnly, user.id, [
             like,
             like,
             user.id,
@@ -177,7 +208,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             prefixLike,
             like,
             like,
-          ],
+          ]),
         )
       } else {
         const likeDigits = `%${digits}%`
@@ -191,7 +222,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
            ${LATEST_DEAL_SELECT}
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
-           WHERE c.company_id = ? AND c.deleted_at IS NULL
+           WHERE c.company_id = ? AND c.deleted_at IS NULL${repScope}
              AND (${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ? OR ${phone2Expr} LIKE ? OR ${phone2Expr} LIKE ?)
            ORDER BY
              CASE
@@ -206,9 +237,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
              END,
              c.name ASC
            LIMIT 15`,
-          [
-            user.id,
-            user.company_id,
+          buildScopedParams(user.id, user.company_id, ownOnly, user.id, [
             likeDigits,
             likeLast10,
             likeDigits,
@@ -222,7 +251,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             likeLast10,
             likeDigits,
             likeLast10,
-          ],
+          ]),
         )
       }
     } else if (searchType === 'company') {
@@ -232,7 +261,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
          ${LATEST_DEAL_SELECT}
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
-         WHERE c.company_id = ? AND c.deleted_at IS NULL
+         WHERE c.company_id = ? AND c.deleted_at IS NULL${repScope}
            AND (c.company_name IS NOT NULL AND c.company_name != '' AND (c.company_name LIKE ? OR c.company_name LIKE ?))
          ORDER BY
            CASE
@@ -247,7 +276,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
            END,
            c.name ASC
          LIMIT ${prefetchedLimit}`,
-        [user.id, user.company_id, prefixLike, like, user.id, prefixLike, like],
+        buildScopedParams(user.id, user.company_id, ownOnly, user.id, [
+          prefixLike,
+          like,
+          user.id,
+          prefixLike,
+          like,
+        ]),
       )
       customers = customers
         .filter(c => matchesNameFuzzy(c.company_name ?? '', term))
@@ -259,7 +294,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
          ${LATEST_DEAL_SELECT}
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
-         WHERE c.company_id = ? AND c.deleted_at IS NULL
+         WHERE c.company_id = ? AND c.deleted_at IS NULL${repScope}
            AND (c.email LIKE ? OR c.email LIKE ?)
          ORDER BY
            CASE
@@ -274,7 +309,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
            END,
            c.name ASC
          LIMIT 15`,
-        [user.id, user.company_id, prefixLike, like, user.id, prefixLike, like],
+        buildScopedParams(user.id, user.company_id, ownOnly, user.id, [
+          prefixLike,
+          like,
+          user.id,
+          prefixLike,
+          like,
+        ]),
       )
     }
 

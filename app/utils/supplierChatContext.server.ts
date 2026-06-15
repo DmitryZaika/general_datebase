@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { toFile } from 'openai/uploads'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { db } from '~/db.server'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { selectMany } from '~/utils/queryHelpers'
 import { downloadFileAsBuffer } from '~/utils/s3.server'
 
@@ -670,9 +671,9 @@ async function extractPdfInline(
   filename: string,
 ): Promise<string | null> {
   const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini-2025-04-14',
+    model: GPT_MINI_MODEL,
     temperature: 0,
-    max_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
+    max_completion_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
     messages: [
       {
         role: 'user',
@@ -705,9 +706,9 @@ async function extractPdfViaUpload(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       temperature: 0,
-      max_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
+      max_completion_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
       messages: [
         {
           role: 'user',
@@ -743,9 +744,9 @@ async function extractPdfWithOpenAI(
 async function extractFullImageText(url: string): Promise<string | null> {
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       temperature: 0,
-      max_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
+      max_completion_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
       messages: [
         {
           role: 'user',

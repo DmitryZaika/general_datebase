@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
 import { AlertCircle, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { CustomerForm } from '~/components/pages/CustomerForm'
@@ -14,6 +15,13 @@ import { RawSelect } from './RawSelect'
 
 const selectOptions = ['name', 'phone', 'email', 'company'] as const
 type SelectOption = (typeof selectOptions)[number]
+
+const RESULTS_PANEL_VARIANTS = {
+  hidden: { opacity: 0, y: -10 },
+  visible: { opacity: 1, y: 0 },
+}
+
+const RESULTS_PANEL_TRANSITION = { duration: 0.2, ease: 'easeOut' as const }
 
 function CustomerSearchError({
   error,
@@ -328,60 +336,69 @@ export function CustomerSearch({
           className='w-full'
         />
         {error && <CustomerSearchError error={error} className='text-red-500' />}
-        {isListOpen && customerSuggestions.length > 0 && (
-          <Command
-            shouldFilter={false}
-            className='z-60 top-full mt-1 w-full h-auto border rounded-md bg-white shadow-md absolute'
-          >
-            <CommandList className='max-h-80'>
-              <CommandGroup heading={isFetching ? 'Searching…' : 'Suggestions'}>
-                {customerSuggestions.map(c => {
-                  const details = customerSuggestionDetails(c)
-                  return (
-                    <CommandItem
-                      key={c.id}
-                      value={String(c.id)}
-                      onSelect={() => {
-                        setIsListOpen(false)
-                        handleFinal(c.id)
-                      }}
-                    >
-                      <div className='flex min-w-0 flex-col gap-0.5 py-0.5'>
-                        <span className='font-medium text-gray-900'>{c.name}</span>
-                        <span
-                          className={cn(
-                            'text-xs',
-                            details.hasEmail ? 'text-gray-500' : 'text-gray-400',
-                          )}
+        <AnimatePresence initial={false}>
+          {isListOpen && customerSuggestions.length > 0 && (
+            <motion.div
+              key='customer-search-suggestions'
+              variants={RESULTS_PANEL_VARIANTS}
+              initial='hidden'
+              animate='visible'
+              exit='hidden'
+              transition={RESULTS_PANEL_TRANSITION}
+              className='absolute z-60 top-full mt-1 w-full origin-top'
+            >
+              <Command shouldFilter={false} className='h-auto border rounded-md bg-white shadow-md'>
+                <CommandList className='max-h-80'>
+                  <CommandGroup heading={isFetching ? 'Searching…' : 'Suggestions'}>
+                    {customerSuggestions.map(c => {
+                      const details = customerSuggestionDetails(c)
+                      return (
+                        <CommandItem
+                          key={c.id}
+                          value={String(c.id)}
+                          onSelect={() => {
+                            setIsListOpen(false)
+                            handleFinal(c.id)
+                          }}
                         >
-                          {details.emailLine}
-                        </span>
-                        <span
-                          className={cn(
-                            'text-xs',
-                            details.hasPhone ? 'text-gray-500' : 'text-gray-400',
-                          )}
-                        >
-                          {details.phoneLine}
-                        </span>
-                        {details.company ? (
-                          <span className='text-xs text-gray-500'>
-                            {details.company}
-                          </span>
-                        ) : null}
-                        {details.address ? (
-                          <span className='text-xs text-gray-500'>
-                            {details.address}
-                          </span>
-                        ) : null}
-                      </div>
-                    </CommandItem>
-                  )
-                })}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        )}
+                          <div className='flex min-w-0 flex-col gap-0.5 py-0.5'>
+                            <span className='font-medium text-gray-900'>{c.name}</span>
+                            <span
+                              className={cn(
+                                'text-xs',
+                                details.hasEmail ? 'text-gray-500' : 'text-gray-400',
+                              )}
+                            >
+                              {details.emailLine}
+                            </span>
+                            <span
+                              className={cn(
+                                'text-xs',
+                                details.hasPhone ? 'text-gray-500' : 'text-gray-400',
+                              )}
+                            >
+                              {details.phoneLine}
+                            </span>
+                            {details.company ? (
+                              <span className='text-xs text-gray-500'>
+                                {details.company}
+                              </span>
+                            ) : null}
+                            {details.address ? (
+                              <span className='text-xs text-gray-500'>
+                                {details.address}
+                              </span>
+                            ) : null}
+                          </div>
+                        </CommandItem>
+                      )
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {selectedCustomer && (
           <Button
             type='button'

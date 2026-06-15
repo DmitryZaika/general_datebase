@@ -13,9 +13,10 @@ import {
 import { DONE_KEY } from '~/utils/constants'
 import {
   buildPriceQueryHint,
-  collectRelatedInstructionImages,
+  collectImagesForMatchedInstructions,
   findBestMatchingInstruction,
   isPriceQuery,
+  type MatchedInstruction,
   resolveInstructionsUsedForReply,
 } from '~/utils/instructionImages'
 import {
@@ -35,6 +36,7 @@ import {
   type PriceListProgress,
   type SupplierSource,
 } from '~/utils/supplierChatContext.server'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { selectMany } from '../utils/queryHelpers'
 import { getUserBySessionId } from '../utils/session.server'
 
@@ -293,11 +295,7 @@ async function streamTextAnswer(
   }
 }
 
-async function loadInstructionMatchData(
-  companyId: number,
-  query: string,
-): Promise<{
-  images: string[]
+async function loadInstructionMatchData(companyId: number): Promise<{
   instructions: InstructionSlim[]
 }> {
   const instructions = await selectMany<InstructionSlim>(
@@ -305,10 +303,7 @@ async function loadInstructionMatchData(
     'SELECT id, title, rich_text from instructions WHERE company_id = ?',
     [companyId],
   )
-  return {
-    images: collectRelatedInstructionImages(instructions, query),
-    instructions,
-  }
+  return { instructions }
 }
 
 async function insertContext(user_id: number, messages: Message[], answer: string) {
@@ -506,19 +501,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
           const instructionMatch =
             mode === 'instructions'
-              ? await loadInstructionMatchData(companyId, query)
+              ? await loadInstructionMatchData(companyId)
               : {
-                  images: [] as string[],
                   instructions: [] as InstructionSlim[],
                 }
 
           send({ event: 'status', data: JSON.stringify({ state: 'answering' }) })
 
           const response = await openai.chat.completions.create({
-            model: 'gpt-4.1-mini-2025-04-14',
+            model: GPT_MINI_MODEL,
             messages: buildRequestMessages(messages, imageDataUrl),
             temperature: 0,
-            max_tokens: 1024,
+            max_completion_tokens: 1024,
             stream: true,
           })
 
@@ -552,10 +546,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
           }
 
           const hasInfo = answerHasUsableInfo(cleanAnswer)
-          const imagesToSend = mode === 'instructions' ? instructionMatch.images : []
+          let instructionsUsed: MatchedInstruction[] = []
+          let imagesToSend: string[] = []
 
           if (hasInfo && mode === 'instructions') {
-            let instructionsUsed = resolveInstructionsUsedForReply(
+            instructionsUsed = resolveInstructionsUsedForReply(
               instructionMatch.instructions,
               answer,
               query,
@@ -577,6 +572,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
                 event: 'instructions',
                 data: JSON.stringify(instructionsUsed),
               })
+              imagesToSend = collectImagesForMatchedInstructions(
+                instructionMatch.instructions,
+                instructionsUsed,
+              )
             }
           }
 
