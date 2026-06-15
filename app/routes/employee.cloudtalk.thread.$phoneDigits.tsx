@@ -9,7 +9,7 @@ import {
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { SmsConversationPane } from '~/components/organisms/SmsPage/SmsConversationPane'
 import { SmsLinkCustomerDialog } from '~/components/organisms/SmsPage/SmsLinkCustomerDialog'
-import { fetchThread, sendSms } from '~/components/organisms/SmsPage/service'
+import { fetchThread, markThreadRead, sendSms } from '~/components/organisms/SmsPage/service'
 import type { SmsMessage, SmsThread } from '~/components/organisms/SmsPage/types'
 import { useCloudtalkReadOnly } from '~/hooks/useCloudtalkReadOnly'
 import type { Nullable } from '~/types/utils'
@@ -75,6 +75,17 @@ export default function CloudTalkThread() {
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
   })
+
+  useEffect(() => {
+    if (readOnly) return
+    if (!phoneDigits) return
+    void markThreadRead(phoneDigits, csrfToken)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
+        queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-unread-count'] })
+      })
+      .catch(() => undefined)
+  }, [readOnly, phoneDigits, csrfToken, queryClient])
 
   useEffect(() => {
     if (readOnly) return

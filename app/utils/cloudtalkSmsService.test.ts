@@ -484,6 +484,51 @@ describe('listThreadsForUser', () => {
     expect(result.threads[0].phoneDigits).toBe('3173161456')
   })
 
+  test('finds threads by customer name with reversed words and one typo', async () => {
+    const company = await factory.company()
+    const admin = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
+    await factory.customer({
+      company_id: company.id,
+      name: 'John Smith',
+      phone: '317-316-1456',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: admin.id,
+      agent: TEST_AGENT,
+      text: 'hello',
+    })
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '5125559090',
+      agent: TEST_AGENT,
+      text: 'other',
+    })
+
+    const reversed = await listThreadsForUser({
+      user: admin,
+      search: 'Smith John',
+      limit: 20,
+      offset: 0,
+    })
+    expect(reversed.threads).toHaveLength(1)
+    expect(reversed.threads[0].phoneDigits).toBe('3173161456')
+
+    const typo = await listThreadsForUser({
+      user: admin,
+      search: 'Jhon Smiht',
+      limit: 20,
+      offset: 0,
+    })
+    expect(typo.threads).toHaveLength(1)
+    expect(typo.threads[0].phoneDigits).toBe('3173161456')
+  })
+
   test('scope all with agentId filter shows only that rep threads', async () => {
     const company = await factory.company()
     const admin = await factory.user({
@@ -787,6 +832,82 @@ describe('getThreadForUser', () => {
     expect(result.threads[0].phoneDigits).toBe(customerPhone)
     expect(result.threads[0].messageCount).toBe(2)
     expect(result.threads[0].lastDirection).toBe('outbound')
+  })
+
+  test('does not count rep phone-app sends as unread in thread list', async () => {
+    const company = await factory.company()
+    const user = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
+    const customerPhone = '3178351004'
+    const companyPhone = '3176767938'
+
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: customerPhone,
+      recipient: companyPhone,
+      text: 'Customer hello',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: companyPhone,
+      recipient: customerPhone,
+      agent: '540273',
+      text: 'Rep reply from phone app',
+    })
+
+    const result = await listThreadsForUser({
+      user,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+
+    expect(result.threads).toHaveLength(1)
+    expect(result.threads[0].phoneDigits).toBe(customerPhone)
+    expect(result.threads[0].unreadCount).toBe(1)
+  })
+
+  test('clears thread unread after mark-read when phone digits differ by leading 1', async () => {
+    const company = await factory.company()
+    const user = await factory.user({
+      company_id: company.id,
+      is_admin: true,
+      cloudtalk_agent_id: TEST_AGENT,
+    })
+
+    await factory.smsOutbound({
+      company_id: company.id,
+      recipient: '3173161456',
+      sender_user_id: user.id,
+      agent: TEST_AGENT,
+      text: 'seed',
+    })
+    await factory.smsInbound({
+      company_id: company.id,
+      sender: '13173161456',
+      text: 'customer msg',
+    })
+
+    const before = await listThreadsForUser({
+      user,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+    expect(before.threads[0]?.unreadCount).toBe(1)
+
+    await markThreadReadForUser({ user, phoneDigits: '3173161456' })
+
+    const after = await listThreadsForUser({
+      user,
+      search: '',
+      limit: 20,
+      offset: 0,
+    })
+    expect(after.threads[0]?.unreadCount).toBe(0)
   })
 
   test('hides CloudTalk webhook echo of app-sent outbound', async () => {

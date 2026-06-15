@@ -150,6 +150,8 @@ export default function CloudTalkPage() {
   const handleStartConversation = useCallback(
     (phoneDigits: string) => {
       setNewConversationOpen(false)
+      setSearch('')
+      setSearchFetchPending(false)
       navigate(`${cloudtalkBase}/thread/${phoneDigits}`)
     },
     [navigate, cloudtalkBase],

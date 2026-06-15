@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
 import { OUTBOUND_ECHO_EXCLUSION } from '~/utils/cloudtalkSms.server'
+import { findThreadPhoneDigitsByCustomerName } from '~/utils/customerNameSearch.server'
 import { canonicalPhone10, phoneVariants } from '~/utils/phone'
 import { selectMany } from '~/utils/queryHelpers'
 import type { SessionUser } from '~/utils/session.server'
@@ -343,10 +344,11 @@ function agentScopeClause(
   return { clause: `(${clauses.join(' OR ')})`, params }
 }
 
-const COMPANY_SENDER_SUBQUERY = `(
+function companySenderSubquery(companyIdExpr: string): string {
+  return `(
   SELECT DISTINCT CAST(s2.sender AS CHAR) AS phone
   FROM cloudtalk_sms s2
-  WHERE s2.company_id = s.company_id
+  WHERE s2.company_id = ${companyIdExpr}
     AND s2.agent IS NOT NULL
     AND TRIM(s2.agent) != ''
     AND s2.sender IS NOT NULL
@@ -358,6 +360,10 @@ const COMPANY_SENDER_SUBQUERY = `(
         AND CAST(c.recipient AS CHAR) = CAST(s2.sender AS CHAR)
     )
 )`
+}
+
+const COMPANY_SENDER_SUBQUERY = companySenderSubquery('s.company_id')
+const COMPANY_SENDER_SUBQUERY_SCOPED = companySenderSubquery('company_id')
 
 const CUSTOMER_PHONE_SQL = `CONVERT(CAST(
   CASE
@@ -368,6 +374,18 @@ const CUSTOMER_PHONE_SQL = `CONVERT(CAST(
 AS CHAR) USING utf8mb4) COLLATE utf8mb4_0900_ai_ci`
 
 const COMPANY_LINE_EXCLUSION = `${CUSTOMER_PHONE_SQL} NOT IN ${COMPANY_SENDER_SUBQUERY}`
+
+const UNREAD_CUSTOMER_INBOUND_SQL = `direction = 'inbound'
+  AND (agent IS NULL OR TRIM(IFNULL(agent, '')) = '')
+  AND CAST(sender AS CHAR) NOT IN ${COMPANY_SENDER_SUBQUERY_SCOPED}`
+
+const UNREAD_CUSTOMER_INBOUND_ON_S = `s.direction = 'inbound'
+  AND (s.agent IS NULL OR TRIM(IFNULL(s.agent, '')) = '')
+  AND CAST(s.sender AS CHAR) NOT IN ${COMPANY_SENDER_SUBQUERY}`
+
+function threadReadPhoneMatch(phoneExpr: string): string {
+  return `RIGHT(r.customer_phone_digits, 10) = RIGHT(${phoneExpr}, 10)`
+}
 
 interface TotalCountRow {
   total_count: number
@@ -395,6 +413,17 @@ export async function listThreadsForUser(
       searchClauseParts.push(`${CUSTOMER_PHONE_SQL} LIKE ?`)
       searchParams.push(`%${searchDigits}%`)
     }
+    if (/[a-zA-Z]/.test(searchTrimmed) && searchTrimmed.length >= 2) {
+      const namePhoneDigits = await findThreadPhoneDigitsByCustomerName(
+        user.company_id,
+        searchTrimmed,
+      )
+      if (namePhoneDigits.length > 0) {
+        const phonePlaceholders = namePhoneDigits.map(() => '?').join(',')
+        searchClauseParts.push(`RIGHT(${CUSTOMER_PHONE_SQL}, 10) IN (${phonePlaceholders})`)
+        searchParams.push(...namePhoneDigits)
+      }
+    }
     searchClauseParts.push('LOWER(s.text) LIKE ?')
     searchParams.push(`%${searchTrimmed.toLowerCase()}%`)
   }
@@ -421,7 +450,7 @@ export async function listThreadsForUser(
       LEFT JOIN cloudtalk_sms_thread_reads r
         ON r.user_id = ?
        AND r.company_id = ?
-       AND r.customer_phone_digits = scoped.phone_digits
+       AND ${threadReadPhoneMatch('scoped.phone_digits')}
     ),
     latest AS (
       SELECT *, ROW_NUMBER() OVER (PARTITION BY phone_digits ORDER BY created_date DESC, id DESC) AS rn
@@ -433,6 +462,7 @@ export async function listThreadsForUser(
              SUM(
                CASE
                  WHEN CAST(sender AS CHAR) = phone_digits
+                  AND ${UNREAD_CUSTOMER_INBOUND_SQL}
                   AND (last_read_at IS NULL OR created_date > last_read_at)
                    THEN 1
                  ELSE 0
@@ -632,12 +662,10 @@ export async function getUnreadThreadCountForUser(
       LEFT JOIN cloudtalk_sms_thread_reads r
         ON r.user_id = ?
        AND r.company_id = s.company_id
-       AND r.customer_phone_digits = ${CUSTOMER_PHONE_SQL}
+       AND ${threadReadPhoneMatch(CUSTOMER_PHONE_SQL)}
      WHERE s.company_id = ?
-       AND s.direction = 'inbound'
+       AND ${UNREAD_CUSTOMER_INBOUND_ON_S}
        AND ${OUTBOUND_ECHO_EXCLUSION}
-       AND (s.agent IS NULL OR TRIM(s.agent) = '')
-       AND s.sender NOT IN ${COMPANY_SENDER_SUBQUERY}
        AND ${agentScope.clause}
        AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)
   `
@@ -671,9 +699,10 @@ export async function getThreadUnreadCountForUser(
        LEFT JOIN cloudtalk_sms_thread_reads r
          ON r.user_id = ?
         AND r.company_id = s.company_id
-        AND r.customer_phone_digits = ?
+        AND ${threadReadPhoneMatch('?')}
       WHERE s.company_id = ?
         AND s.sender IN (${placeholders})
+        AND ${UNREAD_CUSTOMER_INBOUND_ON_S}
         AND ${agentScope.clause}
         AND (r.last_read_at IS NULL OR s.created_date > r.last_read_at)`,
     [user.id, digits, user.company_id, ...variants, ...agentScope.params],

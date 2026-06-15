@@ -33,6 +33,10 @@ export function SmsThreadList(props: SmsThreadListProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    setDraftSearch(props.search)
+  }, [props.search])
+
+  useEffect(() => {
     const t = setTimeout(() => {
       if (draftSearch !== props.search) {
         props.onSearchChange(draftSearch)

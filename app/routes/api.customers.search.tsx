@@ -2,6 +2,7 @@ import { data, type LoaderFunctionArgs } from 'react-router'
 import z from 'zod'
 import { db } from '~/db.server'
 import type { Customer } from '~/types'
+import { matchesNameFuzzy } from '~/utils/customerNameSearch.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -10,44 +11,6 @@ const LATEST_DEAL_SELECT = `
 (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
 (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won,
 (SELECT l.group_id FROM deals d INNER JOIN deals_list l ON d.list_id = l.id WHERE d.customer_id = c.id AND d.deleted_at IS NULL ORDER BY d.id DESC LIMIT 1) as deal_group_id`
-
-function levenshtein(a: string, b: string) {
-  if (a === b) return 0
-  const aLen = a.length
-  const bLen = b.length
-  if (aLen === 0) return bLen
-  if (bLen === 0) return aLen
-  const dp: number[] = []
-  for (let i = 0; i <= bLen; i++) dp[i] = i
-  for (let i = 1; i <= aLen; i++) {
-    let prev = dp[0]
-    dp[0] = i
-    for (let j = 1; j <= bLen; j++) {
-      const temp = dp[j]
-      if (a[i - 1] === b[j - 1]) {
-        dp[j] = prev
-      } else {
-        const min = dp[j] < dp[j - 1] ? dp[j] : dp[j - 1]
-        dp[j] = (prev < min ? prev : min) + 1
-      }
-      prev = temp
-    }
-  }
-  return dp[bLen]
-}
-
-function matchesNameFuzzy(name: string, term: string) {
-  const normalizedName = name.toLowerCase()
-  const normalizedTerm = term.toLowerCase().trim()
-  if (!normalizedTerm) return true
-  const termWords = normalizedTerm.split(/\s+/).filter(w => w.length > 0)
-  if (termWords.length === 0) return true
-  const nameWords = normalizedName.split(/\s+/).filter(w => w.length > 0)
-  return termWords.every(tw => {
-    if (normalizedName.includes(tw)) return true
-    return nameWords.some(nw => levenshtein(nw, tw) <= 1)
-  })
-}
 
 export const customerSchema = z.object({
   term: z.string(),

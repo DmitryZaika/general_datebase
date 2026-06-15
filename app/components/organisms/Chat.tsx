@@ -22,6 +22,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { useSidebar } from "~/components/ui/sidebar";
 import { useIsMobile } from "~/hooks/use-mobile";
 import "~/styles/instructions.css";
 import { stripChatResponseMarkersTrimmed } from "~/utils/chatAnswerHelpers";
@@ -118,6 +119,7 @@ interface ChatMessagesProps {
 	isCreatingImage: boolean;
 	scrollRef: React.RefObject<HTMLDivElement | null>;
 	contentRef: React.RefObject<HTMLDivElement | null>;
+	onSourceClick?: () => void;
 }
 
 interface MessageBubbleProps {
@@ -135,6 +137,7 @@ interface MessageBubbleProps {
 	onSpecialOrderCalculate: (slabs: number, deliveryCost: number) => void;
 	onRecalculate: () => void;
 	calculationDisabled: boolean;
+	onSourceClick?: () => void;
 }
 
 const CHAT_POSITION_KEY = "floatingChatPosition";
@@ -1401,6 +1404,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 	onSpecialOrderCalculate,
 	onRecalculate,
 	calculationDisabled,
+	onSourceClick,
 }) => {
 	let specialOrderActionMode:
 		| "yes"
@@ -1462,6 +1466,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 									href={source.url}
 									target="_blank"
 									rel="noopener noreferrer"
+									onClick={onSourceClick}
 									className="text-blue-700 underline underline-offset-2 hover:text-blue-900"
 								>
 									{source.name}
@@ -1497,6 +1502,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 								<Link
 									key={instruction.id}
 									to={`${instructionsPath}?instructionId=${instruction.id}`}
+									onClick={onSourceClick}
 									className={
 										message.role === "user"
 											? "text-white underline underline-offset-2 hover:text-white/90"
@@ -1534,6 +1540,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 	isCreatingImage,
 	scrollRef,
 	contentRef,
+	onSourceClick,
 }) => {
 	const showTypingIndicator =
 		isThinking &&
@@ -1622,6 +1629,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 										}
 									}}
 									calculationDisabled={isThinking || isClearingChat}
+									onSourceClick={onSourceClick}
 								/>
 							</motion.div>
 						);
@@ -1682,6 +1690,7 @@ export function Chat({
 }) {
 	const isSidebarVariant = variant === "sidebar";
 	const isMobile = useIsMobile();
+	const { setOpenMobile } = useSidebar();
 	const location = useLocation();
 	const instructionsPath = location.pathname.startsWith("/admin")
 		? "/admin/instructions"
@@ -1820,6 +1829,14 @@ export function Chat({
 			setTimeout(focus, 350);
 		}
 	}, []);
+
+	const handleSourceClick = useCallback(() => {
+		if (!isMobile) return;
+		setOpen(false);
+		if (isSidebarVariant) {
+			setOpenMobile(false);
+		}
+	}, [isMobile, isSidebarVariant, setOpenMobile]);
 
 	useEffect(() => {
 		if (open) {
@@ -2775,6 +2792,7 @@ export function Chat({
 								isCreatingImage={isGeneratingDesign}
 								scrollRef={messagesScrollRef}
 								contentRef={messagesContentRef}
+								onSourceClick={handleSourceClick}
 							/>
 						</div>
 						<div className="shrink-0 border-t border-gray-300 bg-gray-100">

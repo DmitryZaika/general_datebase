@@ -129,7 +129,15 @@ export default function CustomerInfoTab() {
           <CopyText value={customer.name} title={customer.name} />
         </div>
         <div className='text-sm text-slate-600 mt-2'>
-          {customer.company_name && <div>Company: {customer.company_name}</div>}
+          {customer.company_name && (
+            <div>
+              Company:{' '}
+              <CopyText
+                value={customer.company_name}
+                title={customer.company_name}
+              />
+            </div>
+          )}
           <div>
             Email:{' '}
             {customer.email ? (
