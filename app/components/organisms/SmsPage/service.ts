@@ -1,3 +1,5 @@
+import type { InfiniteData, QueryClient } from '@tanstack/react-query'
+import { canonicalPhone10 } from '~/utils/phone'
 import type { Nullable } from '~/types/utils'
 import type {
   CustomerSearchResult,
@@ -99,6 +101,53 @@ export async function markThreadRead(
     credentials: 'include',
   })
   if (!res.ok) throw new Error(`mark_read_failed:${res.status}`)
+}
+
+interface ThreadsInfinitePage {
+  threads: ThreadSummary[]
+  totalCount: number
+  unreadCount: number
+  hasMore: boolean
+  nextOffset: number
+}
+
+function threadPhoneMatches(phoneDigits: string, threadPhone: string): boolean {
+  return canonicalPhone10(phoneDigits) === canonicalPhone10(threadPhone)
+}
+
+export function clearThreadUnreadInCache(
+  queryClient: QueryClient,
+  phoneDigits: string,
+): void {
+  let hadUnread = false
+  queryClient.setQueriesData<InfiniteData<ThreadsInfinitePage>>(
+    { queryKey: ['cloudtalk-sms-threads'] },
+    old => {
+      if (!old) return old
+      const pages = old.pages.map(page => ({
+        ...page,
+        threads: page.threads.map(thread => {
+          if (!threadPhoneMatches(phoneDigits, thread.phoneDigits)) return thread
+          if (thread.unreadCount <= 0) return thread
+          hadUnread = true
+          return { ...thread, unreadCount: 0 }
+        }),
+      }))
+      if (!hadUnread) return old
+      return {
+        ...old,
+        pages: pages.map(page => ({
+          ...page,
+          unreadCount: Math.max(0, page.unreadCount - 1),
+        })),
+      }
+    },
+  )
+  if (!hadUnread) return
+  queryClient.setQueryData<{ count: number }>(['cloudtalk-sms-unread-count'], old => {
+    if (!old) return old
+    return { count: Math.max(0, old.count - 1) }
+  })
 }
 
 export async function sendSms(params: {

@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -18,7 +18,7 @@ import {
   NoThreadSelected,
 } from '~/components/organisms/SmsPage/SmsPageEmptyStates'
 import { SmsThreadList } from '~/components/organisms/SmsPage/SmsThreadList'
-import { fetchThreads } from '~/components/organisms/SmsPage/service'
+import { fetchThreads, clearThreadUnreadInCache } from '~/components/organisms/SmsPage/service'
 import type { ThreadSummary } from '~/components/organisms/SmsPage/types'
 import type { Nullable } from '~/types/utils'
 import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'
@@ -58,6 +58,7 @@ interface ThreadsPage {
 
 export default function CloudTalkPage() {
   const data = useLoaderData<typeof loader>()
+  const queryClient = useQueryClient()
 
   const params = useParams()
   const navigate = useNavigate()
@@ -113,6 +114,7 @@ export default function CloudTalkPage() {
     },
     initialPageParam: 0,
     getNextPageParam: last => (last.hasMore ? last.nextOffset : undefined),
+    staleTime: 15_000,
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
   })
@@ -141,10 +143,13 @@ export default function CloudTalkPage() {
 
   const handleSelect = useCallback(
     (phone: string) => {
+      if (!data.readOnly) {
+        clearThreadUnreadInCache(queryClient, phone)
+      }
       const qs = searchParams.toString()
       navigate(`${cloudtalkBase}/thread/${phone}${qs ? `?${qs}` : ''}`)
     },
-    [navigate, cloudtalkBase, searchParams],
+    [data.readOnly, queryClient, navigate, cloudtalkBase, searchParams],
   )
 
   const handleStartConversation = useCallback(

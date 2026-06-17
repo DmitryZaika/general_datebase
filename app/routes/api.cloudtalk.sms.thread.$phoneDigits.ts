@@ -38,7 +38,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     })
     const customer = await fetchCustomerByPhone(user.company_id, phoneDigits)
 
-    if (scope === 'mine') {
+    if (scope === 'mine' && result.messages.length > 0) {
       await markThreadReadForUser({ user, phoneDigits })
     }
 

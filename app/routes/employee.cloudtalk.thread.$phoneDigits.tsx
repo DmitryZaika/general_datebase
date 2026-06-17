@@ -9,7 +9,7 @@ import {
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { SmsConversationPane } from '~/components/organisms/SmsPage/SmsConversationPane'
 import { SmsLinkCustomerDialog } from '~/components/organisms/SmsPage/SmsLinkCustomerDialog'
-import { fetchThread, markThreadRead, sendSms } from '~/components/organisms/SmsPage/service'
+import { fetchThread, markThreadRead, clearThreadUnreadInCache, sendSms } from '~/components/organisms/SmsPage/service'
 import type { SmsMessage, SmsThread } from '~/components/organisms/SmsPage/types'
 import { useCloudtalkReadOnly } from '~/hooks/useCloudtalkReadOnly'
 import type { Nullable } from '~/types/utils'
@@ -72,6 +72,8 @@ export default function CloudTalkThread() {
         scope: readOnly ? 'all' : 'mine',
         agentId: filterAgentId,
       }),
+    staleTime: 30_000,
+    gcTime: 300_000,
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
   })
@@ -79,21 +81,9 @@ export default function CloudTalkThread() {
   useEffect(() => {
     if (readOnly) return
     if (!phoneDigits) return
-    void markThreadRead(phoneDigits, csrfToken)
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
-        queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-unread-count'] })
-      })
-      .catch(() => undefined)
+    clearThreadUnreadInCache(queryClient, phoneDigits)
+    void markThreadRead(phoneDigits, csrfToken).catch(() => undefined)
   }, [readOnly, phoneDigits, csrfToken, queryClient])
-
-  useEffect(() => {
-    if (readOnly) return
-    if (!phoneDigits) return
-    if (!threadQuery.data?.thread) return
-    queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-threads'] })
-    queryClient.invalidateQueries({ queryKey: ['cloudtalk-sms-unread-count'] })
-  }, [readOnly, phoneDigits, threadQuery.data?.thread, queryClient])
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -167,7 +157,7 @@ export default function CloudTalkThread() {
 
   const thread = threadQuery.data?.thread ?? null
   const threadReady =
-    thread !== null && thread.phoneDigits === phoneDigits && !threadQuery.isPending
+    thread !== null && thread.phoneDigits === phoneDigits && !threadQuery.isLoading
 
   useEffect(() => {
     if (threadReady && switchingPhone === phoneDigits) {
