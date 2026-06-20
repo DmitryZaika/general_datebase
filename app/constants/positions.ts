@@ -54,6 +54,11 @@ export const POSITIONS: PositionInfo[] = [
     displayName: 'Super Admin',
     description: 'Can switch between multiple companies',
   },
+  {
+    id: 10,
+    name: 'office_manager',
+    displayName: 'Office Manager',
+  },
 ]
 
 export const getPositionById = (id: number): PositionInfo | undefined => {
