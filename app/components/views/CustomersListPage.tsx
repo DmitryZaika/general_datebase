@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Info, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
@@ -29,6 +29,7 @@ import { DataTable } from '~/components/ui/data-table'
 import { DataTablePagination } from '~/components/ui/data-table-pagination'
 import { Dialog, DialogContent } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -40,6 +41,8 @@ import type { CustomersListCustomer } from '~/utils/customersListLoader.server'
 import {
   computeMonthlyCountsBySalesRep,
   getMonthlyCountLabel,
+  getMonthlyCountRankTooltipLines,
+  getSalesRepRankTierColorClass,
 } from '~/utils/customersMonthlyCounts'
 
 function SalesRepCell({ customer }: { customer: CustomersListCustomer }) {
@@ -577,16 +580,42 @@ export function CustomersListPage() {
         monthlyCountLabel &&
         monthlyCountsBySalesRep.length > 0 ? (
           <div className='flex flex-wrap items-center gap-2'>
-            <span className='text-sm text-slate-500'>{monthlyCountLabel}</span>
-            {monthlyCountsBySalesRep.map(item => (
-              <span
-                key={item.salesRepId}
-                className='inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700'
-              >
-                {item.salesRepName}:{' '}
-                <span className='ml-1 font-semibold text-slate-900'>{item.count}</span>
-              </span>
-            ))}
+            <span className='relative inline-block pr-3 text-sm text-slate-500'>
+              {monthlyCountLabel}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type='button'
+                    aria-label='How sales rep colors are ranked'
+                    className='absolute -top-2 right-0 inline-flex text-slate-400 hover:text-slate-600'
+                  >
+                    <Info className='h-3 w-3' />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side='top' sideOffset={6} className='max-w-sm'>
+                  <div className='space-y-1'>
+                    {getMonthlyCountRankTooltipLines().map(line => (
+                      <p key={line}>{line}</p>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </span>
+            {monthlyCountsBySalesRep.map(item => {
+              const rankColorClass = getSalesRepRankTierColorClass(item.rankTier)
+              return (
+                <span
+                  key={item.salesRepId}
+                  className='inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700'
+                >
+                  <span className={`font-medium ${rankColorClass}`.trim()}>
+                    {item.salesRepName}
+                  </span>
+                  :{' '}
+                  <span className='ml-1 font-semibold text-slate-900'>{item.count}</span>
+                </span>
+              )
+            })}
           </div>
         ) : null}
       </div>

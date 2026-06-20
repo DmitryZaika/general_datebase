@@ -1,7 +1,31 @@
+export type SalesRepRankTier = 'green' | 'yellow' | 'orange' | 'red'
+
 export type SalesRepMonthCount = {
   salesRepId: number
   salesRepName: string
   count: number
+  rankTier: SalesRepRankTier | null
+}
+
+const RANK_TIER_TEXT_CLASS: Record<SalesRepRankTier, string> = {
+  green: 'text-green-600',
+  yellow: 'text-yellow-600',
+  orange: 'text-orange-600',
+  red: 'text-red-600',
+}
+
+export function getSalesRepRankTierColorClass(tier: SalesRepRankTier | null): string {
+  if (!tier) return ''
+  return RANK_TIER_TEXT_CLASS[tier]
+}
+
+function getSalesRepRankTier(rank: number, total: number): SalesRepRankTier | null {
+  if (total <= 1) return null
+  if (total === 2) return rank === 0 ? 'green' : 'red'
+  if (rank === 0) return 'green'
+  if (rank === 1) return 'yellow'
+  if (rank === 2) return 'orange'
+  return 'red'
 }
 
 type MonthlyCountCustomer = {
@@ -31,6 +55,14 @@ export function getMonthlyCountLabel(tab: string): string | null {
   return TAB_LABEL[tab] ?? null
 }
 
+export function getMonthlyCountRankTooltipLines(): string[] {
+  return [
+    'Sales rep names are colored by rank for this month and the selected tab.',
+    'Green — fewest customers. Yellow — second. Orange — third. Red — fourth or more (most).',
+    'When counts are tied, the rep whose most recently added customer came in earlier ranks higher.',
+  ]
+}
+
 export function computeMonthlyCountsBySalesRep(
   customers: MonthlyCountCustomer[],
   tab: string,
@@ -42,7 +74,10 @@ export function computeMonthlyCountsBySalesRep(
   const year = referenceDate.getFullYear()
   const month = referenceDate.getMonth()
   const excludeInvalid = tab === 'walkin' || tab === 'call-in'
-  const counts = new Map<number, { salesRepName: string; count: number }>()
+  const counts = new Map<
+    number,
+    { salesRepName: string; count: number; mostRecentDate: number }
+  >()
 
   for (const customer of customers) {
     if (tab === 'all') {
@@ -56,23 +91,48 @@ export function computeMonthlyCountsBySalesRep(
     const created = new Date(customer.created_date)
     if (created.getFullYear() !== year || created.getMonth() !== month) continue
 
+    const createdTime = created.getTime()
     const existing = counts.get(customer.sales_rep)
     if (existing) {
       existing.count += 1
+      if (createdTime > existing.mostRecentDate) {
+        existing.mostRecentDate = createdTime
+      }
       continue
     }
 
     counts.set(customer.sales_rep, {
       salesRepName: customer.sales_rep_name ?? 'Unknown',
       count: 1,
+      mostRecentDate: createdTime,
     })
   }
 
-  return [...counts.entries()]
+  const ranked = [...counts.entries()]
     .map(([salesRepId, value]) => ({
       salesRepId,
       salesRepName: value.salesRepName,
       count: value.count,
+      mostRecentDate: value.mostRecentDate,
+    }))
+    .sort(
+      (a, b) =>
+        a.count - b.count ||
+        a.mostRecentDate - b.mostRecentDate ||
+        a.salesRepName.localeCompare(b.salesRepName),
+    )
+
+  const rankTierBySalesRepId = new Map<number, SalesRepRankTier | null>()
+  ranked.forEach((entry, index) => {
+    rankTierBySalesRepId.set(entry.salesRepId, getSalesRepRankTier(index, ranked.length))
+  })
+
+  return ranked
+    .map(entry => ({
+      salesRepId: entry.salesRepId,
+      salesRepName: entry.salesRepName,
+      count: entry.count,
+      rankTier: rankTierBySalesRepId.get(entry.salesRepId) ?? null,
     }))
     .sort((a, b) => b.count - a.count || a.salesRepName.localeCompare(b.salesRepName))
 }
