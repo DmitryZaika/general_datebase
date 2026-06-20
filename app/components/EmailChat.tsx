@@ -1305,7 +1305,7 @@ export function EmailChat(props: EmailChatProps) {
 				</div>
 			</DialogHeader>
 
-			<div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+			<div ref={scrollContainerRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
 				{chatMessages.map((message, index) => {
 					const isGmailReaction = isGmailReactionEmailBody(message.body);
 					const visibleAttachments = message.attachments
@@ -1320,7 +1320,7 @@ export function EmailChat(props: EmailChatProps) {
 								</div>
 							)}
 							<div
-								className={`${rowClass} ${message.isFromCustomer ? "flex-row-reverse justify-end pl-2" : "flex-row-reverse justify-start pr-2"}`}
+								className={`${rowClass} min-w-0 ${message.isFromCustomer ? "flex-row-reverse justify-end pl-2" : "flex-row-reverse justify-start pr-2"}`}
 							>
 								<div
 									ref={(node) => {
@@ -1332,8 +1332,8 @@ export function EmailChat(props: EmailChatProps) {
 									}}
 									className={cn(
 										message.isFromCustomer
-											? "bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words"
-											: "bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words",
+											? "bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] min-w-0 break-words [overflow-wrap:anywhere]"
+											: "bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] min-w-0 relative pb-6 break-words [overflow-wrap:anywhere]",
 										isGmailReaction &&
 											message.isFromCustomer &&
 											"bg-gray-100 text-gray-700 px-3 py-1.5",
@@ -1344,7 +1344,7 @@ export function EmailChat(props: EmailChatProps) {
 								>
 									<div
 										className={cn(
-											"email-message-body break-words text-base leading-[1.45] [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5",
+											"email-message-body break-words [overflow-wrap:anywhere] text-base leading-[1.45] [&_a]:break-all [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5",
 											isGmailReaction && "text-sm leading-snug",
 											message.isFromCustomer
 												? "[&_a]:text-blue-700 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5"

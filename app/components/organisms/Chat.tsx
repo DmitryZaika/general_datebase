@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type Variants } from "framer-motion";
-import { ImagePlus, MessageCircle, Plus, Sparkles, X } from "lucide-react";
+import { ArrowDown, ImagePlus, MessageCircle, Plus, Sparkles, X } from "lucide-react";
 import type React from "react";
 import {
 	useCallback,
@@ -148,6 +148,22 @@ const DEFAULT_OFFSET = 20;
 const FIXED_BASE_CLASS = "fixed z-50 touch-none";
 const DEFAULT_ANCHOR_CLASS = "bottom-5 right-5";
 const APPEARANCE_CLASS = "transition-opacity duration-300 ease-out";
+const SCROLL_AT_BOTTOM_TOLERANCE = 48;
+const SCROLL_JUMP_SHOW_THRESHOLD = 180;
+const SCROLLABLE_CONTENT_MIN = 120;
+
+function readChatScrollState(container: HTMLDivElement) {
+	const scrollableDistance = Math.max(
+		0,
+		container.scrollHeight - container.clientHeight,
+	);
+	const distanceFromBottom = scrollableDistance - container.scrollTop;
+	const canScroll = scrollableDistance > SCROLLABLE_CONTENT_MIN;
+	const atBottom = distanceFromBottom <= SCROLL_AT_BOTTOM_TOLERANCE;
+	const showJumpToBottom =
+		canScroll && distanceFromBottom > SCROLL_JUMP_SHOW_THRESHOLD;
+	return { atBottom, showJumpToBottom };
+}
 
 const IMAGE_LIST_VARIANTS: Variants = {
 	hidden: {},
@@ -197,8 +213,6 @@ const QUOTE_LINE_VARIANTS: Variants = {
 const FORM_EXPAND_EASE = [0.22, 1, 0.36, 1] as const;
 const FORM_EXPAND_DURATION = 0.45;
 const SKELETON_EXIT_DURATION = 0.4;
-const SCROLL_SMOOTH_MIN_STEP = 5;
-const SCROLL_SMOOTH_MAX_STEP = 30;
 
 const MESSAGE_CLEAR_VARIANTS: Variants = {
 	exit: (custom: { staggerIndex: number; staggerTotal: number }) => ({
@@ -1179,14 +1193,18 @@ function renderMessageContent(content: string) {
 	}
 
 	flushList();
-	return <div className="flex flex-col gap-0.5">{elements}</div>;
+	return (
+		<div className="flex flex-col gap-0.5 break-words [overflow-wrap:anywhere]">
+			{elements}
+		</div>
+	);
 }
 
 function SpecialOrderQuoteContent({ content }: { content: string }) {
 	const lines = content.split("\n").filter((line) => line.trim().length > 0);
 	return (
 		<motion.div
-			className="flex flex-col gap-1"
+			className="flex flex-col gap-1 break-words [overflow-wrap:anywhere]"
 			variants={QUOTE_LIST_VARIANTS}
 			initial="hidden"
 			animate="visible"
@@ -1424,10 +1442,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
 	return (
 		<div
-			className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+			className={`flex min-w-0 w-full ${message.role === "user" ? "justify-end" : "justify-start"}`}
 		>
 			<div
-				className={`rounded-xl p-3 m-2 max-w-xl ${
+				className={`rounded-xl p-3 m-2 min-w-0 max-w-xl break-words [overflow-wrap:anywhere] ${
 					message.role === "user"
 						? "bg-blue-500 text-white"
 						: "bg-gray-200 text-gray-900"
@@ -1437,7 +1455,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 					message.specialOrderQuote ? (
 						<SpecialOrderQuoteContent content={message.content} />
 					) : (
-						<div>{renderMessageContent(message.content)}</div>
+						<div className="break-words [overflow-wrap:anywhere]">
+							{renderMessageContent(message.content)}
+						</div>
 					)
 				) : null}
 				<AnimatedSpecialOrderPanel
@@ -1467,7 +1487,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 									target="_blank"
 									rel="noopener noreferrer"
 									onClick={onSourceClick}
-									className="text-blue-700 underline underline-offset-2 hover:text-blue-900"
+									className="text-blue-700 underline underline-offset-2 hover:text-blue-900 break-all"
 								>
 									{source.name}
 									{source.supplierName ? ` (${source.supplierName})` : ""}
@@ -1505,8 +1525,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 									onClick={onSourceClick}
 									className={
 										message.role === "user"
-											? "text-white underline underline-offset-2 hover:text-white/90"
-											: "text-blue-700 underline underline-offset-2 hover:text-blue-900"
+											? "text-white underline underline-offset-2 hover:text-white/90 break-all"
+											: "text-blue-700 underline underline-offset-2 hover:text-blue-900 break-all"
 									}
 								>
 									{instruction.title}
@@ -1551,7 +1571,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 	return (
 		<div
 			ref={scrollRef}
-			className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 text-wrap whitespace-pre-wrap"
+			className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y p-4 text-wrap whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
 		>
 			<div ref={contentRef} className="flex flex-col">
 				<AnimatePresence mode="sync" onExitComplete={onClearAnimationComplete}>
@@ -1721,6 +1741,10 @@ export function Chat({
 	const messagesScrollRef = useRef<HTMLDivElement | null>(null);
 	const messagesContentRef = useRef<HTMLDivElement | null>(null);
 	const autoScrollFollowRef = useRef(false);
+	const chatContentCountRef = useRef(0);
+	const isAtBottomRef = useRef(true);
+	const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+	const [newSinceScroll, setNewSinceScroll] = useState(0);
 	const smoothScrollActiveRef = useRef(false);
 	const scrollAnimationFrameRef = useRef<number | null>(null);
 	const [carouselImages, setCarouselImages] = useState<
@@ -1852,84 +1876,34 @@ export function Chat({
 		}
 	}, []);
 
-	const runSmoothScrollFrame = useCallback(() => {
+	const updateScrollIndicators = useCallback(() => {
 		const container = messagesScrollRef.current;
-		if (!container || !smoothScrollActiveRef.current) {
-			scrollAnimationFrameRef.current = null;
-			return;
+		if (!container) return;
+		const { atBottom, showJumpToBottom } = readChatScrollState(container);
+		isAtBottomRef.current = atBottom;
+		setShowJumpToBottom(showJumpToBottom);
+		if (atBottom) {
+			setNewSinceScroll(0);
 		}
-
-		const target = Math.max(0, container.scrollHeight - container.clientHeight);
-		const current = container.scrollTop;
-		const distance = target - current;
-
-		if (distance <= 0.5) {
-			container.scrollTop = target;
-			smoothScrollActiveRef.current = false;
-			scrollAnimationFrameRef.current = null;
-			return;
-		}
-
-		const step = Math.min(
-			Math.max(distance * 0.14, SCROLL_SMOOTH_MIN_STEP),
-			SCROLL_SMOOTH_MAX_STEP,
-		);
-		container.scrollTop = current + step;
-		scrollAnimationFrameRef.current =
-			requestAnimationFrame(runSmoothScrollFrame);
 	}, []);
 
-	const scrollMessagesToBottom = useCallback(
-		(smooth = false) => {
-			const container = messagesScrollRef.current;
-			if (!container || !autoScrollFollowRef.current) return;
-
-			if (!smooth) {
-				stopSmoothScroll();
-				container.scrollTop = Math.max(
-					0,
-					container.scrollHeight - container.clientHeight,
-				);
-				return;
-			}
-
-			smoothScrollActiveRef.current = true;
-			if (scrollAnimationFrameRef.current === null) {
-				scrollAnimationFrameRef.current =
-					requestAnimationFrame(runSmoothScrollFrame);
-			}
-		},
-		[runSmoothScrollFrame, stopSmoothScroll],
-	);
-
-	const triggerSmoothScrollFollow = useCallback(() => {
-		autoScrollFollowRef.current = true;
-		scrollMessagesToBottom(true);
-	}, [scrollMessagesToBottom]);
+	const jumpToBottom = useCallback(() => {
+		const container = messagesScrollRef.current;
+		if (!container) return;
+		stopSmoothScroll();
+		container.scrollTop = Math.max(
+			0,
+			container.scrollHeight - container.clientHeight,
+		);
+		autoScrollFollowRef.current = false;
+		setNewSinceScroll(0);
+		updateScrollIndicators();
+	}, [stopSmoothScroll, updateScrollIndicators]);
 
 	const stopAutoScrollFollow = useCallback(() => {
 		autoScrollFollowRef.current = false;
 		stopSmoothScroll();
 	}, [stopSmoothScroll]);
-
-	useLayoutEffect(() => {
-		if (!open || isClearingChat) return;
-		if (autoScrollFollowRef.current) {
-			scrollMessagesToBottom(false);
-		}
-	}, [
-		answer,
-		dismissingQuoteSkeletonIndex,
-		isClearingChat,
-		messages,
-		open,
-		pendingQuoteSkeletonIndex,
-		priceListFormOpen,
-		priceListStatus,
-		recalculateFormIndex,
-		scrollMessagesToBottom,
-		specialOrderFormIndex,
-	]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -1937,18 +1911,28 @@ export function Chat({
 		const content = messagesContentRef.current;
 		if (!container || !content) return;
 
+		const onScroll = () => {
+			const { atBottom, showJumpToBottom } = readChatScrollState(container);
+			isAtBottomRef.current = atBottom;
+			setShowJumpToBottom(showJumpToBottom);
+			if (atBottom) {
+				setNewSinceScroll(0);
+			}
+		};
+
 		const onUserScrollIntent = () => {
-			stopAutoScrollFollow();
+			autoScrollFollowRef.current = false;
+			stopSmoothScroll();
 		};
 
 		const onContentResize = () => {
-			if (autoScrollFollowRef.current && !isClearingChat) {
-				scrollMessagesToBottom(false);
-			}
+			onScroll();
 		};
 
 		const observer = new ResizeObserver(onContentResize);
 		observer.observe(content);
+		container.addEventListener("scroll", onScroll, { passive: true });
+		container.addEventListener("mousedown", onUserScrollIntent);
 		container.addEventListener("touchstart", onUserScrollIntent, {
 			passive: true,
 		});
@@ -1956,13 +1940,33 @@ export function Chat({
 			passive: true,
 		});
 		container.addEventListener("wheel", onUserScrollIntent, { passive: true });
+		onScroll();
 		return () => {
 			observer.disconnect();
+			container.removeEventListener("scroll", onScroll);
+			container.removeEventListener("mousedown", onUserScrollIntent);
 			container.removeEventListener("touchstart", onUserScrollIntent);
 			container.removeEventListener("touchmove", onUserScrollIntent);
 			container.removeEventListener("wheel", onUserScrollIntent);
 		};
-	}, [isClearingChat, open, scrollMessagesToBottom, stopAutoScrollFollow]);
+	}, [open, stopSmoothScroll]);
+
+	useEffect(() => {
+		if (!open) return;
+		const frame = requestAnimationFrame(updateScrollIndicators);
+		return () => cancelAnimationFrame(frame);
+	}, [answer, messages.length, open, updateScrollIndicators]);
+
+	useEffect(() => {
+		const currentCount =
+			messages.length + (answer ? 1 : 0) + (isThinking && !answer ? 1 : 0);
+		if (currentCount > chatContentCountRef.current && !isAtBottomRef.current) {
+			setNewSinceScroll(
+				(count) => count + (currentCount - chatContentCountRef.current),
+			);
+		}
+		chatContentCountRef.current = currentCount;
+	}, [answer, isThinking, messages.length]);
 
 	useEffect(() => stopSmoothScroll, [stopSmoothScroll]);
 
@@ -2085,11 +2089,7 @@ export function Chat({
 			streamingSpecialOrderOfferRef.current = null;
 			setAnswer("");
 			setIsThinking(true);
-			if (priceListMode) {
-				triggerSmoothScrollFollow();
-			} else {
-				stopAutoScrollFollow();
-			}
+			stopAutoScrollFollow();
 			setPriceListStatus(
 				priceListMode
 					? activeSpecialOrder
@@ -2186,17 +2186,15 @@ export function Chat({
 			messages.length,
 			priceListMode,
 			stopAutoScrollFollow,
-			triggerSmoothScrollFollow,
 		],
 	);
 
 	const handleSpecialOrderYes = useCallback(
 		(messageIndex: number, offer: SpecialOrderOffer) => {
-			triggerSmoothScrollFollow();
 			setActiveSpecialOrder(offer);
 			setSpecialOrderFormIndex(messageIndex);
 		},
-		[triggerSmoothScrollFollow],
+		[],
 	);
 
 	const handleSpecialOrderCalculate = useCallback(
@@ -2310,12 +2308,11 @@ export function Chat({
 
 	const handleRecalculate = useCallback(
 		(messageIndex: number, offer: SpecialOrderOffer) => {
-			triggerSmoothScrollFollow();
 			setActiveSpecialOrder(offer);
 			setRecalculateFormIndex(messageIndex);
 			setSpecialOrderFormIndex(null);
 		},
-		[triggerSmoothScrollFollow],
+		[],
 	);
 
 	const removeAiDesignImage = useCallback(() => {
@@ -2349,7 +2346,6 @@ export function Chat({
 		setAiDesignSurfaces(["countertops"]);
 		setAiDesignExtraInstructions("");
 		removeAiDesignImage();
-		triggerSmoothScrollFollow();
 		setMessages((prev) => [
 			...prev,
 			{
@@ -2357,7 +2353,7 @@ export function Chat({
 				content: "Which color would you like me to find?",
 			},
 		]);
-	}, [removeAiDesignImage, triggerSmoothScrollFollow]);
+	}, [removeAiDesignImage]);
 
 	const closeAiDesignMode = useCallback(() => {
 		stopAutoScrollFollow();
@@ -2395,7 +2391,6 @@ export function Chat({
 		setActiveSpecialOrder(null);
 		setSpecialOrderFormIndex(null);
 		setRecalculateFormIndex(null);
-		triggerSmoothScrollFollow();
 		setMessages((prev) => [
 			...prev,
 			{
@@ -2404,7 +2399,7 @@ export function Chat({
 					"Add a kitchen photo and pick the stones you would like to see installed.",
 			},
 		]);
-	}, [removeAiDesignImage, triggerSmoothScrollFollow]);
+	}, [removeAiDesignImage]);
 
 	const addAiDesignStone = useCallback((stone: DesignStone) => {
 		setAiDesignStones((prev) => {
@@ -2475,7 +2470,7 @@ export function Chat({
 		});
 		setIsGeneratingDesign(true);
 		setIsThinking(true);
-		triggerSmoothScrollFollow();
+		stopAutoScrollFollow();
 
 		try {
 			const formData = new FormData();
@@ -2529,7 +2524,6 @@ export function Chat({
 							content: `Here is your kitchen with ${event.stoneName} installed.`,
 							images: [event.image],
 						});
-						triggerSmoothScrollFollow();
 					} else if (event.type === "error") {
 						throw new Error(event.error ?? "generation-failed");
 					}
@@ -2558,7 +2552,7 @@ export function Chat({
 		aiDesignExtraInstructions,
 		isGeneratingDesign,
 		isThinking,
-		triggerSmoothScrollFollow,
+		stopAutoScrollFollow,
 	]);
 
 	useEffect(() => {
@@ -2795,7 +2789,20 @@ export function Chat({
 								onSourceClick={handleSourceClick}
 							/>
 						</div>
-						<div className="shrink-0 border-t border-gray-300 bg-gray-100">
+						<div className="relative shrink-0 border-t border-gray-300 bg-gray-100">
+							{showJumpToBottom ? (
+								<button
+									type="button"
+									onClick={jumpToBottom}
+									aria-label="Jump to latest messages"
+									className="absolute -top-12 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-blue-500 px-3 py-1.5 text-xs text-white shadow-lg transition-colors hover:bg-blue-600"
+								>
+									<ArrowDown size={14} />
+									{newSinceScroll > 0
+										? `${newSinceScroll} new message${newSinceScroll === 1 ? "" : "s"}`
+										: "Jump to latest"}
+								</button>
+							) : null}
 							<AnimatedPriceListMenu
 								open={priceListFormOpen}
 								color={priceListColor}
