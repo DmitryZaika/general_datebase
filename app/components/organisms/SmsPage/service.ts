@@ -1,6 +1,6 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
-import { canonicalPhone10 } from '~/utils/phone'
 import type { Nullable } from '~/types/utils'
+import { canonicalPhone10 } from '~/utils/phone'
 import type {
   CustomerSearchResult,
   SmsMessage,

@@ -6,8 +6,10 @@ dotenv.config()
 
 const PROGRESS_EVERY = 10
 const SIGINT_EXIT_CODE = 130
+const MAX_SYNC_RETRIES = 5
+const RETRYABLE_HTTP_STATUS = new Set([502, 503, 504])
 const USAGE =
-  'Usage: bun run scripts/cloudtalk-backfill.ts --company-id=<id> [--limit=<n>] [--dry-run] [--yes] [--rate-limit-rpm=<n>]'
+  'Usage: bun run scripts/cloudtalk-backfill.ts --company-id=<id> [--limit=<n>] [--dry-run] [--yes]'
 
 let stopRequested = false
 
@@ -51,7 +53,6 @@ interface Args {
   limit?: number
   dryRun: boolean
   yes: boolean
-  rateLimitRpm?: number
 }
 
 interface CompanyRow extends mysql.RowDataPacket {
@@ -65,20 +66,59 @@ function parseArgs(argv: string[]): Args {
   let limit: number | undefined
   let dryRun = false
   let yes = false
-  let rateLimitRpm: number | undefined
   for (const arg of argv.slice(2)) {
     const [key, value] = arg.split('=')
     if (key === '--company-id') companyId = Number.parseInt(value, 10)
     else if (key === '--limit') limit = Number.parseInt(value, 10)
     else if (key === '--dry-run') dryRun = true
     else if (key === '--yes') yes = true
-    else if (key === '--rate-limit-rpm') rateLimitRpm = Number.parseInt(value, 10)
   }
   if (!companyId || Number.isNaN(companyId)) {
     console.error(USAGE)
     process.exit(1)
   }
-  return { companyId, limit, dryRun, yes, rateLimitRpm }
+  return { companyId, limit, dryRun, yes }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function syncCustomerWithRetry(
+  companyId: number,
+  customerId: number,
+): Promise<void> {
+  const url = `${process.env.LAMBDA_URL}/cloudtalk/sync/${companyId}/${customerId}`
+  if (!process.env.LAMBDA_KEY) throw new Error('LAMBDA_KEY not set')
+
+  for (let attempt = 0; attempt <= MAX_SYNC_RETRIES; attempt += 1) {
+    if (stopRequested) throw new Error('stopped')
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: process.env.LAMBDA_KEY,
+      },
+      body: JSON.stringify(undefined),
+    })
+
+    if (response.ok) return
+
+    const status = response.status
+    const canRetry = RETRYABLE_HTTP_STATUS.has(status) && attempt < MAX_SYNC_RETRIES
+    if (!canRetry) {
+      throw new Error(
+        `Failed to sync customer ${customerId} to CloudTalk: ${response.statusText} (${status})`,
+      )
+    }
+
+    const backoffMs = Math.min(30_000, 2000 * 2 ** attempt)
+    console.error(
+      `Customer ${customerId} got HTTP ${status}, retry ${attempt + 1}/${MAX_SYNC_RETRIES} in ${backoffMs}ms`,
+    )
+    await sleep(backoffMs)
+  }
 }
 
 async function loadCompany(
@@ -158,8 +198,6 @@ async function runBackfill(
   ids: number[],
   companyId: number,
 ): Promise<{ ok: number; failed: number; stopped: boolean }> {
-  const { syncCustomerToCloudTalk } = await import('../app/services/lambda.server')
-
   let ok = 0
   let failed = 0
   let processed = 0
@@ -168,7 +206,7 @@ async function runBackfill(
   for (const id of ids) {
     if (stopRequested) break
     try {
-      await syncCustomerToCloudTalk(companyId, id)
+      await syncCustomerWithRetry(companyId, id)
       ok += 1
     } catch (error) {
       console.error(`Customer ${id} failed:`, error)
@@ -195,9 +233,6 @@ async function runBackfill(
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv)
-  if (args.rateLimitRpm) {
-    process.env.CLOUDTALK_RATE_LIMIT_RPM = String(args.rateLimitRpm)
-  }
 
   const pool = mysql.createPool({
     user: process.env.DB_USER,

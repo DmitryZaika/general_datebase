@@ -118,5 +118,17 @@
       "!app/components/ui/chart.tsx",
       "!app/components/ui/data-table.tsx"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["scripts/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -9,7 +9,12 @@ import {
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { SmsConversationPane } from '~/components/organisms/SmsPage/SmsConversationPane'
 import { SmsLinkCustomerDialog } from '~/components/organisms/SmsPage/SmsLinkCustomerDialog'
-import { fetchThread, markThreadRead, clearThreadUnreadInCache, sendSms } from '~/components/organisms/SmsPage/service'
+import {
+  clearThreadUnreadInCache,
+  fetchThread,
+  markThreadRead,
+  sendSms,
+} from '~/components/organisms/SmsPage/service'
 import type { SmsMessage, SmsThread } from '~/components/organisms/SmsPage/types'
 import { useCloudtalkReadOnly } from '~/hooks/useCloudtalkReadOnly'
 import type { Nullable } from '~/types/utils'

@@ -20,14 +20,17 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { db } from '~/db.server'
+import { canEditAdminUsers } from '~/utils/adminUsersAccess.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type SessionUser } from '~/utils/session.server'
 
 interface User {
   id: number
   name: string
   email: string
   phone_number: string
+  cloudtalk_agent_id: string | null
+  cloudtalk_phone_number: string | null
   is_superuser: boolean
   company_id: number
 }
@@ -38,12 +41,13 @@ interface Company {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user: User
+  let user: SessionUser
   try {
     user = await getAdminUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
+  const canEditUsers = await canEditAdminUsers(user)
   const url = new URL(request.url)
   const companyIdParam = url.searchParams.get('companyId')
   const companyId = companyIdParam ? parseInt(companyIdParam) : undefined
@@ -52,7 +56,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const users = await selectMany<User>(
     db,
-    `select id, name, email, phone_number from users WHERE is_deleted = 0${effectiveCompanyId != null ? ' AND company_id = ?' : ''}`,
+    `SELECT id, name, email, phone_number, cloudtalk_agent_id, cloudtalk_phone_number
+       FROM users
+      WHERE is_deleted = 0${effectiveCompanyId != null ? ' AND company_id = ?' : ''}`,
     effectiveCompanyId != null ? [effectiveCompanyId] : [],
   )
 
@@ -63,10 +69,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     companies,
     companyId: effectiveCompanyId ?? null,
     isSuperUser: user.is_superuser,
+    canEditUsers,
   }
 }
 
-const adminColumns: ColumnDef<User>[] = [
+const baseColumns: ColumnDef<User>[] = [
   {
     accessorKey: 'name',
     header: 'Name*',
@@ -80,29 +87,54 @@ const adminColumns: ColumnDef<User>[] = [
     header: 'Phone Number',
   },
   {
-    id: 'actions',
-    cell: ({ row }) => {
-      const location = useLocation()
-      return (
-        <ActionDropdown
-          actions={{
-            edit: `edit/${row.original.id}${location.search}`,
-            delete: `delete/${row.original.id}${location.search}`,
-          }}
-        />
-      )
-    },
+    accessorKey: 'cloudtalk_agent_id',
+    header: 'CloudTalk Agent ID',
+    cell: ({ row }) => row.original.cloudtalk_agent_id?.trim() ?? '',
+  },
+  {
+    accessorKey: 'cloudtalk_phone_number',
+    header: 'CloudTalk Phone',
+    cell: ({ row }) => row.original.cloudtalk_phone_number?.trim() ?? '',
   },
 ]
 
+function UserActionsCell({
+  userId,
+  isSuperUser,
+}: {
+  userId: number
+  isSuperUser: boolean
+}) {
+  const location = useLocation()
+  const actions: Record<string, string> = {
+    edit: `edit/${userId}${location.search}`,
+  }
+  if (isSuperUser) {
+    actions.delete = `delete/${userId}${location.search}`
+  }
+  return <ActionDropdown actions={actions} />
+}
+
+function buildColumns(canEditUsers: boolean, isSuperUser: boolean): ColumnDef<User>[] {
+  if (!canEditUsers) return baseColumns
+  return [
+    ...baseColumns,
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <UserActionsCell userId={row.original.id} isSuperUser={isSuperUser} />
+      ),
+    },
+  ]
+}
+
 export default function Adminusers() {
-  const { users, companies, companyId, isSuperUser } = useLoaderData<typeof loader>()
+  const { users, companies, companyId, isSuperUser, canEditUsers } =
+    useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
 
-  const columns = isSuperUser
-    ? adminColumns
-    : adminColumns.filter(col => col.id !== 'actions')
+  const columns = buildColumns(canEditUsers, isSuperUser)
 
   return (
     <PageLayout title='Users'>

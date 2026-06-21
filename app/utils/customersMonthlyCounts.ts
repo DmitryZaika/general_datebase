@@ -124,7 +124,10 @@ export function computeMonthlyCountsBySalesRep(
 
   const rankTierBySalesRepId = new Map<number, SalesRepRankTier | null>()
   ranked.forEach((entry, index) => {
-    rankTierBySalesRepId.set(entry.salesRepId, getSalesRepRankTier(index, ranked.length))
+    rankTierBySalesRepId.set(
+      entry.salesRepId,
+      getSalesRepRankTier(index, ranked.length),
+    )
   })
 
   return ranked
@@ -132,7 +135,14 @@ export function computeMonthlyCountsBySalesRep(
       salesRepId: entry.salesRepId,
       salesRepName: entry.salesRepName,
       count: entry.count,
+      mostRecentDate: entry.mostRecentDate,
       rankTier: rankTierBySalesRepId.get(entry.salesRepId) ?? null,
     }))
-    .sort((a, b) => b.count - a.count || a.salesRepName.localeCompare(b.salesRepName))
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.mostRecentDate - b.mostRecentDate ||
+        a.salesRepName.localeCompare(b.salesRepName),
+    )
+    .map(({ mostRecentDate: _mostRecentDate, ...entry }) => entry)
 }

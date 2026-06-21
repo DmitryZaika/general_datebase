@@ -18,7 +18,10 @@ import {
   NoThreadSelected,
 } from '~/components/organisms/SmsPage/SmsPageEmptyStates'
 import { SmsThreadList } from '~/components/organisms/SmsPage/SmsThreadList'
-import { fetchThreads, clearThreadUnreadInCache } from '~/components/organisms/SmsPage/service'
+import {
+  clearThreadUnreadInCache,
+  fetchThreads,
+} from '~/components/organisms/SmsPage/service'
 import type { ThreadSummary } from '~/components/organisms/SmsPage/types'
 import type { Nullable } from '~/types/utils'
 import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'

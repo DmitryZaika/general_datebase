@@ -19,6 +19,7 @@ import {
   type MatchedInstruction,
   resolveInstructionsUsedForReply,
 } from '~/utils/instructionImages'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import {
   appendSpecialOrderPrompt,
   calculateSpecialOrder,
@@ -36,7 +37,6 @@ import {
   type PriceListProgress,
   type SupplierSource,
 } from '~/utils/supplierChatContext.server'
-import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { selectMany } from '../utils/queryHelpers'
 import { getUserBySessionId } from '../utils/session.server'
 

@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import bcrypt from 'bcryptjs'
-import { Info } from 'lucide-react'
 import type { ResultSetHeader } from 'mysql2'
 import { useForm } from 'react-hook-form'
 import {
@@ -14,7 +13,10 @@ import {
 import { getValidatedFormData } from 'remix-hook-form'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
-import { PositionInfoIcon } from '~/components/molecules/PositionInfoIcon'
+import {
+  AdminInfoIcon,
+  PositionInfoIcon,
+} from '~/components/molecules/PositionInfoIcon'
 import { SelectInput } from '~/components/molecules/SelectItem'
 import { Button } from '~/components/ui/button'
 import {
@@ -25,12 +27,6 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Switch } from '~/components/ui/switch'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '~/components/ui/tooltip'
 import { POSITIONS } from '~/constants/positions'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
@@ -224,7 +220,8 @@ export default function UsersAdd() {
                   control={form.control}
                   name='positions'
                   render={({ field }) => (
-                    <div className='flex items-center space-x-2'>
+                    <div className='flex items-center gap-1.5'>
+                      <PositionInfoIcon positionId={position.key} />
                       <Switch
                         id={`position-${position.key}`}
                         checked={
@@ -247,7 +244,6 @@ export default function UsersAdd() {
                       >
                         {position.value}
                       </label>
-                      <PositionInfoIcon positionId={position.key} />
                     </div>
                   )}
                 />
@@ -256,7 +252,8 @@ export default function UsersAdd() {
                 control={form.control}
                 name='is_admin'
                 render={({ field }) => (
-                  <div className='flex items-center space-x-2'>
+                  <div className='flex items-center gap-1.5'>
+                    <AdminInfoIcon />
                     <Switch
                       id='admin-switch'
                       checked={field.value}
@@ -268,22 +265,6 @@ export default function UsersAdd() {
                     >
                       Admin
                     </label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className='w-4 h-4 text-gray-500 hover:text-gray-700 cursor-help' />
-                        </TooltipTrigger>
-                        <TooltipContent className='max-w-xs'>
-                          <div className='space-y-2'>
-                            <div className='font-semibold'>Administrator</div>
-                            <p className='text-sm text-white-600'>
-                              Full system access with administrative privileges. Can
-                              manage users, settings, and all company data.
-                            </p>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
                   </div>
                 )}
               />

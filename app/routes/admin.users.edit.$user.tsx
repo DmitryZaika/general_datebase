@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Info } from 'lucide-react'
 import { useEffect } from 'react'
 import { type FieldPath, useForm } from 'react-hook-form'
 import {
@@ -16,7 +15,10 @@ import { getValidatedFormData } from 'remix-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
-import { PositionInfoIcon } from '~/components/molecules/PositionInfoIcon'
+import {
+  AdminInfoIcon,
+  PositionInfoIcon,
+} from '~/components/molecules/PositionInfoIcon'
 import { SelectInput } from '~/components/molecules/SelectItem'
 import { Button } from '~/components/ui/button'
 import {
@@ -28,22 +30,18 @@ import {
 } from '~/components/ui/dialog'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Switch } from '~/components/ui/switch'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '~/components/ui/tooltip'
 import { POSITIONS } from '~/constants/positions'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
 import { Positions } from '~/types'
 import type { Nullable } from '~/types/utils'
+import { canEditAdminUsers } from '~/utils/adminUsersAccess.server'
 import { optionalTrimmedEmailOrEmpty } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getAdminUser, getSuperUser } from '~/utils/session.server'
+import type { SessionUser } from '~/utils/session.server'
+import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 const userschema = z.object({
@@ -92,6 +90,19 @@ const userschema = z.object({
       z.union([z.string().max(36), z.literal('')]),
     )
     .optional(),
+  cloudtalk_phone_number: z.coerce
+    .string()
+    .optional()
+    .superRefine((val, ctx) => {
+      if (val === undefined || String(val).trim() === '') return
+      const digits = String(val).replace(/\D/g, '')
+      if (digits.length < 10) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'CloudTalk phone must include at least 10 digits',
+        })
+      }
+    }),
   superadmin_company_ids: z
     .union([
       z.string().transform(val => {
@@ -111,16 +122,16 @@ const userschema = z.object({
 const resolver = zodResolver(userschema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  let loggedInIsSuperuser = false
+  let loggedInUser: SessionUser
   try {
-    await getSuperUser(request)
-    loggedInIsSuperuser = true
-  } catch {
-    try {
-      await getAdminUser(request)
-    } catch (error) {
-      return redirect(`/login?error=${error}`)
-    }
+    loggedInUser = await getAdminUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+  const loggedInIsSuperuser = Boolean(loggedInUser.is_superuser)
+  const canEditUsers = await canEditAdminUsers(loggedInUser)
+  if (!canEditUsers) {
+    return forceRedirectError(request.headers, 'Unauthorized')
   }
   try {
     await csrf.validate(request)
@@ -131,14 +142,39 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, 'No user id provided')
   }
   const userId = parseInt(params.user)
+  const existingUser = await selectId<User>(
+    db,
+    'SELECT id, company_id, is_admin FROM users WHERE id = ? AND is_deleted = 0',
+    userId,
+  )
+  if (!existingUser) {
+    return forceRedirectError(request.headers, 'Invalid user id')
+  }
+  if (!loggedInIsSuperuser && existingUser.company_id !== loggedInUser.company_id) {
+    return forceRedirectError(request.headers, 'Unauthorized')
+  }
   const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
 
+  const existingPositionRows = await selectMany<{ position_id: number }>(
+    db,
+    'SELECT DISTINCT position_id FROM users_positions WHERE user_id = ?',
+    [userId],
+  )
+  const existingPositionIds = existingPositionRows.map(row => row.position_id)
+
   if (!loggedInIsSuperuser) {
+    data.company_id = existingUser.company_id
+    data.is_admin = existingUser.is_admin === 1
     data.positions = data.positions.filter(id => id !== Positions.SuperAdmin)
     data.superadmin_company_ids = []
+    for (const positionId of existingPositionIds) {
+      if (positionId === Positions.SuperAdmin && !data.positions.includes(positionId)) {
+        data.positions.push(positionId)
+      }
+    }
   }
 
   if (data.positions.includes(Positions.SuperAdmin)) {
@@ -149,6 +185,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     data.cloudtalk_agent_id && data.cloudtalk_agent_id.trim() !== ''
       ? data.cloudtalk_agent_id.trim()
       : null
+  const cloudtalkPhoneDigits = (data.cloudtalk_phone_number ?? '').replace(/\D/g, '')
+  const cloudtalkPhoneNumber =
+    cloudtalkPhoneDigits.length >= 10 ? cloudtalkPhoneDigits.slice(-10) : null
 
   await db.execute(
     `
@@ -159,7 +198,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       phone_number = ?,
       company_id = ?,
       is_admin = ?,
-      cloudtalk_agent_id = ?
+      cloudtalk_agent_id = ?,
+      cloudtalk_phone_number = ?
     WHERE id = ?
     `,
     [
@@ -169,6 +209,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       data.company_id,
       data.is_admin,
       cloudtalkAgentId,
+      cloudtalkPhoneNumber,
       userId,
     ],
   )
@@ -236,19 +277,20 @@ interface User {
   is_superuser: Nullable<number>
   is_employee: Nullable<number>
   cloudtalk_agent_id: Nullable<string>
+  cloudtalk_phone_number: Nullable<string>
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  let loggedInIsSuperuser = false
+  let loggedInUser: SessionUser
   try {
-    await getSuperUser(request)
-    loggedInIsSuperuser = true
-  } catch {
-    try {
-      await getAdminUser(request)
-    } catch (error) {
-      return redirect(`/login?error=${error}`)
-    }
+    loggedInUser = await getAdminUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+  const loggedInIsSuperuser = Boolean(loggedInUser.is_superuser)
+  const canEditUsers = await canEditAdminUsers(loggedInUser)
+  if (!canEditUsers) {
+    return forceRedirectError(request.headers, 'Unauthorized')
   }
   if (!params.user) {
     return forceRedirectError(request.headers, 'No user id provided')
@@ -259,11 +301,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const user = await selectId<User>(
     db,
-    'SELECT id, name, email, phone_number, company_id, is_admin, is_superuser, is_employee, cloudtalk_agent_id FROM users WHERE id = ? AND is_deleted = 0',
+    'SELECT id, name, email, phone_number, company_id, is_admin, is_superuser, is_employee, cloudtalk_agent_id, cloudtalk_phone_number FROM users WHERE id = ? AND is_deleted = 0',
     userId,
   )
   if (!user) {
     return forceRedirectError(request.headers, 'Invalid user id')
+  }
+  if (!loggedInIsSuperuser && user.company_id !== loggedInUser.company_id) {
+    return forceRedirectError(request.headers, 'Unauthorized')
   }
 
   const userPositions = await selectMany<{ position_id: number }>(
@@ -333,6 +378,7 @@ export default function User() {
       marketing_company_ids: marketingCompanyIds,
       is_admin: user.is_admin === 1,
       cloudtalk_agent_id: user.cloudtalk_agent_id || '',
+      cloudtalk_phone_number: user.cloudtalk_phone_number || '',
       superadmin_company_ids: superadminCompanyIds,
     },
   })
@@ -395,13 +441,23 @@ export default function User() {
                 <InputItem name='Email' placeholder='Email' field={field} />
               )}
             />
-            <FormField
-              control={form.control}
-              name='company_id'
-              render={({ field }) => (
-                <SelectInput field={field} name='Company' options={companies} />
-              )}
-            />
+            {loggedInIsSuperuser ? (
+              <FormField
+                control={form.control}
+                name='company_id'
+                render={({ field }) => (
+                  <SelectInput field={field} name='Company' options={companies} />
+                )}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name='company_id'
+                render={({ field }) => (
+                  <input type='hidden' name={field.name} value={field.value} />
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name='cloudtalk_agent_id'
@@ -414,7 +470,23 @@ export default function User() {
                   />
                   <p className='text-xs text-gray-500 -mt-1'>
                     Set this to enable sending SMS from the CRM. Find the value in
-                    CloudTalk → Settings → Agents.
+                    CloudTalk → Users → Edit user → Agent ID will be in the URL.
+                  </p>
+                </div>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='cloudtalk_phone_number'
+              render={({ field }) => (
+                <div className='mb-6'>
+                  <InputItem
+                    name='CloudTalk phone number'
+                    placeholder='CloudTalk phone number'
+                    field={field}
+                  />
+                  <p className='text-xs text-gray-500 -mt-1'>
+                    The CloudTalk line used as the SMS sender for this user.
                   </p>
                 </div>
               )}
@@ -426,7 +498,8 @@ export default function User() {
                   control={form.control}
                   name='positions'
                   render={({ field }) => (
-                    <div className='flex items-center space-x-2'>
+                    <div className='flex items-center gap-1.5'>
+                      <PositionInfoIcon positionId={position.key} />
                       <Switch
                         id={`position-${position.key}`}
                         checked={
@@ -449,46 +522,44 @@ export default function User() {
                       >
                         {position.value}
                       </label>
-                      <PositionInfoIcon positionId={position.key} />
                     </div>
                   )}
                 />
               ))}
-              <FormField
-                control={form.control}
-                name='is_admin'
-                render={({ field }) => (
-                  <div className='flex items-center space-x-2'>
-                    <Switch
-                      id='admin-switch'
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
+              {loggedInIsSuperuser ? (
+                <FormField
+                  control={form.control}
+                  name='is_admin'
+                  render={({ field }) => (
+                    <div className='flex items-center gap-1.5'>
+                      <AdminInfoIcon />
+                      <Switch
+                        id='admin-switch'
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                      <label
+                        htmlFor='admin-switch'
+                        className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+                      >
+                        Admin
+                      </label>
+                    </div>
+                  )}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name='is_admin'
+                  render={({ field }) => (
+                    <input
+                      type='hidden'
+                      name={field.name}
+                      value={field.value ? 'true' : 'false'}
                     />
-                    <label
-                      htmlFor='admin-switch'
-                      className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
-                    >
-                      Admin
-                    </label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className='w-4 h-4 text-gray-500 hover:text-gray-700 cursor-help' />
-                        </TooltipTrigger>
-                        <TooltipContent className='max-w-xs'>
-                          <div className='space-y-2'>
-                            <div className='font-semibold'>Administrator</div>
-                            <p className='text-sm text-white-600'>
-                              Full system access with administrative privileges. Can
-                              manage users, settings, and all company data.
-                            </p>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                )}
-              />
+                  )}
+                />
+              )}
               {Array.isArray(formPositions) &&
                 formPositions.includes(Positions.ExternalMarketing) && (
                   <div className='col-span-2 border-t pt-2 mt-2'>
@@ -533,49 +604,47 @@ export default function User() {
                   </div>
                 )}
               {loggedInIsSuperuser &&
-                Array.isArray(formPositions) &&
-                formPositions.includes(Positions.SuperAdmin) && (
-                  <div className='col-span-2 border-t pt-2 mt-2'>
-                    <div className='text-sm font-medium mb-2'>
-                      Super Admin Companies
-                    </div>
-                    {companies.map(company => (
-                      <FormField
-                        key={company.key}
-                        control={form.control}
-                        name='superadmin_company_ids'
-                        render={({ field }) => (
-                          <div className='flex items-center space-x-2'>
-                            <Switch
-                              id={`superadmin-company-${company.key}`}
-                              checked={
-                                Array.isArray(field.value) &&
-                                field.value.includes(company.key)
+              Array.isArray(formPositions) &&
+              formPositions.includes(Positions.SuperAdmin) ? (
+                <div className='col-span-2 border-t pt-2 mt-2'>
+                  <div className='text-sm font-medium mb-2'>Super Admin Companies</div>
+                  {companies.map(company => (
+                    <FormField
+                      key={company.key}
+                      control={form.control}
+                      name='superadmin_company_ids'
+                      render={({ field }) => (
+                        <div className='flex items-center space-x-2'>
+                          <Switch
+                            id={`superadmin-company-${company.key}`}
+                            checked={
+                              Array.isArray(field.value) &&
+                              field.value.includes(company.key)
+                            }
+                            onCheckedChange={checked => {
+                              if (checked && Array.isArray(field.value)) {
+                                field.onChange([...field.value, company.key])
+                              } else if (Array.isArray(field.value)) {
+                                field.onChange(
+                                  field.value.filter(
+                                    (id: number) => id !== company.key,
+                                  ),
+                                )
                               }
-                              onCheckedChange={checked => {
-                                if (checked && Array.isArray(field.value)) {
-                                  field.onChange([...field.value, company.key])
-                                } else if (Array.isArray(field.value)) {
-                                  field.onChange(
-                                    field.value.filter(
-                                      (id: number) => id !== company.key,
-                                    ),
-                                  )
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`superadmin-company-${company.key}`}
-                              className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
-                            >
-                              {company.value}
-                            </label>
-                          </div>
-                        )}
-                      />
-                    ))}
-                  </div>
-                )}
+                            }}
+                          />
+                          <label
+                            htmlFor={`superadmin-company-${company.key}`}
+                            className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+                          >
+                            {company.value}
+                          </label>
+                        </div>
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
             <DialogFooter className='mt-2'>
               <Button type='submit' disabled={isSubmitting}>

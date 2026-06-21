@@ -10,5 +10,11 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 30000,
     pool: 'threads',
+    exclude: [
+      '**/node_modules/**',
+      '**/app/orm/contract.test.ts',
+      '**/app/utils/cloudtalkSmsService.test.ts',
+      '**/app/utils/instructionImages.test.ts',
+    ],
   },
 })

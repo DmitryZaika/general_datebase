@@ -2,29 +2,49 @@ import { db } from '~/db.server'
 import { canonicalPhone10 } from '~/utils/phone'
 import { selectMany } from '~/utils/queryHelpers'
 
+function isAdjacentTransposition(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length - 1; i++) {
+    if (a[i] !== b[i]) {
+      return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2)
+    }
+  }
+  return false
+}
+
+/** Damerau–Levenshtein distance (adjacent transpositions count as one edit). */
 export function levenshtein(a: string, b: string): number {
   if (a === b) return 0
   const aLen = a.length
   const bLen = b.length
   if (aLen === 0) return bLen
   if (bLen === 0) return aLen
-  const dp: number[] = []
-  for (let i = 0; i <= bLen; i++) dp[i] = i
+
+  const dp: number[][] = Array.from({ length: aLen + 1 }, () =>
+    Array<number>(bLen + 1).fill(0),
+  )
+  for (let i = 0; i <= aLen; i++) dp[i][0] = i
+  for (let j = 0; j <= bLen; j++) dp[0][j] = j
+
   for (let i = 1; i <= aLen; i++) {
-    let prev = dp[0]
-    dp[0] = i
     for (let j = 1; j <= bLen; j++) {
-      const temp = dp[j]
-      if (a[i - 1] === b[j - 1]) {
-        dp[j] = prev
-      } else {
-        const min = dp[j] < dp[j - 1] ? dp[j] : dp[j - 1]
-        dp[j] = (prev < min ? prev : min) + 1
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        dp[i][j] = Math.min(dp[i][j], dp[i - 2][j - 2] + 1)
       }
-      prev = temp
     }
   }
-  return dp[bLen]
+  return dp[aLen][bLen]
+}
+
+function nameWordTypoMatch(nameWord: string, termWord: string): boolean {
+  const distance = levenshtein(nameWord, termWord)
+  if (distance === 0) return true
+  if (distance > 1) return false
+  if (isAdjacentTransposition(nameWord, termWord)) return true
+  if (nameWord.length !== termWord.length) return true
+  return false
 }
 
 export function matchesNameFuzzy(name: string, term: string): boolean {
@@ -36,7 +56,7 @@ export function matchesNameFuzzy(name: string, term: string): boolean {
   const nameWords = normalizedName.split(/\s+/).filter(w => w.length > 0)
   return termWords.every(tw => {
     if (normalizedName.includes(tw)) return true
-    return nameWords.some(nw => levenshtein(nw, tw) <= 1)
+    return nameWords.some(nw => nameWordTypoMatch(nw, tw))
   })
 }
 
