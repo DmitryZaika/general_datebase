@@ -29,5 +29,6 @@ export interface DealActivityPanelProps {
   customerEmails?: DealEmailHistoryItem[]
   currentUserName?: string
   readOnly?: boolean
+  customerId?: number
   customerPhones?: { phone: Nullable<string>; phone2: Nullable<string> }
 }

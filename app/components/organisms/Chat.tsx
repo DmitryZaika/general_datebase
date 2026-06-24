@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type Variants } from 'framer-motion'
-import { ArrowDown, ImagePlus, MessageCircle, Plus, Sparkles, X } from 'lucide-react'
+import { ImagePlus, MessageCircle, Plus, Sparkles, X } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -111,8 +111,6 @@ interface ChatMessagesProps {
   clearStaggerTotal: number
   onClearAnimationComplete: () => void
   isCreatingImage: boolean
-  scrollRef: React.RefObject<HTMLDivElement | null>
-  contentRef: React.RefObject<HTMLDivElement | null>
   onSourceClick?: () => void
 }
 
@@ -142,21 +140,6 @@ const DEFAULT_OFFSET = 20
 const FIXED_BASE_CLASS = 'fixed z-50 touch-none'
 const DEFAULT_ANCHOR_CLASS = 'bottom-5 right-5'
 const APPEARANCE_CLASS = 'transition-opacity duration-300 ease-out'
-const SCROLL_AT_BOTTOM_TOLERANCE = 48
-const SCROLL_JUMP_SHOW_THRESHOLD = 180
-const SCROLLABLE_CONTENT_MIN = 120
-
-function readChatScrollState(container: HTMLDivElement) {
-  const scrollableDistance = Math.max(
-    0,
-    container.scrollHeight - container.clientHeight,
-  )
-  const distanceFromBottom = scrollableDistance - container.scrollTop
-  const canScroll = scrollableDistance > SCROLLABLE_CONTENT_MIN
-  const atBottom = distanceFromBottom <= SCROLL_AT_BOTTOM_TOLERANCE
-  const showJumpToBottom = canScroll && distanceFromBottom > SCROLL_JUMP_SHOW_THRESHOLD
-  return { atBottom, showJumpToBottom }
-}
 
 const IMAGE_LIST_VARIANTS: Variants = {
   hidden: {},
@@ -1512,8 +1495,6 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   clearStaggerTotal,
   onClearAnimationComplete,
   isCreatingImage,
-  scrollRef,
-  contentRef,
   onSourceClick,
 }) => {
   const showTypingIndicator =
@@ -1523,11 +1504,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
     !(status && status.state !== 'answering')
 
   return (
-    <div
-      ref={scrollRef}
-      className='min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y p-4 text-wrap whitespace-pre-wrap break-words [overflow-wrap:anywhere]'
-    >
-      <div ref={contentRef} className='flex flex-col'>
+    <div className='min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y p-4 text-wrap whitespace-pre-wrap break-words [overflow-wrap:anywhere]'>
+      <div className='flex flex-col'>
         <AnimatePresence mode='sync' onExitComplete={onClearAnimationComplete}>
           {messages.map((message, index) => {
             const hasUserReplyAfter = messages
@@ -1684,15 +1662,6 @@ export function Chat({
   const pendingQuoteOfferRef = useRef<SpecialOrderOffer | null>(null)
   const pendingQuoteSkeletonIndexRef = useRef<number | null>(null)
   const responseFinishedRef = useRef(false)
-  const messagesScrollRef = useRef<HTMLDivElement | null>(null)
-  const messagesContentRef = useRef<HTMLDivElement | null>(null)
-  const autoScrollFollowRef = useRef(false)
-  const chatContentCountRef = useRef(0)
-  const isAtBottomRef = useRef(true)
-  const [showJumpToBottom, setShowJumpToBottom] = useState(false)
-  const [newSinceScroll, setNewSinceScroll] = useState(0)
-  const smoothScrollActiveRef = useRef(false)
-  const scrollAnimationFrameRef = useRef<number | null>(null)
   const [carouselImages, setCarouselImages] = useState<InstructionCarouselImage[]>([])
   const [currentImageId, setCurrentImageId] = useState<number | undefined>(undefined)
   const [priceListMode, setPriceListMode] = useState(false)
@@ -1804,103 +1773,6 @@ export function Chat({
       focusInput()
     }
   }, [open, focusInput])
-
-  const stopSmoothScroll = useCallback(() => {
-    smoothScrollActiveRef.current = false
-    if (scrollAnimationFrameRef.current !== null) {
-      cancelAnimationFrame(scrollAnimationFrameRef.current)
-      scrollAnimationFrameRef.current = null
-    }
-  }, [])
-
-  const updateScrollIndicators = useCallback(() => {
-    const container = messagesScrollRef.current
-    if (!container) return
-    const { atBottom, showJumpToBottom } = readChatScrollState(container)
-    isAtBottomRef.current = atBottom
-    setShowJumpToBottom(showJumpToBottom)
-    if (atBottom) {
-      setNewSinceScroll(0)
-    }
-  }, [])
-
-  const jumpToBottom = useCallback(() => {
-    const container = messagesScrollRef.current
-    if (!container) return
-    stopSmoothScroll()
-    container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight)
-    autoScrollFollowRef.current = false
-    setNewSinceScroll(0)
-    updateScrollIndicators()
-  }, [stopSmoothScroll, updateScrollIndicators])
-
-  const stopAutoScrollFollow = useCallback(() => {
-    autoScrollFollowRef.current = false
-    stopSmoothScroll()
-  }, [stopSmoothScroll])
-
-  useEffect(() => {
-    if (!open) return
-    const container = messagesScrollRef.current
-    const content = messagesContentRef.current
-    if (!container || !content) return
-
-    const onScroll = () => {
-      const { atBottom, showJumpToBottom } = readChatScrollState(container)
-      isAtBottomRef.current = atBottom
-      setShowJumpToBottom(showJumpToBottom)
-      if (atBottom) {
-        setNewSinceScroll(0)
-      }
-    }
-
-    const onUserScrollIntent = () => {
-      autoScrollFollowRef.current = false
-      stopSmoothScroll()
-    }
-
-    const onContentResize = () => {
-      onScroll()
-    }
-
-    const observer = new ResizeObserver(onContentResize)
-    observer.observe(content)
-    container.addEventListener('scroll', onScroll, { passive: true })
-    container.addEventListener('mousedown', onUserScrollIntent)
-    container.addEventListener('touchstart', onUserScrollIntent, {
-      passive: true,
-    })
-    container.addEventListener('touchmove', onUserScrollIntent, {
-      passive: true,
-    })
-    container.addEventListener('wheel', onUserScrollIntent, { passive: true })
-    onScroll()
-    return () => {
-      observer.disconnect()
-      container.removeEventListener('scroll', onScroll)
-      container.removeEventListener('mousedown', onUserScrollIntent)
-      container.removeEventListener('touchstart', onUserScrollIntent)
-      container.removeEventListener('touchmove', onUserScrollIntent)
-      container.removeEventListener('wheel', onUserScrollIntent)
-    }
-  }, [open, stopSmoothScroll])
-
-  useEffect(() => {
-    if (!open) return
-    const frame = requestAnimationFrame(updateScrollIndicators)
-    return () => cancelAnimationFrame(frame)
-  }, [answer, messages.length, open, updateScrollIndicators])
-
-  useEffect(() => {
-    const currentCount =
-      messages.length + (answer ? 1 : 0) + (isThinking && !answer ? 1 : 0)
-    if (currentCount > chatContentCountRef.current && !isAtBottomRef.current) {
-      setNewSinceScroll(count => count + (currentCount - chatContentCountRef.current))
-    }
-    chatContentCountRef.current = currentCount
-  }, [answer, isThinking, messages.length])
-
-  useEffect(() => stopSmoothScroll, [stopSmoothScroll])
 
   const finishResponse = useCallback(
     (sse: EventSource) => {
@@ -2018,7 +1890,6 @@ export function Chat({
       streamingSpecialOrderOfferRef.current = null
       setAnswer('')
       setIsThinking(true)
-      stopAutoScrollFollow()
       setPriceListStatus(
         priceListMode
           ? activeSpecialOrder
@@ -2106,14 +1977,7 @@ export function Chat({
         finishResponse(sse)
       })
     },
-    [
-      activeSpecialOrder,
-      finishResponse,
-      isThinking,
-      messages.length,
-      priceListMode,
-      stopAutoScrollFollow,
-    ],
+    [activeSpecialOrder, finishResponse, isThinking, messages.length, priceListMode],
   )
 
   const handleSpecialOrderYes = useCallback(
@@ -2249,12 +2113,11 @@ export function Chat({
   }, [])
 
   const closePriceListMode = useCallback(() => {
-    stopAutoScrollFollow()
     setPriceListMode(false)
     setPriceListFormOpen(false)
     setPriceListColor('')
     setPriceListSupplier('')
-  }, [stopAutoScrollFollow])
+  }, [])
 
   const enablePriceListMode = useCallback(() => {
     setPriceListMode(true)
@@ -2279,13 +2142,12 @@ export function Chat({
   }, [removeAiDesignImage])
 
   const closeAiDesignMode = useCallback(() => {
-    stopAutoScrollFollow()
     setAiDesignFormOpen(false)
     setAiDesignStones([])
     setAiDesignSurfaces(['countertops'])
     setAiDesignExtraInstructions('')
     removeAiDesignImage()
-  }, [removeAiDesignImage, stopAutoScrollFollow])
+  }, [removeAiDesignImage])
 
   const setAiDesignImageFromFile = useCallback((file: File | null | undefined) => {
     if (!file?.type.startsWith('image/')) return
@@ -2390,7 +2252,6 @@ export function Chat({
     })
     setIsGeneratingDesign(true)
     setIsThinking(true)
-    stopAutoScrollFollow()
 
     try {
       const formData = new FormData()
@@ -2467,7 +2328,6 @@ export function Chat({
     aiDesignExtraInstructions,
     isGeneratingDesign,
     isThinking,
-    stopAutoScrollFollow,
   ])
 
   useEffect(() => {
@@ -2693,25 +2553,10 @@ export function Chat({
                 clearStaggerTotal={clearStaggerTotal}
                 onClearAnimationComplete={handleClearAnimationComplete}
                 isCreatingImage={isGeneratingDesign}
-                scrollRef={messagesScrollRef}
-                contentRef={messagesContentRef}
                 onSourceClick={handleSourceClick}
               />
             </div>
-            <div className='relative shrink-0 border-t border-gray-300 bg-gray-100'>
-              {showJumpToBottom ? (
-                <button
-                  type='button'
-                  onClick={jumpToBottom}
-                  aria-label='Jump to latest messages'
-                  className='absolute -top-12 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-blue-500 px-3 py-1.5 text-xs text-white shadow-lg transition-colors hover:bg-blue-600'
-                >
-                  <ArrowDown size={14} />
-                  {newSinceScroll > 0
-                    ? `${newSinceScroll} new message${newSinceScroll === 1 ? '' : 's'}`
-                    : 'Jump to latest'}
-                </button>
-              ) : null}
+            <div className='shrink-0 border-t border-gray-300 bg-gray-100'>
               <AnimatedPriceListMenu
                 open={priceListFormOpen}
                 color={priceListColor}

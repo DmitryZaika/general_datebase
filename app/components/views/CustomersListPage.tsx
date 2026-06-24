@@ -29,7 +29,6 @@ import { DataTable } from '~/components/ui/data-table'
 import { DataTablePagination } from '~/components/ui/data-table-pagination'
 import { Dialog, DialogContent } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
-import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -37,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import type { CustomersListCustomer } from '~/utils/customersListLoader.server'
 import {
   computeMonthlyCountsBySalesRep,
@@ -240,6 +240,20 @@ function isCustomerActionPath(pathname: string) {
     pathname.includes('/customers/delete/') ||
     pathname.includes('/customers/add')
   )
+}
+
+function isCustomerEmailChatPath(pathname: string) {
+  return /\/customers\/info\/\d+\/chat\//.test(pathname)
+}
+
+function getCustomerDialogClassName(pathname: string, navPath: string) {
+  if (isCustomerEmailChatPath(pathname) || isCustomerEmailChatPath(navPath)) {
+    return 'max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col overflow-hidden'
+  }
+  if (isCompactCustomerAction(pathname) || isCompactCustomerAction(navPath)) {
+    return 'sm:max-w-[425px] overflow-auto p-5'
+  }
+  return 'sm:max-w-[560px] max-h-[95vh] overflow-y-auto flex flex-col p-5'
 }
 
 function isCompactCustomerAction(pathname: string) {
@@ -612,7 +626,9 @@ export function CustomersListPage() {
                     {item.salesRepName}
                   </span>
                   :{' '}
-                  <span className='ml-1 font-semibold text-slate-900'>{item.count}</span>
+                  <span className='ml-1 font-semibold text-slate-900'>
+                    {item.count}
+                  </span>
                 </span>
               )
             })}
@@ -677,11 +693,7 @@ export function CustomersListPage() {
       {showCustomerDialog ? (
         <Dialog open={true} onOpenChange={handleCustomerDialogClose}>
           <DialogContent
-            className={
-              compactCustomerAction || compactCustomerActionNav
-                ? 'sm:max-w-[425px] overflow-auto p-5'
-                : 'sm:max-w-[560px] max-h-[95vh] overflow-y-auto flex flex-col p-5'
-            }
+            className={getCustomerDialogClassName(location.pathname, navPath)}
           >
             {showCustomerActionSkeleton ? (
               <CustomerActionDialogSkeletonContent />

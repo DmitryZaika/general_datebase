@@ -360,6 +360,8 @@ export default function App() {
   const isContractors = pathname.startsWith('/contractors')
   const isCustomersCompanies = pathname === '/customers/companies'
   const segments = pathname.split('/').filter(Boolean)
+  const isCustomerSurveyPage =
+    segments[0] === 'customer' && segments.length === 3 && segments[2] === 'survey'
   const isCustomerViewPage =
     segments[0] === 'customer' &&
     segments[2] !== undefined &&
@@ -439,6 +441,7 @@ export default function App() {
                     isSuperAdmin={userIsSuperAdmin}
                     superadminCompanies={superadminCompanies}
                     activeCompanyId={activeCompanyId}
+                    hideCustomerBurgerMenu={isCustomerSurveyPage}
                   />
                 )}
                 <div className='relative'>

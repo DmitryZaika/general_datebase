@@ -13,8 +13,9 @@ import {
 import { DONE_KEY } from '~/utils/constants'
 import {
   buildPriceQueryHint,
-  collectImagesForMatchedInstructions,
+  collectImagesForUsedInstructions,
   findBestMatchingInstruction,
+  findInstructionMatchingAnswer,
   isPriceQuery,
   type MatchedInstruction,
   resolveInstructionsUsedForReply,
@@ -567,14 +568,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
                 instructionsUsed = [fallback]
               }
             }
+            const contentMatch = findInstructionMatchingAnswer(
+              instructionMatch.instructions,
+              cleanAnswer,
+              query,
+            )
+            if (
+              contentMatch &&
+              !instructionsUsed.some(item => item.id === contentMatch.id)
+            ) {
+              instructionsUsed = [contentMatch]
+            }
             if (instructionsUsed.length > 0) {
               send({
                 event: 'instructions',
                 data: JSON.stringify(instructionsUsed),
               })
-              imagesToSend = collectImagesForMatchedInstructions(
+              imagesToSend = collectImagesForUsedInstructions(
                 instructionMatch.instructions,
                 instructionsUsed,
+                cleanAnswer,
+                query,
               )
             }
           }

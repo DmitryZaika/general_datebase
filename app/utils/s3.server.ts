@@ -275,6 +275,90 @@ export async function downloadFileAsBuffer(url: string) {
   }
 }
 
+function parseS3Uri(input: string) {
+  if (!input.startsWith('s3://')) return null
+  const withoutScheme = input.slice('s3://'.length)
+  const firstSlash = withoutScheme.indexOf('/')
+  if (firstSlash <= 0) return null
+  const bucket = withoutScheme.slice(0, firstSlash)
+  const key = withoutScheme.slice(firstSlash + 1)
+  if (!bucket || !key) return null
+  return { bucket, key }
+}
+
+function resolveS3Object(url: string): { bucket: string; key: string } | null {
+  const s3Uri = parseS3Uri(url)
+  if (s3Uri) return s3Uri
+
+  try {
+    const parsed = new URL(url)
+    const host = parsed.hostname.toLowerCase()
+    const path = parsed.pathname.replace(/^\/+/, '')
+    if (!path) return null
+
+    const vhostMatch = host.match(
+      /^(.+)\.s3[.-][a-z0-9-]+\.amazonaws\.com$|^(.+)\.s3\.amazonaws\.com$/,
+    )
+    if (vhostMatch) {
+      const bucket = vhostMatch[1] || vhostMatch[2]
+      if (bucket) return { bucket, key: path }
+    }
+
+    if (host.startsWith('s3.') && host.endsWith('.amazonaws.com')) {
+      const [bucket, ...rest] = path.split('/')
+      if (bucket && rest.length > 0) return { bucket, key: rest.join('/') }
+    }
+
+    if (STORAGE_BUCKET && host.includes(STORAGE_BUCKET)) {
+      return { bucket: STORAGE_BUCKET, key: path }
+    }
+
+    const legacyKey = url.replace(
+      `https://${STORAGE_BUCKET}.s3.${STORAGE_REGION}.amazonaws.com/`,
+      '',
+    )
+    if (legacyKey !== url && legacyKey && STORAGE_BUCKET) {
+      return { bucket: STORAGE_BUCKET, key: legacyKey }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+async function downloadS3Object(bucket: string, key: string) {
+  const client = getClient()
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    }),
+  )
+  if (!(response.Body instanceof Readable)) return null
+  const chunks: Uint8Array[] = []
+  for await (const chunk of response.Body) {
+    chunks.push(chunk)
+  }
+  return {
+    buffer: Buffer.concat(chunks),
+    contentType: response.ContentType ?? 'application/octet-stream',
+    filename: key.split('/').pop() ?? 'file',
+  }
+}
+
+export async function downloadObjectAsBuffer(url: string) {
+  const resolved = resolveS3Object(url)
+  if (resolved) {
+    try {
+      return await downloadS3Object(resolved.bucket, resolved.key)
+    } catch {
+      return null
+    }
+  }
+  return downloadFileAsBuffer(url)
+}
+
 export const downloadPDFAsBuffer = async (url: string) => {
   const pdfData = await downloadPDF(url)
   if (!pdfData?.stream) {

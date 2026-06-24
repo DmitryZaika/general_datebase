@@ -132,10 +132,7 @@ export default function CustomerInfoTab() {
           {customer.company_name && (
             <div>
               Company:{' '}
-              <CopyText
-                value={customer.company_name}
-                title={customer.company_name}
-              />
+              <CopyText value={customer.company_name} title={customer.company_name} />
             </div>
           )}
           <div>
@@ -239,6 +236,7 @@ export default function CustomerInfoTab() {
           customerEmails={[]}
           currentUserName={viewerName}
           readOnly
+          customerId={customer.id}
           customerPhones={{ phone: customer.phone, phone2: customer.phone_2 }}
         />
       </div>

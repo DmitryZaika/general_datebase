@@ -65,6 +65,7 @@ import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
 import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
+import { compressImageFiles } from '~/utils/compressImage.client'
 import { zodEmail } from '~/utils/constants'
 import type { EmailTemplate } from '~/utils/emailTemplates'
 import { getUnfilledCustomVariables } from '~/utils/emailTemplateVariables'
@@ -882,15 +883,16 @@ export default function DealEmailDialog() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files
     if (files && files.length > 0) {
-      addFiles(Array.from(files))
+      void addFiles(Array.from(files))
     }
     e.currentTarget.value = ''
   }
 
-  const addFiles = (newFiles: File[]) => {
-    form.setValue('attachments', [...form.getValues('attachments'), ...newFiles])
+  const addFiles = async (newFiles: File[]) => {
+    const processed = await compressImageFiles(newFiles)
+    form.setValue('attachments', [...form.getValues('attachments'), ...processed])
 
-    newFiles.forEach(file => {
+    processed.forEach(file => {
       const parts = file.name.split('.')
       const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
       if (ext && imageExt.has(ext)) {
@@ -921,7 +923,7 @@ export default function DealEmailDialog() {
       e.preventDefault()
       e.stopPropagation()
       e.nativeEvent.stopImmediatePropagation()
-      addFiles(pastedFiles)
+      void addFiles(pastedFiles)
       setIsDragging(false)
     }
   }
@@ -947,7 +949,7 @@ export default function DealEmailDialog() {
     setIsDragging(false)
     const files = e.dataTransfer?.files
     if (files && files.length > 0) {
-      addFiles(Array.from(files))
+      void addFiles(Array.from(files))
     }
   }
 
@@ -1055,7 +1057,7 @@ export default function DealEmailDialog() {
               onTemplateApply={applyTemplate}
               canEditTo={!dealId}
               onFilesDrop={files => {
-                addFiles(files)
+                void addFiles(files)
                 setIsDragging(false)
               }}
               toLabels={toLabels}
@@ -1242,7 +1244,7 @@ export default function DealEmailDialog() {
           open={showStonesPicker}
           onClose={() => setShowStonesPicker(false)}
           onSelect={files => {
-            addFiles(files)
+            void addFiles(files)
             setShowStonesPicker(false)
           }}
           onAddFiles={addFiles}
@@ -1253,7 +1255,7 @@ export default function DealEmailDialog() {
           open={showImagesPicker}
           onClose={() => setShowImagesPicker(false)}
           onSelect={files => {
-            addFiles(files)
+            void addFiles(files)
             setShowImagesPicker(false)
           }}
         />
@@ -1263,7 +1265,7 @@ export default function DealEmailDialog() {
           open={showDocumentsPicker}
           onClose={() => setShowDocumentsPicker(false)}
           onSelect={files => {
-            addFiles(files)
+            void addFiles(files)
             setShowDocumentsPicker(false)
           }}
         />

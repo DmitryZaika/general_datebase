@@ -1183,9 +1183,13 @@ function SmsHistoryRow({ message }: { message: SmsEntry }) {
 function EmailHistoryRow({
   email,
   viewerName,
+  readOnly = false,
+  customerId,
 }: {
   email: DealEmailHistoryItem
   viewerName?: Nullable<string>
+  readOnly?: boolean
+  customerId?: number
 }) {
   const location = useLocation()
   const params = useParams()
@@ -1195,7 +1199,10 @@ function EmailHistoryRow({
   const emailDealId = email.deal_id ? String(email.deal_id) : currentDealId
   const searchParams = new URLSearchParams(location.search)
   searchParams.set('messageId', String(email.id))
-  const to = `${basePath}/edit/${emailDealId}/project/chat/${email.thread_id}?${searchParams.toString()}`
+  const to =
+    readOnly && customerId
+      ? `${isAdmin ? '/admin' : '/employee'}/customers/info/${customerId}/chat/${email.thread_id}?${searchParams.toString()}`
+      : `${basePath}/edit/${emailDealId}/project/chat/${email.thread_id}?${searchParams.toString()}`
 
   const sentLabel = formatTimestamp(email.sent_at)
   const isSent = !!email.sender_user_id
@@ -1350,6 +1357,7 @@ function ActivityList({
   isSmsPending,
   readOnly = false,
   showSms,
+  customerId,
 }: {
   dealId: number
   activities: DealActivity[]
@@ -1366,6 +1374,7 @@ function ActivityList({
   isSmsPending: boolean
   readOnly?: boolean
   showSms: boolean
+  customerId?: number
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
   const toggleHistoryOpen = useCallback(() => setIsHistoryOpen(prev => !prev), [])
@@ -1535,7 +1544,12 @@ function ActivityList({
         case 'email':
           return (
             <TimelineItem icon={Mail} isLast={isLast} compact={readOnly}>
-              <EmailHistoryRow email={item.data} viewerName={viewerName} />
+              <EmailHistoryRow
+                email={item.data}
+                viewerName={viewerName}
+                readOnly={readOnly}
+                customerId={customerId}
+              />
             </TimelineItem>
           )
       }
@@ -1548,6 +1562,7 @@ function ActivityList({
       updatingNoteId,
       viewerName,
       readOnly,
+      customerId,
     ],
   )
 
@@ -1690,7 +1705,12 @@ function ActivityList({
                     isLast={index === sortedEmails.length - 1}
                     compact={readOnly}
                   >
-                    <EmailHistoryRow email={email} viewerName={viewerName} />
+                    <EmailHistoryRow
+                      email={email}
+                      viewerName={viewerName}
+                      readOnly={readOnly}
+                      customerId={customerId}
+                    />
                   </TimelineItem>
                 </motion.div>
               ))}
@@ -1834,6 +1854,7 @@ export function DealActivityPanel({
   customerEmails = [],
   currentUserName = '',
   readOnly = false,
+  customerId,
   customerPhones,
 }: DealActivityPanelProps) {
   const hasCloudtalkApi = useHasCloudtalkApi()
@@ -2051,6 +2072,7 @@ export function DealActivityPanel({
           isSmsPending={isSmsPendingResolved}
           readOnly={readOnly}
           showSms={hasCloudtalkApi}
+          customerId={customerId}
         />
       </div>
     </div>

@@ -14,6 +14,7 @@ export const ALLOWED_IMAGE_MIME = new Set([
   'image/bmp',
   'image/x-icon',
   'image/heif',
+  'image/heic',
   'image/x-canon-cr2',
   'image/x-nikon-nef',
 ])
