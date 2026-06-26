@@ -1,6 +1,6 @@
 import { EnvelopeClosedIcon } from '@radix-ui/react-icons'
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import { FileText, Loader2, MapIcon, PhoneIcon } from 'lucide-react'
+import { FileText, Loader2, MapIcon } from 'lucide-react'
 import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { useEffect, useState } from 'react'
 import {
@@ -17,6 +17,7 @@ import {
   useNavigation,
 } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
+import { SmsDealButton } from '~/components/molecules/SmsDealButton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
@@ -231,19 +232,10 @@ function AddressLinkCell({
   return (
     <div className='flex items-center'>
       {isPhoneField || isPhone2Field ? (
-        isMobile ? (
-          <div className='flex gap-2 '>
-            <CopyText value={row.original.value} className='font-bold' />
-            <Link
-              to={`tel:${(String(row.original.value || '').match(/[+\d]/g) || []).join('')}`}
-              className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden border-2 border-gray-300 rounded-md px-2'
-            >
-              <PhoneIcon size={17} />
-            </Link>
-          </div>
-        ) : (
+        <div className='flex gap-2 items-center'>
           <CopyText value={row.original.value} className='font-bold' />
-        )
+          <SmsDealButton phone={row.original.value} showCallIcon={isPhoneField} />
+        </div>
       ) : isEmailField ? (
         <div className='flex gap-2 '>
           <CopyText value={row.original.value} className='font-bold' />

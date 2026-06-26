@@ -22,7 +22,9 @@ import { getEmployeeUser } from '~/utils/session.server'
 
 type CustomerDetails = { name?: string; address?: string | null; email?: string | null }
 
-async function fetchCustomerDetails(customerId: number): Promise<CustomerDetails | null> {
+async function fetchCustomerDetails(
+  customerId: number,
+): Promise<CustomerDetails | null> {
   const res = await fetch(`/api/customers/${customerId}`)
   if (!res.ok) return null
   const data: { customer?: CustomerDetails } = await res.json()
@@ -108,9 +110,6 @@ export default function AdminChecklists() {
         variant: 'success',
       })
     },
-    onError: (error) => {
-      console.error('[Queue] Processing error:', error)
-    },
   })
 
   const { mutate, isPending } = useMutation({
@@ -182,8 +181,7 @@ export default function AdminChecklists() {
             variant: 'default',
             duration: 6000,
           })
-        } catch (error) {
-          console.error('[Checklist] Failed to add to queue:', error)
+        } catch {
           toast({
             title: 'Error',
             description: 'Failed to save offline. Please try again.',
@@ -258,7 +256,10 @@ export default function AdminChecklists() {
                               'Are you sure you want to delete the pending form? This cannot be undone.',
                             )
                           ) {
-                            await deleteSubmission(firstSubmission.id!)
+                            const submissionId = firstSubmission.id
+                            if (submissionId !== undefined) {
+                              await deleteSubmission(submissionId)
+                            }
                           }
                         }}
                         className='text-xs bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 transition-colors'
@@ -326,7 +327,9 @@ export default function AdminChecklists() {
                   onCustomerChange={async customerId => {
                     if (!customerId) {
                       form.setValue('customer_id', null, { shouldValidate: true })
-                      form.setValue('installation_address', '', { shouldValidate: true })
+                      form.setValue('installation_address', '', {
+                        shouldValidate: true,
+                      })
                       form.setValue('email', '', { shouldValidate: true })
                       field.onChange('')
                       return
@@ -338,7 +341,9 @@ export default function AdminChecklists() {
                     const email = details?.email ?? ''
                     field.onChange(name)
                     if (address) {
-                      form.setValue('installation_address', address, { shouldValidate: true })
+                      form.setValue('installation_address', address, {
+                        shouldValidate: true,
+                      })
                     }
                     if (email) {
                       form.setValue('email', email, { shouldValidate: true })
@@ -353,11 +358,13 @@ export default function AdminChecklists() {
                   selectedCustomer={selectedCustomerId ?? undefined}
                   value={field.value}
                   error={fieldState.error?.message}
-                  setError={
-                    fieldState.error?.message
-                      ? error => form.setError('customer_name', { message: error ?? undefined })
-                      : () => {}
-                  }
+                  setError={error => {
+                    if (error) {
+                      form.setError('customer_name', { message: error })
+                      return
+                    }
+                    form.clearErrors('customer_name')
+                  }}
                 />
               )}
             />
@@ -412,15 +419,8 @@ export default function AdminChecklists() {
             </p>
 
             <div className='mt-6 flex justify-center'>
-              <LoadingButton
-                loading={isPending || isProcessing}
-                disabled={isPending || isProcessing}
-              >
-                {isProcessing
-                  ? 'Sending pending form...'
-                  : isPending
-                    ? 'Submitting...'
-                    : 'Submit'}
+              <LoadingButton loading={isPending} disabled={isPending}>
+                {isPending ? 'Submitting...' : 'Submit'}
               </LoadingButton>
             </div>
           </form>

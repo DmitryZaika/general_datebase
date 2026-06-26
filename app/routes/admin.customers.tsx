@@ -15,7 +15,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  return loadCustomersListPage(request, user, { includeWalkInsBySalesRep: true })
+  return loadCustomersListPage(request, user)
 }
 
 export default function AdminCustomers() {

@@ -30,6 +30,12 @@ import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { CopyText } from '~/components/atoms/CopyText'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { AttachmentImageEditorDialog } from '~/components/molecules/AttachmentImageEditorDialog'
+import {
+  DealChoiceList,
+  dealOptionName,
+  parseDealOptionsFromPayload,
+  readPayloadError,
+} from '~/components/molecules/DealChoiceList'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { EmailTemplatePickerPopover } from '~/components/molecules/EmailTemplatePickerPopover'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -69,7 +75,18 @@ import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
 import type { Nullable } from '~/types/utils'
 import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
+import { compressImageFiles } from '~/utils/compressImage.client'
 import { dateClass, fileSize } from '~/utils/constants'
+import type { CustomerDealOption } from '~/utils/customerDeals.server'
+import {
+  buildEmailCarouselImages,
+  resolveEmailAttachmentDisplayUrl,
+} from '~/utils/emailAttachmentPreview.client'
+import {
+  getEmailAttachmentImageSrc,
+  isEmailAttachmentImage,
+  isHeicEmailAttachment,
+} from '~/utils/emailAttachmentUi'
 import {
   type EmailTemplate,
   fetchAllTemplates,
@@ -97,26 +114,6 @@ export interface EmailChatAttachment {
   filename: string
   url: string
   signed_url?: string
-}
-
-interface AttachmentDealOption {
-  id: number
-  title: string | null
-  status: string | null
-  amount: number | null
-  list_name: string | null
-  notes: {
-    id: number
-    content: string
-    created_at: string
-  }[]
-  activities: {
-    id: number
-    name: string
-    deadline: string | null
-    priority: string
-    is_completed: number
-  }[]
 }
 
 export interface EmailChatMessage {
@@ -147,6 +144,7 @@ interface EmailChatBaseProps {
   dealNav?: EmailChatDealNav
   embedded?: boolean
   userId: number
+  readOnly?: boolean
 }
 
 interface EmailChatEmployeeProps extends EmailChatBaseProps {
@@ -258,7 +256,10 @@ function MessageDate({
   className?: string
 }) {
   const date = new Date(message.sent_at)
-  const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const time = date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
   return <span className={`text-[10px] ${className ?? 'text-gray-500'}`}>{time}</span>
 }
 
@@ -536,111 +537,70 @@ function MobileTemplatePicker({
   )
 }
 
-function dealOptionName(deal: AttachmentDealOption): string {
-  const title = deal.title?.trim()
-  return title ? title : `Deal #${deal.id}`
-}
-
-function dealAmount(value: number | null): string | null {
-  if (value === null) return null
-  return `$${Number(value).toLocaleString()}`
-}
-
-function shortDealText(value: string): string {
-  const trimmed = value.trim()
-  if (trimmed.length <= 80) return trimmed
-  return `${trimmed.slice(0, 80)}...`
-}
-
-function readPayloadError(payload: unknown): string | undefined {
-  if (payload === null || typeof payload !== 'object') return undefined
-  if (!Object.hasOwn(payload, 'error')) return undefined
-  const err = Reflect.get(payload, 'error')
-  return typeof err === 'string' ? err : undefined
-}
-
-function isAttachmentDealOption(item: unknown): item is AttachmentDealOption {
-  if (item === null || typeof item !== 'object') return false
-  const id = Reflect.get(item, 'id')
-  if (typeof id !== 'number') return false
-  const notes = Reflect.get(item, 'notes')
-  if (!Array.isArray(notes)) return false
-  const activities = Reflect.get(item, 'activities')
-  if (!Array.isArray(activities)) return false
-  return true
-}
-
-function parseDealOptionsFromPayload(payload: unknown): AttachmentDealOption[] {
-  if (payload === null || typeof payload !== 'object') return []
-  if (!Object.hasOwn(payload, 'deals')) return []
-  const raw = Reflect.get(payload, 'deals')
-  if (!Array.isArray(raw)) return []
-  return raw.filter(isAttachmentDealOption)
-}
-
-function DealChoiceList({
-  deals,
-  onSelectDeal,
-  disabled,
+function EmailChatAttachmentImage({
+  attachment,
+  label,
+  className,
+  onOpen,
 }: {
-  deals: AttachmentDealOption[]
-  onSelectDeal: (dealId: number) => void
-  disabled?: boolean
+  attachment: EmailChatAttachment
+  label: string
+  className: string
+  onOpen: () => void
 }) {
+  const needsPreview = isHeicEmailAttachment(attachment)
+  const [displayUrl, setDisplayUrl] = useState<string | null>(
+    needsPreview ? null : (getEmailAttachmentImageSrc(attachment) ?? null),
+  )
+  const [loading, setLoading] = useState(needsPreview)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const url = await resolveEmailAttachmentDisplayUrl(attachment)
+      if (!cancelled) {
+        setDisplayUrl(url)
+        setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    attachment.id,
+    attachment.url,
+    attachment.signed_url,
+    attachment.filename,
+    attachment.content_type,
+    attachment.content_subtype,
+  ])
+
+  if (loading) {
+    return (
+      <div
+        className={`${className} bg-slate-100 animate-pulse`}
+        aria-label='Loading image'
+      />
+    )
+  }
+
+  if (!displayUrl) {
+    return (
+      <button
+        type='button'
+        className={`${className} flex flex-col items-center justify-center gap-1 bg-slate-100 text-slate-600 p-2`}
+        onClick={onOpen}
+      >
+        <ImageIcon className='h-6 w-6' />
+        <span className='text-[10px] line-clamp-2 break-all text-center'>{label}</span>
+      </button>
+    )
+  }
+
   return (
-    <div className='max-h-[60vh] space-y-2 overflow-y-auto pr-1'>
-      {deals.map(deal => (
-        <button
-          key={deal.id}
-          type='button'
-          className='w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
-          disabled={disabled}
-          onClick={() => onSelectDeal(deal.id)}
-        >
-          <div className='flex items-center justify-between gap-2'>
-            <span className='text-sm font-medium text-slate-900'>
-              {dealOptionName(deal)}
-            </span>
-            <span className='text-xs text-slate-500'>#{deal.id}</span>
-          </div>
-          <div className='mt-1 text-xs text-slate-500'>
-            {[deal.list_name, deal.status, dealAmount(deal.amount)]
-              .filter(Boolean)
-              .join(' - ') || 'No stage'}
-          </div>
-          {deal.notes.length > 0 ? (
-            <div className='mt-2 rounded-md bg-amber-50 px-2 py-1.5'>
-              <div className='text-[11px] font-semibold text-amber-900'>Notes</div>
-              <div className='mt-1 space-y-1'>
-                {deal.notes.map(note => (
-                  <div key={note.id} className='text-xs leading-snug text-amber-950'>
-                    {shortDealText(note.content)}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {deal.activities.length > 0 ? (
-            <div className='mt-2 rounded-md bg-blue-50 px-2 py-1.5'>
-              <div className='text-[11px] font-semibold text-blue-900'>Activities</div>
-              <div className='mt-1 space-y-1'>
-                {deal.activities.map(activity => (
-                  <div
-                    key={activity.id}
-                    className='flex items-center justify-between gap-2 text-xs leading-snug text-blue-950'
-                  >
-                    <span>{shortDealText(activity.name)}</span>
-                    <span className='shrink-0 text-[11px] capitalize text-blue-700'>
-                      {activity.is_completed ? 'Done' : activity.priority}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </button>
-      ))}
-    </div>
+    <button type='button' className='block cursor-pointer' onClick={onOpen}>
+      <img src={displayUrl} alt={label} className={className} />
+    </button>
   )
 }
 
@@ -654,9 +614,11 @@ export function EmailChat(props: EmailChatProps) {
     dealNav,
     userId,
     embedded = false,
+    readOnly = false,
   } = props
   const navigate = useNavigate()
   const navigation = useNavigation()
+  const canCompose = isEmployeeProps(props) && !readOnly
 
   const [chatMessages, setChatMessages] = useState<EmailChatMessage[]>(messages)
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -696,11 +658,11 @@ export function EmailChat(props: EmailChatProps) {
   const [pendingDealAttachment, setPendingDealAttachment] =
     useState<Nullable<EmailChatAttachment>>(null)
   const [attachmentDealChoices, setAttachmentDealChoices] = useState<
-    AttachmentDealOption[]
+    CustomerDealOption[]
   >([])
   const [isAddingAttachmentToDeal, setIsAddingAttachmentToDeal] = useState(false)
   const [dealNavPickerOpen, setDealNavPickerOpen] = useState(false)
-  const [dealNavChoices, setDealNavChoices] = useState<AttachmentDealOption[]>([])
+  const [dealNavChoices, setDealNavChoices] = useState<CustomerDealOption[]>([])
   const [dealNavLoading, setDealNavLoading] = useState(false)
   const [dealNavRouteActive, setDealNavRouteActive] = useState(false)
   const { toast } = useToast()
@@ -711,7 +673,7 @@ export function EmailChat(props: EmailChatProps) {
   }, [targetMessageId])
 
   useLayoutEffect(() => {
-    if (!isEmployee || targetMessageId !== null) return
+    if (!canCompose || targetMessageId !== null) return
     focusComposer()
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       const timerA = setTimeout(focusComposer, 100)
@@ -721,7 +683,7 @@ export function EmailChat(props: EmailChatProps) {
         clearTimeout(timerB)
       }
     }
-  }, [isEmployee, targetMessageId, focusComposer])
+  }, [canCompose, targetMessageId, focusComposer])
 
   const { data: mobileTemplates = [], isLoading: mobileTemplatesLoading } = useQuery({
     queryKey: templateQueryKey(employeeProps?.companyId ?? 0),
@@ -798,7 +760,7 @@ export function EmailChat(props: EmailChatProps) {
   }, [isEmployee, messageText])
 
   useEffect(() => {
-    if (!isEmployee) return
+    if (!canCompose) return
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items
       if (!items) return
@@ -812,7 +774,7 @@ export function EmailChat(props: EmailChatProps) {
       }
       if (files.length > 0) {
         e.preventDefault()
-        appendAttachments(files)
+        void appendAttachments(files)
       }
     }
     document.addEventListener('paste', handlePaste, true)
@@ -875,11 +837,12 @@ export function EmailChat(props: EmailChatProps) {
     return <FileText className='h-8 w-8' />
   }
 
-  function appendAttachments(newFiles: File[]) {
-    setAttachments(prev => [...prev, ...newFiles])
+  async function appendAttachments(newFiles: File[]) {
+    const processed = await compressImageFiles(newFiles)
+    setAttachments(prev => [...prev, ...processed])
     setAttachmentPreviews(prev => {
       const next = { ...prev }
-      for (const file of newFiles) {
+      for (const file of processed) {
         const key = getAttachmentPreviewKey(file)
         const isImageFile = file.type.toLowerCase().startsWith('image/')
         if (isImageFile && !next[key]) {
@@ -1236,7 +1199,11 @@ export function EmailChat(props: EmailChatProps) {
       clearAttachmentPreviews()
       setAttachments([])
       setActiveTemplateId(null)
-      toast({ title: 'Success', description: 'Email sent!', variant: 'success' })
+      toast({
+        title: 'Success',
+        description: 'Email sent!',
+        variant: 'success',
+      })
     } catch (error) {
       if (error instanceof Error) {
         alert(error.message)
@@ -1267,10 +1234,10 @@ export function EmailChat(props: EmailChatProps) {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
-    if (!isEmployee) return
+    if (!canCompose) return
     const files = e.dataTransfer?.files
     if (files && files.length > 0) {
-      appendAttachments(Array.from(files))
+      void appendAttachments(Array.from(files))
     }
   }
 
@@ -1282,8 +1249,8 @@ export function EmailChat(props: EmailChatProps) {
     className: dialogContentClass,
     onDragOver: handleDragOver,
     onDragLeave: handleDragLeave,
-    onDrop: isEmployee ? handleDrop : undefined,
-    onOpenAutoFocus: isEmployee
+    onDrop: canCompose ? handleDrop : undefined,
+    onOpenAutoFocus: canCompose
       ? (e: Event) => {
           if (targetMessageId !== null) return
           e.preventDefault()
@@ -1310,7 +1277,19 @@ export function EmailChat(props: EmailChatProps) {
     <>
       <DialogHeader className='border-b p-2'>
         <div className='flex w-full items-start gap-3'>
-          <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-500 font-bold text-white'>
+          {readOnly ? (
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='shrink-0'
+              onClick={onClose}
+              aria-label='Back to customer'
+            >
+              <X className='h-4 w-4' />
+            </Button>
+          ) : null}
+          <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500 font-bold text-white'>
             {getInitials(customerName)}
           </div>
           <div className='min-w-0 flex-1'>
@@ -1358,7 +1337,10 @@ export function EmailChat(props: EmailChatProps) {
         </div>
       </DialogHeader>
 
-      <div ref={scrollContainerRef} className='flex-1 overflow-y-auto'>
+      <div
+        ref={scrollContainerRef}
+        className='min-w-0 flex-1 overflow-x-hidden overflow-y-auto'
+      >
         {chatMessages.map((message, index) => {
           const isGmailReaction = isGmailReactionEmailBody(message.body)
           const visibleAttachments = message.attachments
@@ -1373,7 +1355,7 @@ export function EmailChat(props: EmailChatProps) {
                 </div>
               )}
               <div
-                className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
+                className={`${rowClass} min-w-0 ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
               >
                 <div
                   ref={node => {
@@ -1385,8 +1367,8 @@ export function EmailChat(props: EmailChatProps) {
                   }}
                   className={cn(
                     message.isFromCustomer
-                      ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words'
-                      : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words',
+                      ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] min-w-0 break-words [overflow-wrap:anywhere]'
+                      : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] min-w-0 relative pb-6 break-words [overflow-wrap:anywhere]',
                     isGmailReaction &&
                       message.isFromCustomer &&
                       'bg-gray-100 text-gray-700 px-3 py-1.5',
@@ -1397,7 +1379,7 @@ export function EmailChat(props: EmailChatProps) {
                 >
                   <div
                     className={cn(
-                      'email-message-body break-words text-base leading-[1.45] [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5',
+                      'email-message-body break-words [overflow-wrap:anywhere] text-base leading-[1.45] [&_a]:break-all [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5',
                       isGmailReaction && 'text-sm leading-snug',
                       message.isFromCustomer
                         ? '[&_a]:text-blue-700 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5'
@@ -1442,19 +1424,17 @@ export function EmailChat(props: EmailChatProps) {
                       {visibleAttachments.map(attachment => {
                         const mime = `${attachment.content_type}/${attachment.content_subtype}`
                         const label = attachment.filename || mime
-                        const contentType = attachment.content_type.toLowerCase()
-                        const isImage =
-                          contentType === 'image' || contentType.startsWith('image/')
+                        const isImage = isEmailAttachmentImage(attachment)
                         const isPdf =
-                          (contentType === 'application' &&
+                          !isImage &&
+                          ((attachment.content_type.toLowerCase() === 'application' &&
                             attachment.content_subtype.toLowerCase() === 'pdf') ||
-                          mime.toLowerCase().includes('pdf')
-                        const href = attachment.signed_url || attachment.url
+                            mime.toLowerCase().includes('pdf'))
+                        const href = getEmailAttachmentImageSrc(attachment)
                         const linkClass = message.isFromCustomer
                           ? 'text-blue-700 underline'
                           : 'text-white underline'
-                        const canAddToDeal =
-                          isEmployee && !!employeeProps && !!href && attachment.id > 0
+                        const canAddToDeal = canCompose && !!href && attachment.id > 0
 
                         return (
                           <div
@@ -1512,37 +1492,20 @@ export function EmailChat(props: EmailChatProps) {
                                 </span>
                               </a>
                             ) : null}
-                            {isImage && href ? (
-                              <button
-                                type='button'
-                                className='block cursor-pointer'
-                                onClick={() => {
-                                  const imgs =
-                                    visibleAttachments
-                                      .filter(
-                                        a =>
-                                          a.content_type.toLowerCase() === 'image' &&
-                                          (a.signed_url || a.url),
-                                      )
-                                      .map(img => ({
-                                        id: img.id,
-                                        url: img.signed_url || img.url,
-                                        name:
-                                          img.filename ||
-                                          `${img.content_type}/${img.content_subtype}`,
-                                        type: 'email',
-                                        available: null,
-                                      })) || []
-                                  setCurrentImages(imgs)
-                                  setCurrentImageId(attachment.id)
+                            {isImage ? (
+                              <EmailChatAttachmentImage
+                                attachment={attachment}
+                                label={label}
+                                className={`${fileSize} object-cover rounded-md border border-black/10`}
+                                onOpen={() => {
+                                  void buildEmailCarouselImages(
+                                    visibleAttachments,
+                                  ).then(imgs => {
+                                    setCurrentImages(imgs)
+                                    setCurrentImageId(attachment.id)
+                                  })
                                 }}
-                              >
-                                <img
-                                  src={href}
-                                  alt={label}
-                                  className={`${fileSize} object-cover rounded-md border border-black/10`}
-                                />
-                              </button>
+                              />
                             ) : null}
                           </div>
                         )
@@ -1563,7 +1526,7 @@ export function EmailChat(props: EmailChatProps) {
       </div>
 
       <div className='p-2 border-t'>
-        {isEmployee && attachments.length > 0 && (
+        {canCompose && attachments.length > 0 && (
           <div className='mb-2 flex flex-wrap gap-2'>
             {attachments.map(file => {
               const previewKey = getAttachmentPreviewKey(file)
@@ -1622,7 +1585,7 @@ export function EmailChat(props: EmailChatProps) {
             })}
           </div>
         )}
-        {isEmployee && unfilled.length > 0 && (
+        {isEmployee && employeeProps && !readOnly && unfilled.length > 0 && (
           <div className='mb-2 p-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md'>
             <p>
               <strong>Action required:</strong> Please replace the following
@@ -1637,7 +1600,7 @@ export function EmailChat(props: EmailChatProps) {
             </ul>
           </div>
         )}
-        {isEmployee && employeeProps ? (
+        {canCompose ? (
           <div className='flex flex-col md:flex-row flex-1 gap-2'>
             <div className='hidden md:flex items-end gap-2'>
               {showSelect ? (
@@ -1812,7 +1775,7 @@ export function EmailChat(props: EmailChatProps) {
                 onChange={e => {
                   const files = e.currentTarget.files
                   if (files && files.length > 0) {
-                    appendAttachments(Array.from(files))
+                    void appendAttachments(Array.from(files))
                   }
                   e.currentTarget.value = ''
                 }}
@@ -1827,6 +1790,17 @@ export function EmailChat(props: EmailChatProps) {
                   if (textareaRef.current) {
                     textareaRef.current.style.height = 'auto'
                     textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+                  }
+                }}
+                onKeyDown={e => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault()
+                    if (
+                      !isSending &&
+                      (messageText.trim() !== '' || attachments.length > 0)
+                    ) {
+                      void handleSend()
+                    }
                   }
                 }}
                 placeholder='Send a message'
@@ -1864,7 +1838,7 @@ export function EmailChat(props: EmailChatProps) {
           <div className='flex flex-col md:flex-row flex-1 gap-2' />
         )}
       </div>
-      {isEmployee && employeeProps && employeeProps.companyId > 0 && (
+      {canCompose && employeeProps && employeeProps.companyId > 0 && (
         <>
           <AttachmentImagePicker
             type='stones'
@@ -1872,7 +1846,7 @@ export function EmailChat(props: EmailChatProps) {
             open={showStonesPicker}
             onClose={() => setShowStonesPicker(false)}
             onSelect={files => {
-              appendAttachments(files)
+              void appendAttachments(files)
               setShowStonesPicker(false)
             }}
             onAddFiles={appendAttachments}
@@ -1883,7 +1857,7 @@ export function EmailChat(props: EmailChatProps) {
             open={showImagesPicker}
             onClose={() => setShowImagesPicker(false)}
             onSelect={files => {
-              appendAttachments(files)
+              void appendAttachments(files)
               setShowImagesPicker(false)
             }}
           />
@@ -1893,13 +1867,13 @@ export function EmailChat(props: EmailChatProps) {
             open={showDocumentsPicker}
             onClose={() => setShowDocumentsPicker(false)}
             onSelect={files => {
-              appendAttachments(files)
+              void appendAttachments(files)
               setShowDocumentsPicker(false)
             }}
           />
         </>
       )}
-      {isEmployee && employeeProps && (
+      {canCompose && employeeProps && (
         <MobileTemplatePicker
           open={showMobileTemplatePicker}
           onOpenChange={open => {
@@ -1920,7 +1894,7 @@ export function EmailChat(props: EmailChatProps) {
           activeTemplateId={activeTemplateId}
         />
       )}
-      {isEmployee && employeeProps && (
+      {canCompose && employeeProps && (
         <Dialog
           open={!!pendingDealAttachment && attachmentDealChoices.length > 0}
           onOpenChange={open => {

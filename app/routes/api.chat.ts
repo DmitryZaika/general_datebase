@@ -7,13 +7,20 @@ import { getSession } from '~/sessions.server'
 import type { InstructionSlim } from '~/types'
 import {
   answerHasUsableInfo,
+  parseInstructionIndices,
   stripChatResponseMarkersTrimmed,
 } from '~/utils/chatAnswerHelpers'
 import { DONE_KEY } from '~/utils/constants'
 import {
-  collectRelatedInstructionImages,
+  buildPriceQueryHint,
+  collectImagesForUsedInstructions,
+  findBestMatchingInstruction,
+  findInstructionMatchingAnswer,
+  isPriceQuery,
+  type MatchedInstruction,
   resolveInstructionsUsedForReply,
 } from '~/utils/instructionImages'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import {
   appendSpecialOrderPrompt,
   calculateSpecialOrder,
@@ -121,7 +128,10 @@ async function getContext(
   return { messages: currentConvo, id: history[0].id }
 }
 
-function buildInstructionContext(instructions: InstructionSlim[]): string {
+function buildInstructionContext(
+  instructions: InstructionSlim[],
+  query: string,
+): string {
   const entries = instructions.map((instruction, index) => {
     const title = instruction.title?.trim() || `Untitled #${instruction.id}`
     const body = htmlToPlainText(instruction.rich_text).trim() || '(empty)'
@@ -130,37 +140,49 @@ TITLE: ${title}
 BODY: ${body}`
   })
 
-  return `Here are the instructions you can use, each TITLE is linked to its own BODY:
+  return `${buildPriceQueryHint(instructions, query)}Here are the instructions you can use, each TITLE is linked to its own BODY:
 
 ${entries.join('\n\n')}`
 }
 
+function buildInstructionUserMessage(query: string): string {
+  const priceHint = isPriceQuery(query)
+    ? 'Answer only the specific price or fee the user asked about. Do not include formulas, minimum charges, discounts, or unrelated fees unless the user asked for them.\n\n'
+    : ''
+  return `${priceHint}Answer the question as best as you can.\n\nQuestion: ${query}\n\nAnswer:`
+}
+
 const INSTRUCTION_RULES = `How to use this context:
 1. Each entry above is one instruction with a clear TITLE and the BODY that belongs to that exact title.
-2. When the user asks about a topic, FIRST find the instruction whose TITLE best matches the topic (for example, a question about fabrication must be answered from a Fabrication title's BODY, not Quotes or unrelated titles).
-3. Answer using ONLY that matching title's BODY. Do not mix in content from other titles unless the user explicitly asks about them.
-4. If no title matches the topic, say that you do not have an instruction for it instead of guessing.
-5. Be brief and direct. Do NOT copy the instruction text word-for-word. Summarize the main idea in your own words using short paragraphs or bullet points.
-6. Include every important fact, step, requirement, and exception from the matching BODY. Do not leave out actionable information, but skip filler and repetition.
-7. Do NOT add unnecessary assumptions or commentary beyond what the matching instruction requires.
-8. Each instruction above is labeled with an instruction number (Instruction 1, Instruction 2, etc.). After your answer, add a final line containing ONLY the marker in the exact form [[INSTRUCTION:n]]. If your answer draws on more than one instruction BODY, list every instruction number you actually used, comma-separated, like [[INSTRUCTION:2,5]].
-9. Be VERY STRICT about citations. Cite an instruction ONLY when the facts in your answer came from that instruction's BODY. Do NOT cite an instruction just because a word from the user's message also appears in its TITLE (for example, do not cite a "Template" instruction merely because the user's text contains the word "template").
-10. If the user gives you their own text and asks you to continue, complete, finish, rewrite, rephrase, translate, summarize, fix, or reformat it, that text is the user's own. Use [[INSTRUCTION:none]] unless an instruction BODY genuinely supplied additional facts that you actually used.
-11. If the user asks a meta question about your previous answer or about which sources/instructions you used (for example "which information did you take from X?"), you are explaining your earlier answer, not providing new facts from an instruction BODY. Use [[INSTRUCTION:none]].
-12. Never invent or guess a number. When unsure, use [[INSTRUCTION:none]]. Never describe or mention this marker in your prose.`
+2. When the user asks about a topic, find the instruction whose TITLE or BODY best matches what they need.
+3. If the user asks about a price, cost, fee, rate, or charge, search instruction BODIES for the specific dollar amount or rate they asked about. The answer often lives under a general title like "Standard Formula" even when the title does not mention the topic.
+4. Match your answer scope to the question scope. A narrow question gets a narrow answer. Example: if the user asks "price for fabrication", give only the fabrication rates by material — do not include special-order formulas, minimum charges, contractor discounts, cutting board prices, or other fees unless the user asked about them.
+5. Use the single best-matching instruction when it fully answers the question. Only combine a second instruction when the user explicitly asks about multiple topics or the first instruction is missing a specific detail they asked for.
+6. If no instruction BODY contains the requested information, say that you do not have an instruction for it instead of guessing.
+7. Do not use outside knowledge. Every fact in your answer must come from an instruction BODY.
+8. Be brief and direct. Do NOT copy the instruction text word-for-word. Summarize the main idea in your own words.
+9. Format every answer for easy reading. Put each distinct topic, rule, or step on its own line and use blank lines between sections. Use **bold** for headings, prices, minimum charges, and other key terms that are emphasized in the matching BODY. Present multiple steps, requirements, or rules as a numbered list (1. 2. 3.) or bullet list (- ) with one item per line. Never output one long paragraph.
+10. Include only the facts that directly answer the user's question. Do not dump the entire instruction BODY.
+11. Do NOT add unnecessary assumptions or commentary beyond what the matching instruction requires.
+12. Each instruction above is labeled with an instruction number (Instruction 1, Instruction 2, etc.). After your answer, add a final line containing ONLY the marker in the exact form [[INSTRUCTION:n]]. If your answer draws on more than one instruction BODY, list every instruction number you actually used, comma-separated, like [[INSTRUCTION:2,5]].
+13. Be VERY STRICT about citations. Cite an instruction ONLY when the facts in your answer came from that instruction's BODY. Do NOT cite an instruction just because a word from the user's message also appears in its TITLE (for example, do not cite a "Template" instruction merely because the user's text contains the word "template").
+14. If the user gives you their own text and asks you to continue, complete, finish, rewrite, rephrase, translate, summarize, fix, or reformat it, that text is the user's own. Use [[INSTRUCTION:none]] unless an instruction BODY genuinely supplied additional facts that you actually used.
+15. If the user asks a meta question about your previous answer or about which sources/instructions you used (for example "which information did you take from X?"), you are explaining your earlier answer, not providing new facts from an instruction BODY. Use [[INSTRUCTION:none]].
+16. Never invent or guess a number. When unsure, use [[INSTRUCTION:none]]. Never describe or mention this marker in your prose.`
 
 const PRICE_LIST_RULES = `How to use this context:
 1. You are in Price lists mode. Use ONLY the supplier documents below.
 2. These documents come from supplier files on the Suppliers page. They may be PDFs or images.
 3. Only state a dollar price if an exact price appears in the documents. Never calculate, estimate, or invent a price.
-4. Many supplier documents show color groups or levels instead of prices. When one SOURCE from a supplier lists the product with a group or level and size but no dollar amount, check every other SOURCE from that same supplier for the actual price before answering.
-5. Only if no SOURCE from that supplier contains a dollar price should you say the price is not specified and state the level or group and size. Example: "The price is not specified. The level is Group 7. The size is 126x63."
-6. When citing a dollar price, use the SOURCE that contains the price, not the color group document.
-7. If the requested color name is close but not exact (for example the user asks for "Adonia" and the document lists "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say clearly that the name was not an exact match, give the exact product name from the document, then state the price and slab size. Example: "There is no exact match for "Adonia", but Calacatta Adonia is listed at $21.47 per sqft for a 130×79 slab."
-8. Only say you could not find the product when there is no reasonable close match in the documents from that supplier.
-9. Be brief and direct. Do not guess or use outside knowledge.
-10. Each document is labeled with a SOURCE number. After your answer, add a final line containing ONLY the marker in the exact form [[SOURCE:n]] or [[SOURCE:n,m]] when multiple documents were used (use a colon, no spaces), where n is the SOURCE number of the document you used. If you could not find the product, use [[SOURCE:none]]. Never describe or mention this marker in your prose.
-11. Whenever you state an exact dollar price AND a slab size in inches (whether per sqft, per slab, or other wording), do NOT ask about special orders in your prose. Always add the marker [[SPECIAL_ORDER:price=X,length=Y,width=Z]] on its own line at the end, where X is the price per sqft (convert from slab price if the document lists per slab), Y is length in inches, Z is width in inches. The app adds the special order question automatically. Never describe or mention this marker in your prose.`
+4. Some supplier tables list many products in a Group N block with no price on each row, and one price at the bottom of that block. That bottom price is the Group N price for every product listed above it in the same block unless a row shows its own price. When a GROUP N SLAB PRICE line appears in the context, use it for products in that group.
+5. Many supplier documents show color groups or levels instead of prices. When one SOURCE from a supplier lists the product with a group or level and size but no dollar amount on its row, check the GROUP price line and every other SOURCE from that same supplier before answering.
+6. Only if no SOURCE from that supplier contains a dollar price should you say the price is not specified and state the level or group and size. Example: "The price is not specified. The level is Group 7. The size is 126x63."
+7. When citing a dollar price, use the SOURCE that contains the price, not the color group document.
+8. If the requested color name is close but not exact (for example the user asks for "Adonia" and the document lists "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say clearly that the name was not an exact match, give the exact product name from the document, then state the price and slab size. Example: "There is no exact match for "Adonia", but Calacatta Adonia is listed at $21.47 per sqft for a 130×79 slab."
+9. Only say you could not find the product when there is no reasonable close match in the documents from that supplier.
+10. Be brief and direct. Do not guess or use outside knowledge.
+11. Each document is labeled with a SOURCE number. After your answer, add a final line containing ONLY the marker in the exact form [[SOURCE:n]] or [[SOURCE:n,m]] when multiple documents were used (use a colon, no spaces), where n is the SOURCE number of the document you used. If you could not find the product, use [[SOURCE:none]]. Never describe or mention this marker in your prose.
+12. Whenever you state an exact dollar price AND a slab size in inches (whether per sqft, per slab, or other wording), do NOT ask about special orders in your prose. Always add the marker [[SPECIAL_ORDER:price=X,length=Y,width=Z]] on its own line at the end, where X is the price per sqft (convert from slab price if the document lists per slab), Y is length in inches, Z is width in inches. The app adds the special order question automatically. Never describe or mention this marker in your prose.`
 
 async function getCompanyTaxRate(companyId: number): Promise<number> {
   const rows = await selectMany<{ state_taxes: number | string | null }>(
@@ -204,11 +226,11 @@ async function newInstructionContext(
     history: [
       {
         role: 'system',
-        content: `${buildInstructionContext(instructions)}\n\n${INSTRUCTION_RULES}`,
+        content: `${buildInstructionContext(instructions, query)}\n\n${INSTRUCTION_RULES}`,
       },
       {
         role: 'user',
-        content: `Answer the question as best as you can.\n\nQuestion: ${query}\n\nAnswer:`,
+        content: buildInstructionUserMessage(query),
       },
     ],
   }
@@ -274,11 +296,7 @@ async function streamTextAnswer(
   }
 }
 
-async function loadInstructionMatchData(
-  companyId: number,
-  query: string,
-): Promise<{
-  images: string[]
+async function loadInstructionMatchData(companyId: number): Promise<{
   instructions: InstructionSlim[]
 }> {
   const instructions = await selectMany<InstructionSlim>(
@@ -286,10 +304,7 @@ async function loadInstructionMatchData(
     'SELECT id, title, rich_text from instructions WHERE company_id = ?',
     [companyId],
   )
-  return {
-    images: collectRelatedInstructionImages(instructions, query),
-    instructions,
-  }
+  return { instructions }
 }
 
 async function insertContext(user_id: number, messages: Message[], answer: string) {
@@ -434,14 +449,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             }
 
             messages = result.messages
-            const historyBeforeQuery = result.messages.slice(0, -1)
-            if (
-              shouldRebuildPriceListContext(
-                historyBeforeQuery,
-                query,
-                specialOrderOffer,
-              )
-            ) {
+            if (shouldRebuildPriceListContext(query, specialOrderOffer)) {
               const priceListData = await buildSupplierPriceListContext(
                 companyId,
                 query,
@@ -478,14 +486,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             messages = result.messages
             chatHistoryId = result.id
             if (mode === 'priceLists') {
-              const historyBeforeQuery = result.messages.slice(0, -1)
-              if (
-                shouldRebuildPriceListContext(
-                  historyBeforeQuery,
-                  query,
-                  specialOrderOffer,
-                )
-              ) {
+              if (shouldRebuildPriceListContext(query, specialOrderOffer)) {
                 const priceListData = await buildSupplierPriceListContext(
                   companyId,
                   query,
@@ -501,19 +502,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
           const instructionMatch =
             mode === 'instructions'
-              ? await loadInstructionMatchData(companyId, query)
+              ? await loadInstructionMatchData(companyId)
               : {
-                  images: [] as string[],
                   instructions: [] as InstructionSlim[],
                 }
 
           send({ event: 'status', data: JSON.stringify({ state: 'answering' }) })
 
           const response = await openai.chat.completions.create({
-            model: 'gpt-4.1-mini-2025-04-14',
+            model: GPT_MINI_MODEL,
             messages: buildRequestMessages(messages, imageDataUrl),
             temperature: 0,
-            max_tokens: 1024,
+            max_completion_tokens: 1024,
             stream: true,
           })
 
@@ -547,19 +547,49 @@ export async function loader({ request }: LoaderFunctionArgs) {
           }
 
           const hasInfo = answerHasUsableInfo(cleanAnswer)
-          const imagesToSend = mode === 'instructions' ? instructionMatch.images : []
+          let instructionsUsed: MatchedInstruction[] = []
+          let imagesToSend: string[] = []
 
           if (hasInfo && mode === 'instructions') {
-            const instructionsUsed = resolveInstructionsUsedForReply(
+            instructionsUsed = resolveInstructionsUsedForReply(
               instructionMatch.instructions,
               answer,
               query,
             )
+            if (
+              instructionsUsed.length === 0 &&
+              parseInstructionIndices(answer) !== 'none'
+            ) {
+              const fallback = findBestMatchingInstruction(
+                instructionMatch.instructions,
+                query,
+              )
+              if (fallback) {
+                instructionsUsed = [fallback]
+              }
+            }
+            const contentMatch = findInstructionMatchingAnswer(
+              instructionMatch.instructions,
+              cleanAnswer,
+              query,
+            )
+            if (
+              contentMatch &&
+              !instructionsUsed.some(item => item.id === contentMatch.id)
+            ) {
+              instructionsUsed = [contentMatch]
+            }
             if (instructionsUsed.length > 0) {
               send({
                 event: 'instructions',
                 data: JSON.stringify(instructionsUsed),
               })
+              imagesToSend = collectImagesForUsedInstructions(
+                instructionMatch.instructions,
+                instructionsUsed,
+                cleanAnswer,
+                query,
+              )
             }
           }
 

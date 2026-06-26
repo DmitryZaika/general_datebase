@@ -1,5 +1,6 @@
 import { CheckIcon } from 'lucide-react'
 import { type MouseEvent, useEffect, useRef, useState } from 'react'
+import { copyTextToClipboard } from '~/utils/copyToClipboard'
 
 interface CopyTextProps {
   value?: string
@@ -19,19 +20,23 @@ export function CopyText({ value, display, title, className }: CopyTextProps) {
     }
   }, [])
 
-  if (!value) return <span />
+  const textToCopy = (value ?? display ?? '').trim()
+  const visibleText = display ?? value ?? ''
+
+  if (!textToCopy) return <span />
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
     event.stopPropagation()
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      void navigator.clipboard.writeText(value)
-    }
-    setCopied(true)
-    if (resetRef.current) clearTimeout(resetRef.current)
-    resetRef.current = setTimeout(() => {
-      setCopied(false)
-      resetRef.current = null
-    }, 1500)
+    void copyTextToClipboard(textToCopy).then(success => {
+      if (!success) return
+      setCopied(true)
+      if (resetRef.current) clearTimeout(resetRef.current)
+      resetRef.current = setTimeout(() => {
+        setCopied(false)
+        resetRef.current = null
+      }, 1500)
+    })
   }
 
   const showLabel = hovered || copied
@@ -40,8 +45,8 @@ export function CopyText({ value, display, title, className }: CopyTextProps) {
   return (
     <button
       type='button'
-      title={title ?? value}
-      className={`group relative inline-flex items-center bg-transparent p-0 text-left text-current border-0 focus-visible:outline-none`}
+      title={title ?? textToCopy}
+      className='group relative inline-flex items-center bg-transparent p-0 text-left text-current border-0 focus-visible:outline-none'
       onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -50,7 +55,7 @@ export function CopyText({ value, display, title, className }: CopyTextProps) {
         <span
           className={`${className ?? ''} transition-opacity duration-200 ${showLabel ? 'opacity-10' : 'opacity-100'}`}
         >
-          {display ?? value}
+          {visibleText}
         </span>
         <span
           className={`pointer-events-none absolute inset-0 flex items-center justify-center text-md transition-opacity duration-200 ${

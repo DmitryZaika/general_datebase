@@ -138,17 +138,21 @@ export function CustomerForm({
   } | null>(null)
 
   const phoneValue = form.watch('phone')
+  const phone2Value = form.watch('phone_2')
   const emailValue = form.watch('email')
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
     if (typeof phoneValue === 'string' && phoneValue.trim() !== '') {
       params.set('phone', phoneValue.trim())
     }
+    if (typeof phone2Value === 'string' && phone2Value.trim() !== '') {
+      params.set('phone_2', phone2Value.trim())
+    }
     if (typeof emailValue === 'string' && emailValue.trim() !== '') {
       params.set('email', emailValue.trim())
     }
     return params.toString()
-  }, [phoneValue, emailValue])
+  }, [phoneValue, phone2Value, emailValue])
 
   const onSubmit = async (data: CustomerDialogSchema) => {
     if (!customerId && queryString) {

@@ -66,6 +66,19 @@ const userSchema = z.object({
         })
       }
     }),
+  cloudtalk_phone_number: z.coerce
+    .string()
+    .optional()
+    .superRefine((val, ctx) => {
+      if (val === undefined || String(val).trim() === '') return
+      const digits = String(val).replace(/\D/g, '')
+      if (digits.length < 10) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'CloudTalk phone must include at least 10 digits',
+        })
+      }
+    }),
 })
 
 const resolver = zodResolver(userSchema)
@@ -83,6 +96,7 @@ interface UserData extends RowDataPacket {
   email_signature: string | null
   email_name: string | null
   cloudtalk_agent_id: string | null
+  cloudtalk_phone_number: string | null
   telegram_id: boolean
 }
 
@@ -112,9 +126,13 @@ export async function action({ request }: ActionFunctionArgs) {
       'email_name = ?',
       'email_signature = ?',
       'cloudtalk_agent_id = ?',
+      'cloudtalk_phone_number = ?',
     ]
     const cloudtalkTrimmed = (data.cloudtalk_agent_id ?? '').trim()
     const cloudtalkForDb = cloudtalkTrimmed === '' ? null : cloudtalkTrimmed
+    const cloudtalkPhoneDigits = (data.cloudtalk_phone_number ?? '').replace(/\D/g, '')
+    const cloudtalkPhoneForDb =
+      cloudtalkPhoneDigits.length >= 10 ? cloudtalkPhoneDigits.slice(-10) : null
 
     const params = [
       data.name,
@@ -123,6 +141,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data.email_name ?? null,
       data.email_signature ?? null,
       cloudtalkForDb,
+      cloudtalkPhoneForDb,
     ]
 
     // Only hash and update password if provided
@@ -160,7 +179,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = await getEmployeeUser(request)
 
     ;[rows] = await db.query<UserData[]>(
-      `SELECT name, email, phone_number, email_signature, email_name, cloudtalk_agent_id, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
+      `SELECT name, email, phone_number, email_signature, email_name, cloudtalk_agent_id, cloudtalk_phone_number, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
       [user.id],
     )
 
@@ -223,6 +242,7 @@ export default function UserProfile() {
       email_signature: userData.email_signature || '',
       email_name: userData.email_name || '',
       cloudtalk_agent_id: userData.cloudtalk_agent_id ?? '',
+      cloudtalk_phone_number: userData.cloudtalk_phone_number ?? '',
     },
   })
 
@@ -335,6 +355,17 @@ export default function UserProfile() {
                   <InputItem
                     name='CloudTalk agent ID'
                     placeholder='From CloudTalk (optional)'
+                    field={field}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='cloudtalk_phone_number'
+                render={({ field }) => (
+                  <InputItem
+                    name='CloudTalk phone number'
+                    placeholder='Your CloudTalk line (optional)'
                     field={field}
                   />
                 )}

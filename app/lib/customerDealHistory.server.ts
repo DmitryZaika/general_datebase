@@ -1,4 +1,5 @@
 import type { Pool } from 'mysql2/promise'
+import { MYSQL_LOCAL_DATETIME_FORMAT } from '~/lib/dateHelpers'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote, DealNoteComment } from '~/routes/api.deal-notes.$dealId'
 import { selectMany } from '~/utils/queryHelpers'
@@ -20,7 +21,7 @@ export async function fetchCustomerDealActivityNoteHistory(
   const activities = await selectMany<CustomerDealActivityHistory>(
     db,
     `SELECT da.id, da.deal_id, da.company_id, da.name,
-            DATE_FORMAT(da.deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline,
+            DATE_FORMAT(da.deadline, '${MYSQL_LOCAL_DATETIME_FORMAT}') AS deadline,
             da.priority, da.is_completed,
             DATE_FORMAT(da.completed_at, '%Y-%m-%dT%H:%i:%sZ') AS completed_at,
             DATE_FORMAT(da.created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,

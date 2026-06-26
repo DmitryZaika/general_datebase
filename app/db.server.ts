@@ -10,6 +10,7 @@ const access: PoolOptions = {
   waitForConnections: true,
   queueLimit: 0,
   enableKeepAlive: true,
+  keepAliveInitialDelay: 10_000,
 }
 
 export const db = mysql.createPool(access)

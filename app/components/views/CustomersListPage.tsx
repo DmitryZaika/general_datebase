@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Info, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
@@ -36,10 +36,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import type {
-  CustomersListCustomer,
-  WalkInSalesRepCount,
-} from '~/utils/customersListLoader.server'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
+import type { CustomersListCustomer } from '~/utils/customersListLoader.server'
+import {
+  computeMonthlyCountsBySalesRep,
+  getMonthlyCountLabel,
+  getMonthlyCountRankTooltipLines,
+  getSalesRepRankTierColorClass,
+} from '~/utils/customersMonthlyCounts'
 
 function SalesRepCell({ customer }: { customer: CustomersListCustomer }) {
   const { data: reps = [] } = useQuery<{ id: number; name: string }[]>({
@@ -238,6 +242,20 @@ function isCustomerActionPath(pathname: string) {
   )
 }
 
+function isCustomerEmailChatPath(pathname: string) {
+  return /\/customers\/info\/\d+\/chat\//.test(pathname)
+}
+
+function getCustomerDialogClassName(pathname: string, navPath: string) {
+  if (isCustomerEmailChatPath(pathname) || isCustomerEmailChatPath(navPath)) {
+    return 'max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col overflow-hidden'
+  }
+  if (isCompactCustomerAction(pathname) || isCompactCustomerAction(navPath)) {
+    return 'sm:max-w-[425px] overflow-auto p-5'
+  }
+  return 'sm:max-w-[560px] max-h-[95vh] overflow-y-auto flex flex-col p-5'
+}
+
 function isCompactCustomerAction(pathname: string) {
   return (
     pathname.includes('/customers/invalid/') || pathname.includes('/customers/delete/')
@@ -261,9 +279,8 @@ function isSameCustomerActionNavigation(from: string, to: string) {
 }
 
 export function CustomersListPage() {
-  const { customers, walkInsBySalesRep = [] } = useLoaderData<{
+  const { customers } = useLoaderData<{
     customers: CustomersListCustomer[]
-    walkInsBySalesRep?: WalkInSalesRepCount[]
   }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -342,6 +359,12 @@ export function CustomersListPage() {
     Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : 20
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
   const viewParam = searchParams.get('view') || 'customers'
+
+  const monthlyCountsBySalesRep = useMemo(
+    () => computeMonthlyCountsBySalesRep(customers, tabParam),
+    [customers, tabParam],
+  )
+  const monthlyCountLabel = getMonthlyCountLabel(tabParam)
 
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams(searchParams)
@@ -567,18 +590,48 @@ export function CustomersListPage() {
             </LoadingButton>
           </Link>
         )}
-        {walkInsBySalesRep.length > 0 ? (
+        {viewParam === 'customers' &&
+        monthlyCountLabel &&
+        monthlyCountsBySalesRep.length > 0 ? (
           <div className='flex flex-wrap items-center gap-2'>
-            <span className='text-sm text-slate-500'>Walk-ins this month:</span>
-            {walkInsBySalesRep.map(item => (
-              <span
-                key={item.salesRepId ?? 'unassigned'}
-                className='inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700'
-              >
-                {item.salesRepName}:{' '}
-                <span className='ml-1 font-semibold text-slate-900'>{item.count}</span>
-              </span>
-            ))}
+            <span className='relative inline-block pr-3 text-sm text-slate-500'>
+              {monthlyCountLabel}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type='button'
+                    aria-label='How sales rep colors are ranked'
+                    className='absolute -top-2 right-0 inline-flex text-slate-400 hover:text-slate-600'
+                  >
+                    <Info className='h-3 w-3' />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side='top' sideOffset={6} className='max-w-sm'>
+                  <div className='space-y-1'>
+                    {getMonthlyCountRankTooltipLines().map(line => (
+                      <p key={line}>{line}</p>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </span>
+            {monthlyCountsBySalesRep.map(item => {
+              const rankColorClass = getSalesRepRankTierColorClass(item.rankTier)
+              return (
+                <span
+                  key={item.salesRepId}
+                  className='inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700'
+                >
+                  <span className={`font-medium ${rankColorClass}`.trim()}>
+                    {item.salesRepName}
+                  </span>
+                  :{' '}
+                  <span className='ml-1 font-semibold text-slate-900'>
+                    {item.count}
+                  </span>
+                </span>
+              )
+            })}
           </div>
         ) : null}
       </div>
@@ -640,11 +693,7 @@ export function CustomersListPage() {
       {showCustomerDialog ? (
         <Dialog open={true} onOpenChange={handleCustomerDialogClose}>
           <DialogContent
-            className={
-              compactCustomerAction || compactCustomerActionNav
-                ? 'sm:max-w-[425px] overflow-auto p-5'
-                : 'sm:max-w-[560px] max-h-[95vh] overflow-y-auto flex flex-col p-5'
-            }
+            className={getCustomerDialogClassName(location.pathname, navPath)}
           >
             {showCustomerActionSkeleton ? (
               <CustomerActionDialogSkeletonContent />

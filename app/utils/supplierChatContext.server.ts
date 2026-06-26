@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { toFile } from 'openai/uploads'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { db } from '~/db.server'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { selectMany } from '~/utils/queryHelpers'
 import { downloadFileAsBuffer } from '~/utils/s3.server'
 
@@ -11,9 +12,33 @@ interface DownloadedFile {
   filename: string
 }
 
-async function fetchFileBuffer(url: string): Promise<DownloadedFile | null> {
+const FETCH_TIMEOUT_MS = 30_000
+const PDF_TEXT_EXTRACT_TIMEOUT_MS = 45_000
+const OPENAI_EXTRACT_TIMEOUT_MS = 180_000
+
+function isS3StorageUrl(url: string): boolean {
+  return /\.s3\.[\w-]+\.amazonaws\.com\//i.test(url)
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeoutPromise = new Promise<undefined>(resolve => {
+    timeoutId = setTimeout(() => resolve(undefined), ms)
+  })
   try {
-    const response = await fetch(url)
+    return await Promise.race([promise, timeoutPromise])
+  } catch {
+    return undefined
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
+
+async function fetchFileBuffer(url: string): Promise<DownloadedFile | null> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
     if (!response.ok) return null
     const arrayBuffer = await response.arrayBuffer()
     const filenameFromUrl = url.split('?')[0].split('/').pop() ?? 'file'
@@ -24,10 +49,15 @@ async function fetchFileBuffer(url: string): Promise<DownloadedFile | null> {
     }
   } catch {
     return null
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
 async function downloadAnyFile(url: string): Promise<DownloadedFile | null> {
+  if (isS3StorageUrl(url)) {
+    return downloadFileAsBuffer(url)
+  }
   const fetched = await fetchFileBuffer(url)
   if (fetched && fetched.buffer.length > 0) return fetched
   return downloadFileAsBuffer(url)
@@ -129,6 +159,11 @@ interface SupplierFileRow {
   supplier_id: number
   name: string
   url: string
+  file_text: string | null
+}
+
+export interface SupplierFileIndexRow extends SupplierFileRow {
+  supplier_name: string
 }
 
 export interface SupplierSource {
@@ -146,7 +181,12 @@ export interface SupplierPriceListResult {
 
 export type PriceListProgress =
   | { state: 'searching' }
-  | { state: 'reading'; fileType: 'pdf' | 'image' | 'file'; name: string }
+  | {
+      state: 'reading'
+      phase?: 'downloading' | 'extracting'
+      fileType: 'pdf' | 'image' | 'file'
+      name: string
+    }
 
 function queryTerms(query: string): string[] {
   return query
@@ -157,18 +197,321 @@ function queryTerms(query: string): string[] {
 
 function countMatchingTerms(terms: string[], haystack: string): number {
   if (!haystack) return 0
-  const lower = haystack.toLowerCase()
   let count = 0
   for (const term of terms) {
-    if (lower.includes(term)) count += 1
+    if (termMatchesInText(term, haystack)) count += 1
   }
   return count
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+  const rows = a.length + 1
+  const cols = b.length + 1
+  const matrix: number[][] = Array.from({ length: rows }, () => Array(cols).fill(0))
+  for (let i = 0; i < rows; i += 1) matrix[i][0] = i
+  for (let j = 0; j < cols; j += 1) matrix[0][j] = j
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      )
+    }
+  }
+  return matrix[a.length][b.length]
+}
+
+function termMatchesInText(term: string, haystack: string): boolean {
+  const lower = haystack.toLowerCase()
+  const termLower = term.toLowerCase()
+  if (lower.includes(termLower)) return true
+  if (term.length < 5) return false
+
+  const maxDist = term.length >= 8 ? 2 : 1
+  const words = lower.split(/[^a-z0-9]+/).filter(word => word.length >= 3)
+  for (const word of words) {
+    if (Math.abs(word.length - term.length) > maxDist) continue
+    if (levenshtein(termLower, word) <= maxDist) return true
+  }
+  return false
+}
+
+function findTermMatchIndex(text: string, term: string): number {
+  const lower = text.toLowerCase()
+  const termLower = term.toLowerCase()
+  const exact = lower.indexOf(termLower)
+  if (exact !== -1) return exact
+
+  if (term.length < 5) return -1
+
+  const maxDist = term.length >= 8 ? 2 : 1
+  let bestIndex = -1
+  let bestDist = maxDist + 1
+  const pattern = /[a-z0-9]{3,}/gi
+  let match = pattern.exec(text)
+  while (match) {
+    const word = match[0]
+    if (Math.abs(word.length - term.length) <= maxDist) {
+      const dist = levenshtein(termLower, word.toLowerCase())
+      if (dist <= maxDist && dist < bestDist) {
+        bestDist = dist
+        bestIndex = match.index
+      }
+    }
+    match = pattern.exec(text)
+  }
+  return bestIndex
 }
 
 function truncateText(text: string, maxChars: number): string {
   const trimmed = text.trim()
   if (trimmed.length <= maxChars) return trimmed
   return `${trimmed.slice(0, maxChars)}\n...[truncated]`
+}
+
+function parseQueryGroupNumber(query: string): string | null {
+  const match = query.match(/\b(?:group|level)\s*(\d+)\b/i)
+  return match?.[1] ?? null
+}
+
+type PriceListSection = {
+  text: string
+  groupNum: string | null
+  start: number
+}
+
+function splitPriceListSections(text: string): PriceListSection[] {
+  const pattern = /\b(?:Group|Level|GROUP|LEVEL)\s+(\d+)\b/g
+  const matches: { index: number; groupNum: string }[] = []
+  let match = pattern.exec(text)
+  while (match) {
+    matches.push({ index: match.index, groupNum: match[1] })
+    match = pattern.exec(text)
+  }
+
+  if (matches.length === 0) {
+    return [{ text, groupNum: null, start: 0 }]
+  }
+
+  const sections: PriceListSection[] = []
+  if (matches[0].index > 0) {
+    sections.push({
+      text: text.slice(0, matches[0].index),
+      groupNum: null,
+      start: 0,
+    })
+  }
+
+  for (let i = 0; i < matches.length; i += 1) {
+    const start = matches[i].index
+    const end = i + 1 < matches.length ? matches[i + 1].index : text.length
+    sections.push({
+      text: text.slice(start, end),
+      groupNum: matches[i].groupNum,
+      start,
+    })
+  }
+
+  return sections
+}
+
+function countDollarPrices(text: string): number {
+  const matches = text.match(/\$\s*[\d,]+(?:\.\d{2})?/g)
+  return matches?.length ?? 0
+}
+
+function sectionMatchesProduct(section: PriceListSection, terms: string[]): boolean {
+  const prominent = terms.filter(term => term.length >= 5)
+  const checkTerms = prominent.length > 0 ? prominent : terms
+  const matched = checkTerms.filter(term =>
+    termMatchesInText(term, section.text),
+  ).length
+  const required = Math.max(1, Math.ceil(checkTerms.length * 0.5))
+  return matched >= required
+}
+
+function scoreDistinctiveTermMatch(section: PriceListSection, terms: string[]): number {
+  const sorted = [...terms]
+    .filter(term => term.length >= 5)
+    .sort((a, b) => b.length - a.length)
+  for (const term of sorted) {
+    if (termMatchesInText(term, section.text)) {
+      return term.length * 6
+    }
+  }
+  return 0
+}
+
+function extractGroupBlockPrice(sectionText: string): string | null {
+  const matches = [...sectionText.matchAll(/\$\s*([\d,]+(?:\.\d{2})?)/g)]
+  if (matches.length === 0) return null
+  return matches[matches.length - 1][0].replace(/\s+/g, '')
+}
+
+function annotateGroupSectionText(section: PriceListSection, text: string): string {
+  const price = extractGroupBlockPrice(text)
+  if (!price || !section.groupNum) return text
+  const header = `GROUP ${section.groupNum} SLAB PRICE: ${price} (listed at the bottom of this group block and applies to every product listed in Group ${section.groupNum} above unless a product row shows its own price)`
+  return `${header}\n${text}`
+}
+
+function trimSectionWithPriceTail(section: string, maxChars: number): string {
+  const trimmed = section.trim()
+  if (trimmed.length <= maxChars) return trimmed
+
+  const separator = '\n...[truncated]...\n'
+  const tailSize = Math.min(2800, Math.floor(maxChars * 0.45))
+  const headSize = maxChars - tailSize - separator.length
+  if (headSize < 500) {
+    return truncateText(trimmed, maxChars)
+  }
+
+  return `${trimmed.slice(0, headSize).trim()}${separator}${trimmed.slice(-tailSize).trim()}`
+}
+
+function scoreSectionForQuery(
+  section: PriceListSection,
+  terms: string[],
+  queryGroupNum: string | null,
+): number {
+  let score = countMatchingTerms(terms, section.text) * 2
+  score += scoreDistinctiveTermMatch(section, terms)
+  if (queryGroupNum && section.groupNum === queryGroupNum) {
+    score += 25
+  }
+  if (sectionMatchesProduct(section, terms)) {
+    score += 12
+    score += countDollarPrices(section.text) * 4
+  }
+  return score
+}
+
+function appendSiblingGroupPrice(
+  section: PriceListSection,
+  sections: PriceListSection[],
+): string {
+  if (contentHasDollarPrice(section.text) || !section.groupNum) {
+    return section.text
+  }
+
+  const priced = sections
+    .filter(
+      item =>
+        item.groupNum === section.groupNum &&
+        item.start !== section.start &&
+        contentHasDollarPrice(item.text),
+    )
+    .sort((a, b) => a.start - b.start)[0]
+
+  if (!priced) return section.text
+
+  const tailStart = Math.max(0, priced.text.length - 1500)
+  return `${section.text.trim()}\n\n${priced.text.slice(tailStart).trim()}`
+}
+
+function excerptAroundTerms(text: string, terms: string[], maxChars: number): string {
+  const trimmed = text.trim()
+  if (trimmed.length <= maxChars) return trimmed
+  if (terms.length === 0) return truncateText(trimmed, maxChars)
+
+  let bestIndex = 0
+  let bestScore = -1
+  for (const term of terms) {
+    const found = findTermMatchIndex(trimmed, term)
+    if (found === -1) continue
+    const score = term.length
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = found
+    }
+  }
+
+  if (bestScore <= 0) return truncateText(trimmed, maxChars)
+
+  let start = Math.max(0, bestIndex - Math.floor(maxChars * 0.4))
+  const end = Math.min(trimmed.length, start + maxChars)
+  if (end - start < maxChars) {
+    start = Math.max(0, end - maxChars)
+  }
+
+  let slice = trimmed.slice(start, end)
+  if (!contentHasDollarPrice(slice) && end < trimmed.length) {
+    const extra = trimmed.slice(end, Math.min(trimmed.length, end + 2500))
+    if (contentHasDollarPrice(extra)) {
+      slice = `${slice}\n${extra}`
+    }
+  }
+
+  if (slice.length <= maxChars) {
+    const prefix = start > 0 ? '...[truncated]...\n' : ''
+    const suffix = start + slice.length < trimmed.length ? '\n...[truncated]' : ''
+    return `${prefix}${slice.trim()}${suffix}`
+  }
+
+  return trimSectionWithPriceTail(slice, maxChars)
+}
+
+export function extractPriceListExcerpt(
+  text: string,
+  query: string,
+  maxChars: number,
+): string {
+  const trimmed = text.trim()
+  if (!trimmed) return ''
+
+  const terms = queryTerms(query)
+  const queryGroupNum = parseQueryGroupNumber(query)
+  const sections = splitPriceListSections(trimmed)
+
+  if (sections.length === 1 && sections[0].groupNum === null) {
+    return excerptAroundTerms(trimmed, terms, maxChars)
+  }
+
+  const ranked = sections
+    .map(section => ({
+      section,
+      score: scoreSectionForQuery(section, terms, queryGroupNum),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      const priceDiff =
+        countDollarPrices(b.section.text) - countDollarPrices(a.section.text)
+      if (priceDiff !== 0) return priceDiff
+      return a.section.start - b.section.start
+    })
+
+  const productMatches = ranked.filter(item =>
+    sectionMatchesProduct(item.section, terms),
+  )
+  const candidates = productMatches.length > 0 ? productMatches : ranked
+
+  const bestScore = candidates[0]?.score ?? 0
+  if (bestScore === 0 && queryGroupNum) {
+    const sameGroup = sections.filter(section => section.groupNum === queryGroupNum)
+    const priced =
+      sameGroup.find(section => contentHasDollarPrice(section.text)) ??
+      sameGroup.sort((a, b) => a.start - b.start)[0]
+    if (priced) {
+      return trimSectionWithPriceTail(priced.text, maxChars)
+    }
+  }
+
+  if (bestScore === 0) {
+    return excerptAroundTerms(trimmed, terms, maxChars)
+  }
+
+  const chosenSection = candidates[0].section
+  const mergedText = appendSiblingGroupPrice(chosenSection, sections)
+  const sectionText = annotateGroupSectionText(chosenSection, mergedText)
+  if (sectionText.length <= maxChars) {
+    return sectionText.trim()
+  }
+
+  return trimSectionWithPriceTail(sectionText, maxChars)
 }
 
 function fileExtension(filename: string, url: string): string {
@@ -267,7 +610,10 @@ function findRelevantFiles(
   const scored = pool
     .map(file => ({
       file,
-      score: countMatchingTerms(terms, `${file.name} ${file.url}`),
+      score: countMatchingTerms(
+        terms,
+        `${file.name} ${file.url} ${(file.file_text ?? '').slice(0, 8000)}`,
+      ),
     }))
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score
@@ -313,26 +659,26 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   return parts.join('\n')
 }
 
-const PDF_EXTRACT_PROMPT =
-  'Read this supplier price list PDF and extract information to answer the question. Include exact dollar prices only if they appear in the document. Also extract the color group or level number, product name, and slab size if shown. If no dollar price is listed for the product, explicitly say that no price is specified and report the level or group and size instead.'
+const FULL_FILE_EXTRACT_PROMPT =
+  'Transcribe all text from this supplier price list document exactly as it appears. Include every product name, color group or level number, slab size, and dollar price. Preserve the document structure and list all entries completely. Do not summarize or omit anything.'
 
 const INLINE_PDF_LIMIT = 4 * 1024 * 1024
 const MAX_PDF_UPLOAD = 32 * 1024 * 1024
+const FULL_FILE_EXTRACT_MAX_TOKENS = 16000
 
 async function extractPdfInline(
   buffer: Buffer,
   filename: string,
-  query: string,
 ): Promise<string | null> {
   const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini-2025-04-14',
+    model: GPT_MINI_MODEL,
     temperature: 0,
-    max_tokens: 1200,
+    max_completion_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
     messages: [
       {
         role: 'user',
         content: [
-          { type: 'text', text: `${PDF_EXTRACT_PROMPT} Question: ${query}` },
+          { type: 'text', text: FULL_FILE_EXTRACT_PROMPT },
           {
             type: 'file',
             file: {
@@ -350,7 +696,6 @@ async function extractPdfInline(
 async function extractPdfViaUpload(
   buffer: Buffer,
   filename: string,
-  query: string,
 ): Promise<string | null> {
   const uploaded = await openai.files.create({
     file: await toFile(buffer, pdfFileName(filename), {
@@ -361,14 +706,14 @@ async function extractPdfViaUpload(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       temperature: 0,
-      max_tokens: 1200,
+      max_completion_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
       messages: [
         {
           role: 'user',
           content: [
-            { type: 'text', text: `${PDF_EXTRACT_PROMPT} Question: ${query}` },
+            { type: 'text', text: FULL_FILE_EXTRACT_PROMPT },
             { type: 'file', file: { file_id: uploaded.id } },
           ],
         },
@@ -376,44 +721,39 @@ async function extractPdfViaUpload(
     })
     return response.choices[0]?.message?.content?.trim() ?? null
   } finally {
-    try {
-      await openai.files.delete(uploaded.id)
-    } catch {
-      // best effort cleanup
-    }
+    await openai.files.delete(uploaded.id).catch(() => undefined)
   }
 }
 
 async function extractPdfWithOpenAI(
   buffer: Buffer,
   filename: string,
-  query: string,
 ): Promise<string | null> {
   if (buffer.length > MAX_PDF_UPLOAD) return null
 
   try {
     if (buffer.length <= INLINE_PDF_LIMIT) {
-      return await extractPdfInline(buffer, filename, query)
+      return await extractPdfInline(buffer, filename)
     }
-    return await extractPdfViaUpload(buffer, filename, query)
+    return await extractPdfViaUpload(buffer, filename)
   } catch {
     return null
   }
 }
 
-async function extractImageText(url: string, query: string): Promise<string | null> {
+async function extractFullImageText(url: string): Promise<string | null> {
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       temperature: 0,
-      max_tokens: 800,
+      max_completion_tokens: FULL_FILE_EXTRACT_MAX_TOKENS,
       messages: [
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: `Extract information from this supplier price list image to answer the question. Include exact dollar prices only if they appear in the document. Also extract the color group or level number, product name, and slab size if shown. If no dollar price is listed for the product, explicitly say that no price is specified and report the level or group and size instead. Question: ${query}`,
+              text: FULL_FILE_EXTRACT_PROMPT,
             },
             {
               type: 'image_url',
@@ -429,46 +769,88 @@ async function extractImageText(url: string, query: string): Promise<string | nu
   }
 }
 
-async function extractSupplierFileText(
+async function saveSupplierFileText(fileId: number, text: string): Promise<void> {
+  await db
+    .execute('UPDATE supplier_files SET file_text = ? WHERE id = ?', [text, fileId])
+    .catch(() => undefined)
+}
+
+async function extractFullTextFromFile(
   file: SupplierFileRow,
-  query: string,
+  onPhase?: (phase: 'downloading' | 'extracting') => void,
 ): Promise<string | null> {
+  onPhase?.('downloading')
   const downloaded = await downloadAnyFile(file.url)
   if (!downloaded) return null
 
+  onPhase?.('extracting')
   const ext = fileExtension(downloaded.filename, file.url)
   const { buffer, contentType } = downloaded
+  let fullText: string | null = null
 
   if (isTextExtension(ext) || contentType.startsWith('text/')) {
-    return truncateText(buffer.toString('utf8'), MAX_FILE_CHARS)
+    fullText = buffer.toString('utf8').trim() || null
+  } else if (isPdfFile(ext, contentType, buffer)) {
+    const pdfText = await withTimeout(
+      extractPdfText(buffer),
+      PDF_TEXT_EXTRACT_TIMEOUT_MS,
+    )
+    fullText = pdfText?.trim() || null
+
+    if (!fullText) {
+      const openAiText = await withTimeout(
+        extractPdfWithOpenAI(buffer, downloaded.filename),
+        OPENAI_EXTRACT_TIMEOUT_MS,
+      )
+      fullText = openAiText?.trim() || null
+    }
+  } else if (isImageExtension(ext) || contentType.startsWith('image/')) {
+    const imageText = await withTimeout(
+      extractFullImageText(file.url),
+      OPENAI_EXTRACT_TIMEOUT_MS,
+    )
+    fullText = imageText?.trim() || null
   }
 
-  if (isPdfFile(ext, contentType, buffer)) {
-    let text = ''
-    try {
-      text = await extractPdfText(buffer)
-    } catch {
-      text = ''
-    }
+  return fullText?.trim() || null
+}
 
-    if (text.trim()) {
-      return truncateText(text, MAX_FILE_CHARS)
-    }
-
-    const openAiText = await extractPdfWithOpenAI(buffer, downloaded.filename, query)
-    if (openAiText) {
-      return truncateText(openAiText, MAX_FILE_CHARS)
-    }
-
-    return null
+async function extractSupplierFileText(
+  file: SupplierFileRow,
+  query: string,
+  onPhase?: (phase: 'downloading' | 'extracting') => void,
+): Promise<string | null> {
+  const cached = file.file_text?.trim()
+  if (cached) {
+    return extractPriceListExcerpt(cached, query, MAX_FILE_CHARS)
   }
 
-  if (isImageExtension(ext) || contentType.startsWith('image/')) {
-    const text = await extractImageText(file.url, query)
-    return text ? truncateText(text, MAX_FILE_CHARS) : null
-  }
+  const fullText = await extractFullTextFromFile(file, onPhase)
+  if (!fullText) return null
 
-  return null
+  return extractPriceListExcerpt(fullText, query, MAX_FILE_CHARS)
+}
+
+export async function listSupplierFilesNeedingText(): Promise<SupplierFileIndexRow[]> {
+  return selectMany<SupplierFileIndexRow>(
+    db,
+    `SELECT sf.id, sf.supplier_id, sf.name, sf.url, sf.file_text, s.supplier_name
+       FROM supplier_files sf
+       JOIN suppliers s ON s.id = sf.supplier_id
+      WHERE sf.file_text IS NULL OR TRIM(sf.file_text) = ''
+      ORDER BY sf.id`,
+  )
+}
+
+export async function indexSupplierFileText(
+  file: SupplierFileRow,
+  onPhase?: (phase: 'downloading' | 'extracting') => void,
+): Promise<boolean> {
+  if (file.file_text?.trim()) return true
+  const fullText = await extractFullTextFromFile(file, onPhase)
+  if (!fullText) return false
+  await saveSupplierFileText(file.id, fullText)
+  return true
 }
 
 export async function buildSupplierPriceListContext(
@@ -491,7 +873,7 @@ export async function buildSupplierPriceListContext(
   const supplierIds = suppliers.map(supplier => supplier.id)
   const files = await selectMany<SupplierFileRow>(
     db,
-    'SELECT id, supplier_id, name, url FROM supplier_files WHERE supplier_id IN (?)',
+    'SELECT id, supplier_id, name, url, file_text FROM supplier_files WHERE supplier_id IN (?)',
     [supplierIds],
   )
 
@@ -512,7 +894,8 @@ export async function buildSupplierPriceListContext(
     'SUPPLIER PRICE LISTS',
     'Answer using ONLY the supplier documents below. These are PDF files and images uploaded on the Suppliers page.',
     'Only report dollar prices that explicitly appear in the documents. Never invent or estimate prices.',
-    'When one document from a supplier shows a product with a color group or level and size but no dollar price, check every other SOURCE from that same supplier for the actual price before saying the price is not specified.',
+    'When a Group N block lists products without individual prices and one price at the bottom of that block, that bottom price applies to every product in Group N above it. A GROUP N SLAB PRICE line in the excerpt states that group price explicitly.',
+    'When one document from a supplier shows a product with a color group or level and size but no dollar price on its row, check the GROUP price line and every other SOURCE from that same supplier before saying the price is not specified.',
     'Only after checking all documents from that supplier should you say the price is not specified and give the level or group and size.',
     'If the requested color name is close but not exact (for example "Adonia" vs "Calacatta Adonia"), give the price for the closest matching product from that supplier. Say the name was not an exact match, give the exact document name, then state the price and size.',
     'Only say the product could not be found when there is no reasonable close match in the documents from that supplier.',
@@ -570,22 +953,29 @@ export async function buildSupplierPriceListContext(
         ? 'image'
         : 'file'
 
-    if (isImage && visionCalls >= MAX_VISION_FILES) {
+    const hasCachedText = Boolean(file.file_text?.trim())
+
+    if (isImage && !hasCachedText && visionCalls >= MAX_VISION_FILES) {
       sections.push(`\nFILE: ${file.name} (${supplierName})`)
       sections.push('CONTENT: Skipped additional image files to limit processing.')
       continue
     }
-    if (isImage) {
+    if (isImage && !hasCachedText) {
       visionCalls += 1
     }
 
-    onProgress?.({
-      state: 'reading',
-      fileType: isPdf ? 'pdf' : isImage ? 'image' : 'file',
-      name: file.name,
-    })
+    const emitFilePhase = (phase: 'downloading' | 'extracting') => {
+      onProgress?.({
+        state: 'reading',
+        phase,
+        fileType,
+        name: file.name,
+      })
+    }
 
-    const extracted = await extractSupplierFileText(file, query)
+    emitFilePhase('downloading')
+
+    const extracted = await extractSupplierFileText(file, query, emitFilePhase)
     if (extracted) {
       const sourceId = sources.length + 1
       sources.push({

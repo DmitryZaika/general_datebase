@@ -1,7 +1,18 @@
 import type { Nullable } from '~/types/utils'
 
+export const PHONE_DIGITS_REGEX = /^\d{10,15}$/
+
+// SMS body limits, shared by the composer and the server send action.
+export const SMS_MAX_TEXT = 1600
+export const SMS_SEGMENT_LEN = 160
+
 export function phoneDigitsOnly(phone: string): string {
   return phone.replace(/\D/g, '')
+}
+
+export function clampInt(n: number, min: number, max: number): number {
+  if (!Number.isFinite(n)) return min
+  return Math.max(min, Math.min(max, Math.floor(n)))
 }
 
 export function normalizeToE164(phone: Nullable<string> | undefined): Nullable<string> {
@@ -24,6 +35,42 @@ export function formatPhoneForDisplay(phone: Nullable<string> | undefined): stri
     return `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`
   }
   return phone
+}
+
+// Canonical dashed US format for customers.phone / phone_2 columns.
+export function formatPhoneForStorage(phoneDigits: string): Nullable<string> {
+  const digits = phoneDigitsOnly(phoneDigits)
+  if (!PHONE_DIGITS_REGEX.test(digits)) return null
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    const local = digits.slice(1)
+    return `${local.slice(0, 3)}-${local.slice(3, 6)}-${local.slice(6)}`
+  }
+  return null
+}
+
+// Returns both 10-digit and 11-digit forms — BIGINT phone columns drop any
+// leading "1", so equality checks need to test both.
+export function phoneVariants(digits: string): string[] {
+  const trimmed = digits.replace(/\D+/g, '')
+  if (trimmed.length === 0) return []
+  const variants = new Set<string>()
+  variants.add(trimmed)
+  if (trimmed.length === 11 && trimmed.startsWith('1')) {
+    variants.add(trimmed.slice(1))
+  }
+  if (trimmed.length === 10) {
+    variants.add(`1${trimmed}`)
+  }
+  return [...variants]
+}
+
+// Last 10 digits — matches how the Rust webhook stores sender/recipient.
+export function canonicalPhone10(phone: string): string {
+  const digits = phone.replace(/\D+/g, '')
+  return digits.length > 10 ? digits.slice(-10) : digits
 }
 
 export function formatPhoneInput(value: string, isDeleting = false): string {

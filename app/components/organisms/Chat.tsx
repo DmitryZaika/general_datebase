@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type Variants } from 'framer-motion'
-import { ImagePlus, Plus, Sparkles, X } from 'lucide-react'
+import { ImagePlus, MessageCircle, Plus, Sparkles, X } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -16,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+import { useSidebar } from '~/components/ui/sidebar'
+import { useIsMobile } from '~/hooks/use-mobile'
 import '~/styles/instructions.css'
 import { stripChatResponseMarkersTrimmed } from '~/utils/chatAnswerHelpers'
 import { DONE_KEY } from '~/utils/constants'
@@ -109,8 +111,7 @@ interface ChatMessagesProps {
   clearStaggerTotal: number
   onClearAnimationComplete: () => void
   isCreatingImage: boolean
-  scrollRef: React.RefObject<HTMLDivElement | null>
-  contentRef: React.RefObject<HTMLDivElement | null>
+  onSourceClick?: () => void
 }
 
 interface MessageBubbleProps {
@@ -128,6 +129,7 @@ interface MessageBubbleProps {
   onSpecialOrderCalculate: (slabs: number, deliveryCost: number) => void
   onRecalculate: () => void
   calculationDisabled: boolean
+  onSourceClick?: () => void
 }
 
 const CHAT_POSITION_KEY = 'floatingChatPosition'
@@ -187,9 +189,6 @@ const QUOTE_LINE_VARIANTS: Variants = {
 const FORM_EXPAND_EASE = [0.22, 1, 0.36, 1] as const
 const FORM_EXPAND_DURATION = 0.45
 const SKELETON_EXIT_DURATION = 0.4
-const SCROLL_STICK_THRESHOLD = 64
-const SCROLL_SMOOTH_MIN_STEP = 5
-const SCROLL_SMOOTH_MAX_STEP = 30
 
 const MESSAGE_CLEAR_VARIANTS: Variants = {
   exit: (custom: { staggerIndex: number; staggerTotal: number }) => ({
@@ -345,7 +344,11 @@ function AnimatedPriceListMenu({
         <motion.div
           initial={false}
           animate={{ opacity: open ? 1 : 0, y: open ? 0 : 10 }}
-          transition={{ duration: 0.32, delay: open ? 0.1 : 0, ease: FORM_EXPAND_EASE }}
+          transition={{
+            duration: 0.32,
+            delay: open ? 0.1 : 0,
+            ease: FORM_EXPAND_EASE,
+          }}
           className='flex flex-col gap-1 text-sm'
         >
           <span>From which supplier</span>
@@ -521,7 +524,11 @@ function AnimatedAiDesignMenu({
         <motion.div
           initial={false}
           animate={{ opacity: open ? 1 : 0, y: open ? 0 : 10 }}
-          transition={{ duration: 0.32, delay: open ? 0.1 : 0, ease: FORM_EXPAND_EASE }}
+          transition={{
+            duration: 0.32,
+            delay: open ? 0.1 : 0,
+            ease: FORM_EXPAND_EASE,
+          }}
           className='flex flex-col gap-1 text-sm'
         >
           <span>Stones to install (max 3)</span>
@@ -767,6 +774,7 @@ function parseImageUrlsPayload(data: string): string[] {
 
 interface PriceListStatus {
   state: 'searching' | 'reading' | 'answering'
+  phase?: 'downloading' | 'extracting'
   fileType?: 'pdf' | 'image' | 'file'
   name?: string
 }
@@ -792,6 +800,11 @@ function parsePriceListStatus(data: string): PriceListStatus | null {
     if ('name' in parsed && typeof parsed.name === 'string') {
       status.name = parsed.name
     }
+    if ('phase' in parsed && typeof parsed.phase === 'string') {
+      if (parsed.phase === 'downloading' || parsed.phase === 'extracting') {
+        status.phase = parsed.phase
+      }
+    }
     return status
   } catch {
     return null
@@ -801,13 +814,20 @@ function parsePriceListStatus(data: string): PriceListStatus | null {
 function statusLabel(status: PriceListStatus): string {
   if (status.state === 'searching') return 'Searching supplier files…'
   if (status.state === 'reading') {
+    const suffix = status.name ? `: ${status.name}` : ''
     if (status.fileType === 'pdf') {
-      return `Downloading PDF${status.name ? `: ${status.name}` : ''}…`
+      if (status.phase === 'extracting') {
+        return `Extracting text from PDF${suffix}…`
+      }
+      return `Downloading PDF${suffix}…`
     }
     if (status.fileType === 'image') {
-      return `Reading image${status.name ? `: ${status.name}` : ''}…`
+      if (status.phase === 'extracting') {
+        return `Extracting text from image${suffix}…`
+      }
+      return `Reading image${suffix}…`
     }
-    return `Reading file${status.name ? `: ${status.name}` : ''}…`
+    return `Reading file${suffix}…`
   }
   return 'Reading documents…'
 }
@@ -1013,21 +1033,130 @@ function buildCarouselImages(urls: string[]): InstructionCarouselImage[] {
   }))
 }
 
-function renderMessageContent(content: string) {
-  const parts = content.split(/(\*\*[^*]+\*\*)/g)
+function renderInlineContent(text: string, keyPrefix: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>
+      return <strong key={`${keyPrefix}-${index}`}>{part.slice(2, -2)}</strong>
     }
-    return part
+    return <span key={`${keyPrefix}-${index}`}>{part}</span>
   })
+}
+
+type MessageListItem = {
+  key: string
+  content: string
+  nestedBullets: string[]
+}
+
+function renderMessageContent(content: string) {
+  const lines = content.split('\n')
+  const elements: React.ReactNode[] = []
+  let listItems: MessageListItem[] = []
+  let listType: 'ul' | 'ol' | null = null
+
+  const renderListItem = (item: MessageListItem) => (
+    <li key={item.key}>
+      {renderInlineContent(item.content, item.key)}
+      {item.nestedBullets.length > 0 ? (
+        <ul className='my-1 list-disc space-y-1 pl-5'>
+          {item.nestedBullets.map((bullet, index) => (
+            <li key={`${item.key}-nested-${index}`}>
+              {renderInlineContent(bullet, `${item.key}-nested-${index}`)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  )
+
+  const flushList = () => {
+    if (listItems.length === 0 || !listType) return
+    if (listType === 'ul') {
+      elements.push(
+        <ul key={`list-${elements.length}`} className='my-1 list-disc space-y-1 pl-5'>
+          {listItems.map(renderListItem)}
+        </ul>,
+      )
+    } else {
+      elements.push(
+        <ol
+          key={`list-${elements.length}`}
+          className='my-1 list-decimal space-y-1 pl-5'
+        >
+          {listItems.map(renderListItem)}
+        </ol>,
+      )
+    }
+    listItems = []
+    listType = null
+  }
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const line = lines[lineIndex]
+    const trimmed = line.trim()
+
+    if (trimmed === '') {
+      if (listType) continue
+      flushList()
+      elements.push(<div key={`spacer-${lineIndex}`} className='h-2' />)
+      continue
+    }
+
+    const bulletMatch = trimmed.match(/^[-*•]\s+(.+)$/)
+    const numberedMatch = trimmed.match(/^\d+\.\s+(.+)$/)
+
+    if (bulletMatch) {
+      if (listType === 'ol' && listItems.length > 0) {
+        listItems[listItems.length - 1].nestedBullets.push(bulletMatch[1])
+        continue
+      }
+      if (listType !== 'ul') {
+        flushList()
+        listType = 'ul'
+      }
+      listItems.push({
+        key: `li-${lineIndex}`,
+        content: bulletMatch[1],
+        nestedBullets: [],
+      })
+      continue
+    }
+
+    if (numberedMatch) {
+      if (listType !== 'ol') {
+        flushList()
+        listType = 'ol'
+      }
+      listItems.push({
+        key: `li-${lineIndex}`,
+        content: numberedMatch[1],
+        nestedBullets: [],
+      })
+      continue
+    }
+
+    flushList()
+    elements.push(
+      <div key={`line-${lineIndex}`}>
+        {renderInlineContent(line, `line-${lineIndex}`)}
+      </div>,
+    )
+  }
+
+  flushList()
+  return (
+    <div className='flex flex-col gap-0.5 break-words [overflow-wrap:anywhere]'>
+      {elements}
+    </div>
+  )
 }
 
 function SpecialOrderQuoteContent({ content }: { content: string }) {
   const lines = content.split('\n').filter(line => line.trim().length > 0)
   return (
     <motion.div
-      className='flex flex-col gap-1'
+      className='flex flex-col gap-1 break-words [overflow-wrap:anywhere]'
       variants={QUOTE_LIST_VARIANTS}
       initial='hidden'
       animate='visible'
@@ -1240,6 +1369,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onSpecialOrderCalculate,
   onRecalculate,
   calculationDisabled,
+  onSourceClick,
 }) => {
   let specialOrderActionMode: 'yes' | 'form' | 'skeleton' | 'recalculate' | null = null
   if (showQuotePendingSkeleton) {
@@ -1254,10 +1384,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   return (
     <div
-      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={`flex min-w-0 w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
     >
       <div
-        className={`rounded-xl p-3 m-2 max-w-xl ${
+        className={`rounded-xl p-3 m-2 min-w-0 max-w-xl break-words [overflow-wrap:anywhere] ${
           message.role === 'user'
             ? 'bg-blue-500 text-white'
             : 'bg-gray-200 text-gray-900'
@@ -1267,7 +1397,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           message.specialOrderQuote ? (
             <SpecialOrderQuoteContent content={message.content} />
           ) : (
-            <div>{renderMessageContent(message.content)}</div>
+            <div className='break-words [overflow-wrap:anywhere]'>
+              {renderMessageContent(message.content)}
+            </div>
           )
         ) : null}
         <AnimatedSpecialOrderPanel
@@ -1296,7 +1428,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   href={source.url}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='text-blue-700 underline underline-offset-2 hover:text-blue-900'
+                  onClick={onSourceClick}
+                  className='text-blue-700 underline underline-offset-2 hover:text-blue-900 break-all'
                 >
                   {source.name}
                   {source.supplierName ? ` (${source.supplierName})` : ''}
@@ -1326,10 +1459,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Link
                   key={instruction.id}
                   to={`${instructionsPath}?instructionId=${instruction.id}`}
+                  onClick={onSourceClick}
                   className={
                     message.role === 'user'
-                      ? 'text-white underline underline-offset-2 hover:text-white/90'
-                      : 'text-blue-700 underline underline-offset-2 hover:text-blue-900'
+                      ? 'text-white underline underline-offset-2 hover:text-white/90 break-all'
+                      : 'text-blue-700 underline underline-offset-2 hover:text-blue-900 break-all'
                   }
                 >
                   {instruction.title}
@@ -1361,8 +1495,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   clearStaggerTotal,
   onClearAnimationComplete,
   isCreatingImage,
-  scrollRef,
-  contentRef,
+  onSourceClick,
 }) => {
   const showTypingIndicator =
     isThinking &&
@@ -1371,11 +1504,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
     !(status && status.state !== 'answering')
 
   return (
-    <div
-      ref={scrollRef}
-      className='flex flex-col flex-1 min-h-0 p-4 overflow-y-auto text-wrap whitespace-pre-wrap'
-    >
-      <div ref={contentRef} className='flex flex-col'>
+    <div className='min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y p-4 text-wrap whitespace-pre-wrap break-words [overflow-wrap:anywhere]'>
+      <div className='flex flex-col'>
         <AnimatePresence mode='sync' onExitComplete={onClearAnimationComplete}>
           {messages.map((message, index) => {
             const hasUserReplyAfter = messages
@@ -1447,6 +1577,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                     }
                   }}
                   calculationDisabled={isThinking || isClearingChat}
+                  onSourceClick={onSourceClick}
                 />
               </motion.div>
             )
@@ -1494,7 +1625,16 @@ interface DragState {
   didMove: boolean
 }
 
-export function Chat() {
+export function Chat({
+  variant = 'floating',
+  onSidebarHoverCollapse,
+}: {
+  variant?: 'floating' | 'sidebar'
+  onSidebarHoverCollapse?: (event: React.MouseEvent) => void
+}) {
+  const isSidebarVariant = variant === 'sidebar'
+  const isMobile = useIsMobile()
+  const { setOpenMobile } = useSidebar()
   const location = useLocation()
   const instructionsPath = location.pathname.startsWith('/admin')
     ? '/admin/instructions'
@@ -1522,11 +1662,6 @@ export function Chat() {
   const pendingQuoteOfferRef = useRef<SpecialOrderOffer | null>(null)
   const pendingQuoteSkeletonIndexRef = useRef<number | null>(null)
   const responseFinishedRef = useRef(false)
-  const messagesScrollRef = useRef<HTMLDivElement | null>(null)
-  const messagesContentRef = useRef<HTMLDivElement | null>(null)
-  const stickToBottomRef = useRef(true)
-  const smoothScrollActiveRef = useRef(false)
-  const scrollAnimationFrameRef = useRef<number | null>(null)
   const [carouselImages, setCarouselImages] = useState<InstructionCarouselImage[]>([])
   const [currentImageId, setCurrentImageId] = useState<number | undefined>(undefined)
   const [priceListMode, setPriceListMode] = useState(false)
@@ -1625,119 +1760,19 @@ export function Chat() {
     }
   }, [])
 
+  const handleSourceClick = useCallback(() => {
+    if (!isMobile) return
+    setOpen(false)
+    if (isSidebarVariant) {
+      setOpenMobile(false)
+    }
+  }, [isMobile, isSidebarVariant, setOpenMobile])
+
   useEffect(() => {
     if (open) {
       focusInput()
     }
   }, [open, focusInput])
-
-  const stopSmoothScroll = useCallback(() => {
-    smoothScrollActiveRef.current = false
-    if (scrollAnimationFrameRef.current !== null) {
-      cancelAnimationFrame(scrollAnimationFrameRef.current)
-      scrollAnimationFrameRef.current = null
-    }
-  }, [])
-
-  const runSmoothScrollFrame = useCallback(() => {
-    const container = messagesScrollRef.current
-    if (!container || !smoothScrollActiveRef.current) {
-      scrollAnimationFrameRef.current = null
-      return
-    }
-
-    const target = Math.max(0, container.scrollHeight - container.clientHeight)
-    const current = container.scrollTop
-    const distance = target - current
-
-    if (distance <= 0.5) {
-      container.scrollTop = target
-      smoothScrollActiveRef.current = false
-      scrollAnimationFrameRef.current = null
-      return
-    }
-
-    const step = Math.min(
-      Math.max(distance * 0.14, SCROLL_SMOOTH_MIN_STEP),
-      SCROLL_SMOOTH_MAX_STEP,
-    )
-    container.scrollTop = current + step
-    scrollAnimationFrameRef.current = requestAnimationFrame(runSmoothScrollFrame)
-  }, [])
-
-  const scrollMessagesToBottom = useCallback(
-    (smooth = true) => {
-      const container = messagesScrollRef.current
-      if (!container) return
-      stickToBottomRef.current = true
-
-      if (!smooth) {
-        stopSmoothScroll()
-        container.scrollTop = Math.max(
-          0,
-          container.scrollHeight - container.clientHeight,
-        )
-        return
-      }
-
-      smoothScrollActiveRef.current = true
-      if (scrollAnimationFrameRef.current === null) {
-        scrollAnimationFrameRef.current = requestAnimationFrame(runSmoothScrollFrame)
-      }
-    },
-    [runSmoothScrollFrame, stopSmoothScroll],
-  )
-
-  const triggerSmoothScrollFollow = useCallback(() => {
-    scrollMessagesToBottom(true)
-  }, [scrollMessagesToBottom])
-
-  useLayoutEffect(() => {
-    if (!open || isClearingChat) return
-    scrollMessagesToBottom(true)
-  }, [
-    answer,
-    dismissingQuoteSkeletonIndex,
-    isClearingChat,
-    messages,
-    open,
-    pendingQuoteSkeletonIndex,
-    priceListFormOpen,
-    priceListStatus,
-    recalculateFormIndex,
-    scrollMessagesToBottom,
-    specialOrderFormIndex,
-  ])
-
-  useEffect(() => {
-    if (!open) return
-    const container = messagesScrollRef.current
-    const content = messagesContentRef.current
-    if (!container || !content) return
-
-    const onScroll = () => {
-      stickToBottomRef.current =
-        container.scrollHeight - container.scrollTop - container.clientHeight <=
-        SCROLL_STICK_THRESHOLD
-    }
-
-    const onContentResize = () => {
-      if (stickToBottomRef.current && !isClearingChat) {
-        scrollMessagesToBottom(true)
-      }
-    }
-
-    onScroll()
-    const observer = new ResizeObserver(onContentResize)
-    observer.observe(content)
-    container.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      observer.disconnect()
-      container.removeEventListener('scroll', onScroll)
-    }
-  }, [isClearingChat, open, scrollMessagesToBottom])
-
-  useEffect(() => stopSmoothScroll, [stopSmoothScroll])
 
   const finishResponse = useCallback(
     (sse: EventSource) => {
@@ -1855,7 +1890,6 @@ export function Chat() {
       streamingSpecialOrderOfferRef.current = null
       setAnswer('')
       setIsThinking(true)
-      triggerSmoothScrollFollow()
       setPriceListStatus(
         priceListMode
           ? activeSpecialOrder
@@ -1943,23 +1977,15 @@ export function Chat() {
         finishResponse(sse)
       })
     },
-    [
-      activeSpecialOrder,
-      finishResponse,
-      isThinking,
-      messages.length,
-      priceListMode,
-      triggerSmoothScrollFollow,
-    ],
+    [activeSpecialOrder, finishResponse, isThinking, messages.length, priceListMode],
   )
 
   const handleSpecialOrderYes = useCallback(
     (messageIndex: number, offer: SpecialOrderOffer) => {
-      triggerSmoothScrollFollow()
       setActiveSpecialOrder(offer)
       setSpecialOrderFormIndex(messageIndex)
     },
-    [triggerSmoothScrollFollow],
+    [],
   )
 
   const handleSpecialOrderCalculate = useCallback(
@@ -2069,12 +2095,11 @@ export function Chat() {
 
   const handleRecalculate = useCallback(
     (messageIndex: number, offer: SpecialOrderOffer) => {
-      triggerSmoothScrollFollow()
       setActiveSpecialOrder(offer)
       setRecalculateFormIndex(messageIndex)
       setSpecialOrderFormIndex(null)
     },
-    [triggerSmoothScrollFollow],
+    [],
   )
 
   const removeAiDesignImage = useCallback(() => {
@@ -2107,7 +2132,6 @@ export function Chat() {
     setAiDesignSurfaces(['countertops'])
     setAiDesignExtraInstructions('')
     removeAiDesignImage()
-    triggerSmoothScrollFollow()
     setMessages(prev => [
       ...prev,
       {
@@ -2115,7 +2139,7 @@ export function Chat() {
         content: 'Which color would you like me to find?',
       },
     ])
-  }, [removeAiDesignImage, triggerSmoothScrollFollow])
+  }, [removeAiDesignImage])
 
   const closeAiDesignMode = useCallback(() => {
     setAiDesignFormOpen(false)
@@ -2138,7 +2162,7 @@ export function Chat() {
     })
   }, [])
 
-  const enableAiDesignMode = useCallback(() => {
+  const _enableAiDesignMode = useCallback(() => {
     setAiDesignFormOpen(true)
     setAiDesignStones([])
     setAiDesignSurfaces(['countertops'])
@@ -2149,7 +2173,6 @@ export function Chat() {
     setActiveSpecialOrder(null)
     setSpecialOrderFormIndex(null)
     setRecalculateFormIndex(null)
-    triggerSmoothScrollFollow()
     setMessages(prev => [
       ...prev,
       {
@@ -2158,7 +2181,7 @@ export function Chat() {
           'Add a kitchen photo and pick the stones you would like to see installed.',
       },
     ])
-  }, [removeAiDesignImage, triggerSmoothScrollFollow])
+  }, [removeAiDesignImage])
 
   const addAiDesignStone = useCallback((stone: DesignStone) => {
     setAiDesignStones(prev => {
@@ -2229,7 +2252,6 @@ export function Chat() {
     })
     setIsGeneratingDesign(true)
     setIsThinking(true)
-    triggerSmoothScrollFollow()
 
     try {
       const formData = new FormData()
@@ -2280,7 +2302,6 @@ export function Chat() {
               content: `Here is your kitchen with ${event.stoneName} installed.`,
               images: [event.image],
             })
-            triggerSmoothScrollFollow()
           } else if (event.type === 'error') {
             throw new Error(event.error ?? 'generation-failed')
           }
@@ -2307,7 +2328,6 @@ export function Chat() {
     aiDesignExtraInstructions,
     isGeneratingDesign,
     isThinking,
-    triggerSmoothScrollFollow,
   ])
 
   useEffect(() => {
@@ -2400,56 +2420,77 @@ export function Chat() {
   const chatMessagesList =
     clearingSnapshot !== null ? clearingSnapshot : displayMessages
 
-  if (!ready) {
+  if (!isSidebarVariant && !ready) {
     return null
   }
 
   const pixelAnchor =
-    useCustomPosition && viewportRevision >= 0 ? pixelsFromPercent(anchor) : null
+    !isSidebarVariant && useCustomPosition && viewportRevision >= 0
+      ? pixelsFromPercent(anchor)
+      : null
   const positionStyle = pixelAnchor
     ? { right: pixelAnchor.right, bottom: pixelAnchor.bottom }
     : undefined
-  const anchorClass = useCustomPosition ? '' : DEFAULT_ANCHOR_CLASS
-  const visibilityClass = visible ? 'opacity-100' : 'opacity-0'
+  const anchorClass = !isSidebarVariant && useCustomPosition ? '' : DEFAULT_ANCHOR_CLASS
+  const visibilityClass = isSidebarVariant || visible ? 'opacity-100' : 'opacity-0'
+
+  const triggerButton = isSidebarVariant ? (
+    <button
+      type='button'
+      data-sidebar-chat-trigger
+      aria-label={open ? 'Close chat' : 'Open chat'}
+      aria-expanded={open}
+      onClick={() => setOpen(prev => !prev)}
+      className='flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-blue-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-600 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0'
+    >
+      <MessageCircle className='size-5 shrink-0' />
+      <span className='group-data-[collapsible=icon]:hidden'>Chat</span>
+    </button>
+  ) : (
+    <button
+      type='button'
+      aria-label='Open chat'
+      className={`${FIXED_BASE_CLASS} ${anchorClass} ${APPEARANCE_CLASS} ${visibilityClass} rounded-full bg-blue-500 hover:bg-blue-600 text-white size-14 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg`}
+      style={positionStyle}
+      onPointerDown={startDrag}
+      onPointerMove={moveDrag}
+      onPointerUp={endDrag}
+      onPointerCancel={e => {
+        if (dragStateRef.current?.didMove) persistAnchor()
+        dragStateRef.current = null
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId)
+        }
+      }}
+    >
+      <svg
+        xmlns='http://www.w3.org/2000/svg'
+        fill='none'
+        viewBox='0 0 24 24'
+        strokeWidth={2}
+        stroke='currentColor'
+        className='size-6 pointer-events-none'
+      >
+        <path
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          d='M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z'
+        />
+      </svg>
+    </button>
+  )
 
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen} modal={false}>
-        <button
-          type='button'
-          aria-label='Open chat'
-          className={`${FIXED_BASE_CLASS} ${anchorClass} ${APPEARANCE_CLASS} ${visibilityClass} rounded-full bg-blue-500 hover:bg-blue-600 text-white size-14 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg`}
-          style={positionStyle}
-          onPointerDown={startDrag}
-          onPointerMove={moveDrag}
-          onPointerUp={endDrag}
-          onPointerCancel={e => {
-            if (dragStateRef.current?.didMove) persistAnchor()
-            dragStateRef.current = null
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-              e.currentTarget.releasePointerCapture(e.pointerId)
-            }
-          }}
-        >
-          <svg
-            xmlns='http://www.w3.org/2000/svg'
-            fill='none'
-            viewBox='0 0 24 24'
-            strokeWidth={2}
-            stroke='currentColor'
-            className='size-6 pointer-events-none'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              d='M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z'
-            />
-          </svg>
-        </button>
+        {triggerButton}
         <DialogContent
           hideClose
-          className='h-full p-0 gap-0'
+          disablePortal={isSidebarVariant && isMobile}
+          className='flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden p-0 gap-0'
           position='br'
+          onMouseEnter={event => event.stopPropagation()}
+          onPointerEnter={event => event.stopPropagation()}
           onOpenAutoFocus={e => {
             e.preventDefault()
             focusInput()
@@ -2458,7 +2499,21 @@ export function Chat() {
             e.preventDefault()
           }}
         >
-          <div className='h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-hidden'>
+          <div
+            data-sidebar-chat-panel
+            className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-white border-l border-gray-300 shadow-lg'
+            onMouseLeave={event => {
+              const next = event.relatedTarget
+              if (
+                next instanceof Element &&
+                (next.closest('[data-sidebar-hover-zone]') ||
+                  next.closest('[data-sidebar-chat-panel]'))
+              ) {
+                return
+              }
+              onSidebarHoverCollapse?.(event)
+            }}
+          >
             <DialogFullHeader
               actions={
                 <Button
@@ -2479,7 +2534,7 @@ export function Chat() {
             >
               <span className='text-lg font-bold'>Chat</span>
             </DialogFullHeader>
-            <div className='flex flex-col flex-1 min-h-0'>
+            <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
               <ChatMessages
                 messages={chatMessagesList}
                 isThinking={isThinking && !answer}
@@ -2498,8 +2553,7 @@ export function Chat() {
                 clearStaggerTotal={clearStaggerTotal}
                 onClearAnimationComplete={handleClearAnimationComplete}
                 isCreatingImage={isGeneratingDesign}
-                scrollRef={messagesScrollRef}
-                contentRef={messagesContentRef}
+                onSourceClick={handleSourceClick}
               />
             </div>
             <div className='shrink-0 border-t border-gray-300 bg-gray-100'>
@@ -2561,10 +2615,10 @@ export function Chat() {
                         <DropdownMenuItem onClick={enablePriceListMode}>
                           Price lists
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={enableAiDesignMode}>
-                          <Sparkles className='size-4' />
-                          AI Design
-                        </DropdownMenuItem>
+                        {/* <DropdownMenuItem onClick={_enableAiDesignMode}>
+													<Sparkles className="size-4" />
+													AI Design
+												</DropdownMenuItem> */}
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <Input

@@ -9,6 +9,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useRouteLoaderData,
 } from 'react-router'
 import { z } from 'zod'
 import { EmailInput } from '~/components/molecules/EmailInput'
@@ -31,6 +32,7 @@ import { createCustomerMutation, sourceEnum } from '~/schemas/customers'
 import { getSession } from '~/sessions.server'
 import { optionalEmailSchema, zodPhone } from '~/utils/constants'
 import { getEmployeeUser, type User } from '~/utils/session.server'
+import type { loader as rootLoader } from '~/root'
 import {
   FormControl,
   FormField,
@@ -98,6 +100,9 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 export default function CustomerCheckIn() {
   const { toast } = useToast()
   const { companyId, activeSession } = useLoaderData<typeof loader>()
+  const rootData = useRouteLoaderData<typeof rootLoader>('root')
+  const hasCloudtalkApi = Boolean(rootData?.hasCloudtalkApi)
+  const companyName = rootData?.companyName?.trim() || 'Our company'
 
   const form = useForm({
     resolver,
@@ -142,6 +147,7 @@ export default function CustomerCheckIn() {
   const { mutate, isPending } = useMutation(createCustomerMutation(toast, onSuccess))
 
   const [dupOpen, setDupOpen] = useState(false)
+  const [termsOpen, setTermsOpen] = useState(false)
   const [dupInfo, setDupInfo] = useState<{
     name: string
     sales_rep_name: string | null
@@ -313,7 +319,26 @@ export default function CustomerCheckIn() {
                         className='text-sm font-normal leading-5'
                       >
                         I acknowledge that I have read, understand, and agree to the
-                        safety instructions.
+                        safety instructions
+                        {hasCloudtalkApi ? (
+                          <>
+                            {' and agree with '}
+                            <button
+                              type='button'
+                              className='font-normal text-blue-600 underline underline-offset-2 hover:text-blue-800'
+                              onClick={event => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                setTermsOpen(true)
+                              }}
+                            >
+                              Terms and Conditions
+                            </button>
+                            .
+                          </>
+                        ) : (
+                          '.'
+                        )}
                       </FormFieldLabel>
                     </div>
                     <FormMessage />
@@ -327,6 +352,35 @@ export default function CustomerCheckIn() {
                 Submit
               </LoadingButton>
             </div>
+
+            <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+              <DialogContent className='sm:max-w-lg max-h-[85vh] overflow-y-auto'>
+                <DialogTitle>Terms and Conditions & Privacy Policy</DialogTitle>
+                <div className='space-y-4 text-sm leading-relaxed text-gray-700'>
+                  <p>
+                    We may record phone calls and SMS conversations for quality
+                    assurance, training, and customer service purposes.
+                  </p>
+                  <p>
+                    By checking, you are allowing to receive transactional/informational
+                    SMS communications regarding account notifications, customer care,
+                    etc, from {companyName}. Message frequency may vary. Message and
+                    data rates may apply. Reply HELP for help or STOP to opt-out.
+                  </p>
+                  <p>
+                    By checking, you are allowing to receive promotional/marketing SMS
+                    communications from {companyName}. Frequency may vary. Message and
+                    data rates may apply. Reply HELP for help or STOP to opt-out.
+                  </p>
+                  <p>I accept the Terms and Conditions & Privacy Policy.</p>
+                </div>
+                <DialogFooter>
+                  <Button type='button' onClick={() => setTermsOpen(false)}>
+                    Close
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Polished duplicate dialog */}
             <Dialog open={dupOpen} onOpenChange={setDupOpen}>

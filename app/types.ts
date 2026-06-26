@@ -85,6 +85,7 @@ export interface HeaderProps {
   isEmployee?: boolean
   superadminCompanies?: { id: number; name: string }[]
   activeCompanyId?: number
+  hideCustomerBurgerMenu?: boolean
 }
 
 export interface TokenSet {

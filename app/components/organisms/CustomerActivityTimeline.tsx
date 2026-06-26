@@ -27,6 +27,7 @@ import { Button } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import type { EmailHistory } from '~/crud/emails'
+import { useHasCloudtalkApi } from '~/hooks/useHasCloudtalkApi'
 import { cn } from '~/lib/utils'
 import type { Nullable } from '~/types/utils'
 import {
@@ -427,6 +428,7 @@ export function CustomerActivityTimeline({
   phone2: Nullable<string>
   emails: EmailHistory[]
 }) {
+  const hasCloudtalkApi = useHasCloudtalkApi()
   const [filter, setFilter] = useState<CustomerActivityFilterType>('all')
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
@@ -468,9 +470,14 @@ export function CustomerActivityTimeline({
       if (!r.ok) throw new Error(`SMS ${r.status}`)
       return await r.json()
     },
-    enabled: hasPhones,
+    enabled: hasCloudtalkApi && hasPhones,
     staleTime: 60_000,
   })
+
+  const filterOptions = useMemo(
+    () => FILTER_OPTIONS.filter(opt => hasCloudtalkApi || opt.value !== 'sms'),
+    [hasCloudtalkApi],
+  )
 
   const allCalls = useMemo(() => {
     const items = callsQuery.data?.items ?? []
@@ -523,13 +530,16 @@ export function CustomerActivityTimeline({
     filter !== 'all' || dateFrom !== undefined || dateTo !== undefined
 
   const isFirstLoad =
-    (callsQuery.isLoading || smsQuery.isLoading) && !callsQuery.data && !smsQuery.data
-  const isBothErrored = callsQuery.isError && smsQuery.isError
-  const isFetching = callsQuery.isFetching || smsQuery.isFetching
+    (callsQuery.isLoading || (hasCloudtalkApi && smsQuery.isLoading)) &&
+    !callsQuery.data &&
+    !(hasCloudtalkApi && smsQuery.data)
+  const isBothErrored =
+    callsQuery.isError && (hasCloudtalkApi ? smsQuery.isError : false)
+  const isFetching = callsQuery.isFetching || (hasCloudtalkApi && smsQuery.isFetching)
 
   const refetchAll = () => {
     callsQuery.refetch()
-    smsQuery.refetch()
+    if (hasCloudtalkApi) smsQuery.refetch()
   }
 
   const clearAllFilters = () => {
@@ -594,7 +604,7 @@ export function CustomerActivityTimeline({
 
       <div className='space-y-3 mb-3'>
         <div className='flex gap-1 flex-wrap'>
-          {FILTER_OPTIONS.map(opt => (
+          {filterOptions.map(opt => (
             <button
               key={opt.value}
               type='button'

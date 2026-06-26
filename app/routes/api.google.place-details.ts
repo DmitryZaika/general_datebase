@@ -6,21 +6,40 @@ if (!GOOGLE_KEY) {
   throw new Error('GOOGLE_MAPS_API_KEY is not set')
 }
 
+function zipFromAddressComponents(
+  components:
+    | Array<{
+        longText?: string
+        shortText?: string
+        types: string[]
+      }>
+    | undefined,
+): string | undefined {
+  return components?.find(component => component.types.includes('postal_code'))
+    ?.longText
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const searchParams = new URL(request.url).searchParams
   const place_id = searchParams.get('place_id')
 
-  const url = new URL(`https://places.googleapis.com/v1/places/${place_id}`)
+  if (!place_id) {
+    return data({ error: 'place_id is required' }, { status: 400 })
+  }
 
-  const gRes = await fetch(url, {
-    method: 'get',
-    signal: request.signal,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': GOOGLE_KEY,
-      'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents',
-    } as HeadersInit,
-  })
+  const normalizedPlaceId = place_id.replace(/^places\//, '')
+  const gRes = await fetch(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(normalizedPlaceId)}`,
+    {
+      method: 'get',
+      signal: request.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_KEY,
+        'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents',
+      } as HeadersInit,
+    },
+  )
 
   if (!gRes.ok) {
     return data({ error: 'Google Places Details error' }, { status: 502 })
@@ -37,10 +56,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }>
   }
 
-  // Extract zip code from address components
-  const zipCode = gJson.addressComponents?.find(component =>
-    component.types.includes('postal_code'),
-  )?.longText
+  const zipCode =
+    zipFromAddressComponents(gJson.addressComponents) ??
+    gJson.formattedAddress?.match(/\b(\d{5}(?:-\d{4})?)\b/)?.[1]
 
   // Extract city, state, country
   const city = gJson.addressComponents?.find(component =>

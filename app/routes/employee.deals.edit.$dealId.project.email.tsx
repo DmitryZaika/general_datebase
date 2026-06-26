@@ -66,6 +66,7 @@ import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
+import { compressImageFiles } from '~/utils/compressImage.client'
 import type { EmailTemplate } from '~/utils/emailTemplates'
 import {
   getUnfilledCustomVariables,
@@ -329,6 +330,7 @@ function EmailFormFields({
   onFilesDrop,
   recipientEmail,
   customerName,
+  onSubmitShortcut,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
@@ -338,6 +340,7 @@ function EmailFormFields({
   onFilesDrop?: (files: File[]) => void
   recipientEmail: string
   customerName: string
+  onSubmitShortcut?: () => void
 }) {
   const bodyText = form.watch('text')
   const customVariables = getUnfilledCustomVariables(bodyText)
@@ -382,6 +385,7 @@ function EmailFormFields({
             field={field}
             className='mb-4'
             onFilesDrop={onFilesDrop}
+            onSubmitShortcut={onSubmitShortcut}
           />
         )}
       />
@@ -726,15 +730,16 @@ export default function DealEmailDialog() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files
     if (files && files.length > 0) {
-      addFiles(Array.from(files))
+      void addFiles(Array.from(files))
     }
     e.currentTarget.value = ''
   }
 
-  const addFiles = (newFiles: File[]) => {
-    form.setValue('attachments', [...form.getValues('attachments'), ...newFiles])
+  const addFiles = async (newFiles: File[]) => {
+    const processed = await compressImageFiles(newFiles)
+    form.setValue('attachments', [...form.getValues('attachments'), ...processed])
 
-    newFiles.forEach(file => {
+    processed.forEach(file => {
       const parts = file.name.split('.')
       const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
       if (ext && imageExt.has(ext)) {
@@ -765,7 +770,7 @@ export default function DealEmailDialog() {
       e.preventDefault()
       e.stopPropagation()
       e.nativeEvent.stopImmediatePropagation()
-      addFiles(pastedFiles)
+      void addFiles(pastedFiles)
       setIsDragging(false)
     }
   }
@@ -791,7 +796,7 @@ export default function DealEmailDialog() {
     setIsDragging(false)
     const files = e.dataTransfer?.files
     if (files && files.length > 0) {
-      addFiles(Array.from(files))
+      void addFiles(Array.from(files))
     }
   }
 
@@ -882,6 +887,12 @@ export default function DealEmailDialog() {
         <FormProvider {...form}>
           <Form
             onSubmit={form.handleSubmit(fullSubmit)}
+            onKeyDown={event => {
+              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault()
+                void form.handleSubmit(fullSubmit)()
+              }
+            }}
             className='flex-1 flex flex-col'
           >
             <AuthenticityTokenInput />
@@ -894,8 +905,11 @@ export default function DealEmailDialog() {
               recipientEmail={email}
               customerName={customerName}
               onFilesDrop={files => {
-                addFiles(files)
+                void addFiles(files)
                 setIsDragging(false)
+              }}
+              onSubmitShortcut={() => {
+                void form.handleSubmit(fullSubmit)()
               }}
             />
             {form.watch('attachments').length > 0 ? (
@@ -1076,7 +1090,7 @@ export default function DealEmailDialog() {
           open={showStonesPicker}
           onClose={() => setShowStonesPicker(false)}
           onSelect={files => {
-            addFiles(files)
+            void addFiles(files)
             setShowStonesPicker(false)
           }}
           onAddFiles={addFiles}
@@ -1087,7 +1101,7 @@ export default function DealEmailDialog() {
           open={showImagesPicker}
           onClose={() => setShowImagesPicker(false)}
           onSelect={files => {
-            addFiles(files)
+            void addFiles(files)
             setShowImagesPicker(false)
           }}
         />
@@ -1097,7 +1111,7 @@ export default function DealEmailDialog() {
           open={showDocumentsPicker}
           onClose={() => setShowDocumentsPicker(false)}
           onSelect={files => {
-            addFiles(files)
+            void addFiles(files)
             setShowDocumentsPicker(false)
           }}
         />
