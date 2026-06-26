@@ -1,9 +1,9 @@
 import clsx from 'clsx'
 import { Link, useLoaderData, useLocation } from 'react-router'
 import { Button } from '~/components/ui/button'
-import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { HeaderProps } from '~/types'
+import { resolveCompanyLogoHeight, resolveCompanyLogoUrl } from '~/utils/companyLogo'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
 import { LinkButton } from '../molecules/LinkButton'
 import { Notification } from '../molecules/Notification'
@@ -26,13 +26,17 @@ export function HeaderDesktop({
   const location = useLocation()
   const isAdminPage = location.pathname.startsWith('/admin')
   const isCustomerPage = location.pathname.startsWith('/customer')
-  const data = useLoaderData<{ user: { company_id: number } | null }>()
+  const data = useLoaderData<{
+    user: { company_id: number } | null
+    companyLogoUrl?: string | null
+    companyLogoHeight?: number
+  }>()
   const companyId = isCustomerPage
     ? location.pathname.split('/').filter(Boolean)[1]
     : (activeCompanyId ?? data?.user?.company_id)
   const id = Number(companyId)
-  const companyLogo =
-    id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
+  const companyLogo = resolveCompanyLogoUrl(data?.companyLogoUrl)
+  const logoHeight = resolveCompanyLogoHeight(data?.companyLogoHeight)
 
   const customerSwitchUrl =
     companyId === undefined
@@ -43,22 +47,15 @@ export function HeaderDesktop({
 
   return (
     <header
-      className={
-        id === 4
-          ? clsx('flex-row items-center   gap-0 justify-between  px-3 py-2', className)
-          : clsx('flex-row items-center gap-0 justify-between  px-3', className)
-      }
+      className={clsx('flex-row items-center gap-0 justify-between px-3', className)}
     >
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
             src={companyLogo}
             alt='Logo'
-            className={
-              id === 4
-                ? 'h-12 md:h-16 object-contain mr-4'
-                : 'h-16 md:h-24 object-contain'
-            }
+            className='max-w-full object-contain'
+            style={{ height: logoHeight }}
           />
         </a>
       </div>

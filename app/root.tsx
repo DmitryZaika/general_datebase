@@ -26,9 +26,15 @@ import {
   useScrollMainToTopWhenLoading,
 } from '~/hooks/useScrollMainToTopWhenLoading'
 import type { ISupplier } from '~/schemas/suppliers'
+import { canManageCompanySettings } from '~/utils/adminUsersAccess.server'
 import { queryClient } from '~/utils/api'
 import { renderAppNavigationSkeleton } from '~/utils/appNavigationSkeleton'
 import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'
+import {
+  DEFAULT_COMPANY_LOGO_HEIGHT,
+  getHeaderCompanyId,
+  resolveCompanyLogoHeight,
+} from '~/utils/companyLogo'
 import { csrf } from '~/utils/csrf.server'
 import {
   getSidebarSection,
@@ -98,6 +104,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   let user = null
   let companyName: string | null = null
+  let companyLogoUrl: string | null = null
+  let companyLogoHeight: number = DEFAULT_COMPANY_LOGO_HEIGHT
   let companyId: number | undefined
 
   let superadminCompanies: { id: number; name: string }[] = []
@@ -132,12 +140,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
         session.unset('activeCompanyId')
       }
 
-      const company = await selectId<{ name: string }>(
-        db,
-        'SELECT name FROM company WHERE id = ?',
-        effectiveCompanyId,
-      )
-      companyName = company?.name ?? null
       companyId = effectiveCompanyId
     }
   }
@@ -155,13 +157,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  if (companyId !== undefined && isContractors && !companyName) {
-    const company = await selectId<{ name: string }>(
+  const headerCompanyId = getHeaderCompanyId(url.pathname, companyId)
+  if (headerCompanyId !== undefined) {
+    const company = await selectId<{
+      name: string
+      logo_url: string | null
+      logo_height: number | string | null
+    }>(
       db,
-      'SELECT name FROM company WHERE id = ?',
-      companyId,
+      'SELECT name, logo_url, logo_height FROM company WHERE id = ?',
+      headerCompanyId,
     )
-    companyName = company?.name ?? null
+    companyName = company?.name ?? companyName
+    companyLogoUrl = company?.logo_url ?? null
+    companyLogoHeight = resolveCompanyLogoHeight(company?.logo_height)
   }
 
   let position: string | null = null
@@ -227,6 +236,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const hasCloudtalkApiPromise =
     companyId !== undefined ? companyHasCloudTalk(companyId) : Promise.resolve(false)
 
+  const canManageCompanyPromise = user?.is_admin
+    ? canManageCompanySettings(user)
+    : Promise.resolve(false)
+
   const [
     colors,
     stoneSuppliers,
@@ -234,6 +247,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     faucetSuppliers,
     positionResult,
     hasCloudtalkApi,
+    canManageCompany,
   ] = await Promise.all([
     colorsPromise,
     stoneSuppliersPromise,
@@ -241,6 +255,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     faucetSuppliersPromise,
     positionPromise,
     hasCloudtalkApiPromise,
+    canManageCompanyPromise,
   ])
 
   if (user && positionResult) {
@@ -298,6 +313,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       token,
       user,
       companyName,
+      companyLogoUrl,
+      companyLogoHeight,
       stoneSuppliers,
       sinkSuppliers,
       faucetSuppliers,
@@ -307,6 +324,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       activeCompanyId,
       userIsSuperAdmin,
       hasCloudtalkApi,
+      canManageCompany,
     },
 
     {
@@ -324,6 +342,8 @@ export default function App() {
     token,
     user,
     companyName,
+    companyLogoUrl,
+    companyLogoHeight,
     stoneSuppliers,
     sinkSuppliers,
     faucetSuppliers,
@@ -431,7 +451,11 @@ export default function App() {
                 isInstallerRoute ||
                 (isShopRoute && isShopWorker) ||
                 isContractors ? (
-                  <MarketingHeader companyName={companyName ?? undefined} />
+                  <MarketingHeader
+                    companyName={companyName ?? undefined}
+                    companyLogoUrl={companyLogoUrl}
+                    companyLogoHeight={companyLogoHeight}
+                  />
                 ) : (
                   <Header
                     isEmployee={!!user?.is_employee}

@@ -49,10 +49,11 @@ export const Slider = React.forwardRef<
 
   // Sync internal state with controlled value when it changes
   React.useEffect(() => {
+    if (isDragging) return
     if (isControlled && value !== internalValue) {
       setInternalValue(Array.isArray(value) ? value : [min])
     }
-  }, [isControlled, value, min, internalValue])
+  }, [isControlled, value, min, internalValue, isDragging])
 
   // Track dragging state
   const handleDragStart = React.useCallback(() => {
@@ -67,12 +68,11 @@ export const Slider = React.forwardRef<
   const handleChange = React.useCallback(
     (val: number[]) => {
       setInternalValue(val)
-      if (!isDragging) {
-        // Only call external onChange when not dragging
+      if (isControlled || !isDragging) {
         onValueChange?.(val)
       }
     },
-    [isDragging, onValueChange],
+    [isControlled, isDragging, onValueChange],
   )
 
   // Однократный вызов колбэка после отпускания

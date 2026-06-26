@@ -84,6 +84,7 @@ const getItems = (
   faucetSuppliers?: ISupplier[] | undefined,
   companyId?: number | string,
   hasCloudtalkApi = false,
+  canManageCompany = false,
 ) => {
   if (base === 'shop') {
     return [
@@ -267,12 +268,21 @@ const getItems = (
         url: `/admin/users-activity`,
         icon: Users,
       },
-      {
-        title: 'User Panel',
-        url: `/admin/users`,
-        icon: Users,
-      },
     )
+    if (canManageCompany) {
+      finalList.push(
+        {
+          title: 'Users',
+          url: `/admin/users`,
+          icon: Users,
+        },
+        {
+          title: 'Company',
+          url: `/admin/company`,
+          icon: Building2,
+        },
+      )
+    }
   }
   if (hasCloudtalkApi && ['admin', 'employee'].includes(base)) {
     finalList.push({
@@ -307,6 +317,7 @@ export function EmployeeSidebar({
     activeCompanyId?: number
     userIsSuperAdmin?: boolean
     hasCloudtalkApi?: boolean
+    canManageCompany?: boolean
     token: string
   }>()
 
@@ -373,6 +384,7 @@ export function EmployeeSidebar({
       : null) || 'employee'
 
   const hasCloudtalkApi = Boolean(data?.hasCloudtalkApi)
+  const canManageCompany = Boolean(data?.canManageCompany)
 
   const items = getItems(
     isCustomerRoute ? 'customer' : isContractorsRoute ? 'contractors' : itemsBase,
@@ -382,6 +394,7 @@ export function EmployeeSidebar({
     faucetSuppliers,
     companyId,
     hasCloudtalkApi,
+    canManageCompany,
   )
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
@@ -396,10 +409,14 @@ export function EmployeeSidebar({
     'Teach Mode',
   ]
   const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
+  const companySettingsTitles = ['Users', 'Company']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
   const crmItems = items.filter(item => crmTitles.includes(item.title))
   const resourcesItems = items.filter(item => resourceTitles.includes(item.title))
+  const companySettingsItems = items.filter(item =>
+    companySettingsTitles.includes(item.title),
+  )
   const operationsItems =
     itemsBase === 'employee'
       ? items.filter(item => operationTitles.includes(item.title))
@@ -410,6 +427,7 @@ export function EmployeeSidebar({
     ...crmTitles,
     ...resourceTitles,
     ...operationTitles,
+    ...companySettingsTitles,
   ]
   const otherItems = items.filter(item => !excluded.includes(item.title))
 
@@ -425,6 +443,9 @@ export function EmployeeSidebar({
   )
   const [operationsOpen, setOperationsOpen] = useState(
     operationsItems.some(i => location.pathname.startsWith(i.url)),
+  )
+  const [companySettingsOpen, setCompanySettingsOpen] = useState(
+    companySettingsItems.some(i => location.pathname.startsWith(i.url)),
   )
 
   const pinFetcher = useFetcher<{ pined_bar: number }>()
@@ -750,6 +771,52 @@ export function EmployeeSidebar({
                     </SidebarMenuItem>
                   )
                 })}
+
+                {companySettingsItems.length > 0 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <button
+                        type='button'
+                        className='w-full flex items-center cursor-pointer'
+                        onClick={() => setCompanySettingsOpen(o => !o)}
+                      >
+                        <Building2 />
+                        <span className='group-data-[collapsible=icon]:hidden'>
+                          Company settings
+                        </span>
+                        <ChevronDown
+                          className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${companySettingsOpen ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </SidebarMenuButton>
+                    <Collapsible
+                      isOpen={companySettingsOpen}
+                      openDuration='duration-300'
+                      closeDuration='duration-300'
+                      className='pl-2'
+                    >
+                      <SidebarMenuSub>
+                        {companySettingsItems.map(sub => {
+                          const isActive = navItemPathActive(location.pathname, sub.url)
+                          return (
+                            <SidebarMenuSubItem key={sub.title}>
+                              <SidebarMenuSubButton asChild isActive={isActive}>
+                                <Link
+                                  to={sub.url}
+                                  onClick={handleLinkClick}
+                                  className='flex w-full items-center gap-2'
+                                >
+                                  <sub.icon />
+                                  <span>{sub.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )
+                        })}
+                      </SidebarMenuSub>
+                    </Collapsible>
+                  </SidebarMenuItem>
+                )}
 
                 {showPinControl && (
                   <SidebarMenuItem className='mt-2 border-t border-sidebar-border pt-2 group-data-[collapsible=icon]:hidden'>

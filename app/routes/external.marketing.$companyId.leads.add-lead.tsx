@@ -1,3 +1,4 @@
+import type { ResultSetHeader } from 'mysql2'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -23,12 +24,12 @@ import {
 } from '~/components/ui/dialog'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
+import { db } from '~/db.server'
 import { cn } from '~/lib/utils'
 import { sourceEnum } from '~/schemas/customers'
 import { NullableString } from '~/schemas/general'
 import { commitSession, getSession } from '~/sessions.server'
-import { optionalZodPhone } from '~/utils/constants'
-import { parseMutliForm } from '~/utils/parseMultiForm'
+import { parseOptionalMultiForm } from '~/utils/parseMultiForm'
 import { posthogClient } from '~/utils/posthog.server'
 import { getMarketingUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -51,12 +52,106 @@ const referralSourceEnum = [
 const leadSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: NullableString,
-  phone: optionalZodPhone,
+  phone: z.preprocess(
+    val =>
+      val === null ||
+      val === undefined ||
+      (typeof val === 'string' && val.trim() === '')
+        ? undefined
+        : val,
+    z.string().optional(),
+  ),
   your_message: NullableString,
   address: NullableString,
   source: z.enum(sourceEnum),
   referral_source: z.enum(referralSourceEnum),
 })
+
+type LeadFormData = z.infer<typeof leadSchema>
+
+function hasPhone(phone?: string | null): boolean {
+  return Boolean(phone?.trim())
+}
+
+async function insertMarketingLead(
+  companyId: number,
+  data: LeadFormData,
+): Promise<void> {
+  await db.execute<ResultSetHeader>(
+    `INSERT INTO customers (name, phone, email, address, your_message, referral_source, source, company_id)
+     VALUES (?, ?, ?, ?, ?, ?, 'leads', ?)`,
+    [
+      data.name,
+      data.phone?.trim() || null,
+      data.email || null,
+      data.address || null,
+      data.your_message || null,
+      data.referral_source ?? null,
+      companyId,
+    ],
+  )
+}
+
+async function flashAndRedirect(
+  session: Awaited<ReturnType<typeof getSession>>,
+  title: string,
+  description: string,
+  variant: 'success' | 'destructive' = 'success',
+) {
+  session.flash('message', toastData(title, description, variant))
+  return redirect('..', { headers: { 'Set-Cookie': await commitSession(session) } })
+}
+
+async function notifyLeadWebhook(
+  companyId: number,
+  data: LeadFormData & { file?: string | string[] },
+) {
+  if (!LAMBDA_URL || !hasPhone(data.phone)) return
+
+  const fileValue = Array.isArray(data.file) ? data.file[0] : data.file
+
+  const body = {
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    your_message: data.your_message,
+    address: data.address,
+    source: 'leads',
+    company_id: companyId,
+    referral_source: data.referral_source ?? null,
+    file: fileValue || '',
+  }
+  const cleaned = Object.fromEntries(
+    Object.entries(body).map(([key, value]) => [
+      key,
+      value === 'undefined' ? null : value,
+    ]),
+  )
+  const webhookUrl = `${LAMBDA_URL.replace(/\/$/, '')}/v1/webhooks/new-lead-form/${companyId}`
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cleaned),
+    })
+    if (!response.ok) {
+      posthogClient.captureException(
+        new Error('Failed to notify lead webhook'),
+        'failed_to_add_lead',
+        {
+          companyId,
+        },
+      )
+    }
+  } catch (err) {
+    posthogClient.captureException(
+      err instanceof Error ? err : new Error(String(err)),
+      'add_lead_fetch',
+      { companyId, url: webhookUrl },
+    )
+  }
+}
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const companyId = Number(params.companyId)
@@ -80,88 +175,27 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  const { errors, data } = await parseMutliForm(request, leadSchema, 'leads')
+  const { errors, data } = await parseOptionalMultiForm(request, leadSchema, 'leads')
   if (errors || !data) {
     return { errors }
   }
 
-  const body = {
-    name: data.name,
-    email: data.email,
-    phone: data.phone,
-    your_message: data.your_message,
-    address: data.address,
-    source: 'leads',
-    company_id: paramCompanyId,
-    referral_source: data.referral_source ?? null,
-    file: data.file || '',
-  }
-
   const session = await getSession(request.headers.get('Cookie'))
 
-  if (!LAMBDA_URL) {
-    posthogClient.captureException(
-      new Error('LAMBDA_URL not configured'),
-      'add_lead_config',
-      {
-        paramCompanyId,
-      },
-    )
-    session.flash(
-      'message',
-      toastData('Error', 'Lead service not configured', 'destructive'),
-    )
-    return redirect('..', { headers: { 'Set-Cookie': await commitSession(session) } })
-  }
-
-  const cleaned = Object.fromEntries(
-    Object.entries(body).map(([key, value]) => [
-      key,
-      value === 'undefined' ? null : value,
-    ]),
-  )
-  const webhookUrl = `${LAMBDA_URL.replace(/\/$/, '')}/v1/webhooks/new-lead-form/${paramCompanyId}`
-
-  let response: Response
   try {
-    response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cleaned),
-    })
+    await insertMarketingLead(paramCompanyId, data)
   } catch (err) {
     posthogClient.captureException(
       err instanceof Error ? err : new Error(String(err)),
-      'add_lead_fetch',
-      {
-        paramCompanyId,
-        url: webhookUrl,
-      },
+      'add_lead_db_insert',
+      { paramCompanyId },
     )
-    session.flash(
-      'message',
-      toastData(
-        'Error',
-        'Could not reach lead service. Please text Dima.',
-        'destructive',
-      ),
-    )
-    return redirect('..', { headers: { 'Set-Cookie': await commitSession(session) } })
+    return flashAndRedirect(session, 'Error', 'Failed to add lead', 'destructive')
   }
 
-  if (response.ok) {
-    session.flash('message', toastData('Success', 'Lead added'))
-  } else {
-    posthogClient.captureException(
-      new Error('Failed to add lead'),
-      'failed_to_add_lead',
-      {
-        paramCompanyId,
-      },
-    )
-    session.flash('message', toastData('Error', 'Failed to add lead', 'destructive'))
-  }
-  return redirect('..', { headers: { 'Set-Cookie': await commitSession(session) } })
+  await notifyLeadWebhook(paramCompanyId, data)
+
+  return flashAndRedirect(session, 'Success', 'Lead added')
 }
 
 export const AddLead = () => {

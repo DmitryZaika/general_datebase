@@ -64,14 +64,16 @@ type Props<T extends FieldValues> = {
   form: UseFormReturn<T>
   field: StringPath<T>
   zipField?: StringPath<T>
-  type: 'billing' | 'project'
+  type?: 'billing' | 'project'
+  label?: string
 }
 
 export function AddressInput<T extends FieldValues>({
   form,
   field,
   zipField,
-  type,
+  type = 'project',
+  label,
 }: Props<T>) {
   const [open, setOpen] = useState(false)
 
@@ -114,6 +116,10 @@ export function AddressInput<T extends FieldValues>({
   }
 
   const toUpperCase = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
+  const fieldLabel = label ?? `${toUpperCase(type)} Address`
+  const fieldPlaceholder = label
+    ? `Enter ${label.toLowerCase()} (min 3 characters)`
+    : `Enter ${toUpperCase(type)} address (min 3 characters)`
 
   const isDebouncing = open && searchQuery.length >= 3 && searchQuery !== debounced
   const isSearching = isFetching || isDebouncing
@@ -124,12 +130,12 @@ export function AddressInput<T extends FieldValues>({
       name={field}
       render={({ field: rhf }) => (
         <FormItem className='relative'>
-          <FormLabel>{`${toUpperCase(type)} Address`}</FormLabel>
+          <FormLabel>{fieldLabel}</FormLabel>
           <FormControl>
             <div className='relative w-full'>
               <Input
                 className={isSearching ? 'pr-9' : undefined}
-                placeholder={`Enter ${toUpperCase(type)} address (min 3 characters)`}
+                placeholder={fieldPlaceholder}
                 value={rawValue}
                 onChange={e => {
                   rhf.onChange(stripCountryFromAddressText(e.target.value))

@@ -52,3 +52,57 @@ export async function compressImageFiles(files: File[]): Promise<File[]> {
   }
   return out
 }
+
+export async function resizeImageToMaxHeight(
+  file: File,
+  maxHeight: number,
+): Promise<File> {
+  if (maxHeight <= 0 || !isCompressibleImageFile(file)) {
+    return file
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(file)
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+
+      if (img.height <= maxHeight) {
+        resolve(file)
+        return
+      }
+
+      const scale = maxHeight / img.height
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(img.width * scale))
+      canvas.height = Math.max(1, Math.round(img.height * scale))
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        resolve(file)
+        return
+      }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob(
+        blob => {
+          if (!blob) {
+            resolve(file)
+            return
+          }
+          resolve(new File([blob], file.name, { type: file.type || 'image/png' }))
+        },
+        file.type || 'image/png',
+        0.92,
+      )
+    }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Failed to load image'))
+    }
+
+    img.src = objectUrl
+  })
+}

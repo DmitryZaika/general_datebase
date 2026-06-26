@@ -8,6 +8,9 @@ function createFromData(data: object) {
   const formData = new FormData()
 
   for (const [key, value] of Object.entries(data)) {
+    if (value === undefined || value === null) {
+      continue
+    }
     if (
       Array.isArray(value) &&
       value.length > 0 &&

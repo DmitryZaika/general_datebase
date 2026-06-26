@@ -1,4 +1,4 @@
-import { useLoaderData, useLocation } from 'react-router'
+import { useLoaderData } from 'react-router'
 import type { HeaderProps } from '~/types'
 import { Notification } from '../molecules/Notification'
 import { TodoList } from '../organisms/TodoList'
@@ -11,7 +11,7 @@ import clsx from 'clsx'
 import { Menu } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { useSidebar } from '~/components/ui/sidebar'
-import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
+import { resolveCompanyLogoHeight, resolveCompanyLogoUrl } from '~/utils/companyLogo'
 
 export function BurgerMenu() {
   const { toggleSidebar } = useSidebar()
@@ -29,25 +29,26 @@ export function BurgerMenu() {
 }
 
 export function HeaderMobile({ className }: HeaderMobileProps) {
-  const location = useLocation()
-  const isCustomerPage = location.pathname.startsWith('/customer')
   const data = useLoaderData<{
     user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
     activeCompanyId?: number
+    companyLogoUrl?: string | null
+    companyLogoHeight?: number
   }>()
-  const companyId = isCustomerPage
-    ? location.pathname.split('/').filter(Boolean)[1]
-    : (data?.activeCompanyId ?? data?.user?.company_id)
-  const id = Number(companyId)
-  const companyLogo =
-    id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
+  const companyLogo = resolveCompanyLogoUrl(data?.companyLogoUrl)
+  const logoHeight = resolveCompanyLogoHeight(data?.companyLogoHeight)
 
   return (
     <header className={clsx('flex justify-between', className)}>
       <div className='flex items-center gap-2'>
         <div className='logo'>
           <a className='flex justify-center' href='/'>
-            <img src={companyLogo} alt='Logo' className='h-18 md:h-16 object-contain' />
+            <img
+              src={companyLogo}
+              alt='Logo'
+              className='max-w-full object-contain'
+              style={{ height: logoHeight }}
+            />
           </a>
         </div>
       </div>

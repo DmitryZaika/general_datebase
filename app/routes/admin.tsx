@@ -45,6 +45,9 @@ function adminShellMotionKey(pathname: string, search: string): string {
   if (pathname.startsWith('/admin/cloudtalk')) {
     return '/admin/cloudtalk'
   }
+  if (pathname.startsWith('/admin/company') || pathname.startsWith('/admin/users')) {
+    return '/admin/company-settings'
+  }
   return `${pathname}${search}`
 }
 

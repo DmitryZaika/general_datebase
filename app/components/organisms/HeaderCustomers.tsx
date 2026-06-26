@@ -1,11 +1,12 @@
-import { Link, type Location, useLocation, useNavigation } from 'react-router'
 import {
-  defaultLogo,
-  gbColumbus,
-  gbIndianapolis,
-  gmqTops,
-  loginLogo,
-} from '~/constants/logos'
+  Link,
+  type Location,
+  useLoaderData,
+  useLocation,
+  useNavigation,
+} from 'react-router'
+import { loginLogo } from '~/constants/logos'
+import { resolveCompanyLogoHeight, resolveCompanyLogoUrl } from '~/utils/companyLogo'
 import { LoadingButton } from '../molecules/LoadingButton'
 import { BurgerMenu } from './HeaderMobile'
 
@@ -36,18 +37,14 @@ export default function HeaderCustomers({
   const isCustomersCompanies = location.pathname === '/customers/companies'
   const segments = location.pathname.split('/').filter(Boolean)
   const companyId = segments[1]
+  const { companyLogoUrl, companyLogoHeight } = useLoaderData<{
+    companyLogoUrl?: string | null
+    companyLogoHeight?: number
+  }>()
   const navigation = useNavigation()
   const loading = navigation.state === 'loading'
-  const id = Number(companyId)
-  const logoUrl = isLogin
-    ? loginLogo
-    : id === 1
-      ? gbIndianapolis
-      : id === 3
-        ? gbColumbus
-        : id === 4
-          ? gmqTops
-          : defaultLogo
+  const logoUrl = isLogin ? loginLogo : resolveCompanyLogoUrl(companyLogoUrl)
+  const logoHeight = resolveCompanyLogoHeight(companyLogoHeight)
   const viewId = segments[0] === 'customer' && segments.length >= 3 ? segments[2] : ''
   const isStonesView = viewId === 'stones'
   const buttonLink = getButtonLink({ location, companyId })
@@ -56,7 +53,8 @@ export default function HeaderCustomers({
   const logoSizeClass =
     isLogin || isCustomersCompanies
       ? 'h-36 md:h-44 object-contain'
-      : 'h-12 md:h-16 object-contain'
+      : 'max-w-full object-contain'
+  const logoStyle = isLogin || isCustomersCompanies ? undefined : { height: logoHeight }
   return (
     <header className='flex justify-between items-center'>
       <div className='flex items-center gap-2'>
@@ -71,10 +69,10 @@ export default function HeaderCustomers({
       </div>
       <div className='flex-1 flex justify-center'>
         {isCustomersCompanies ? (
-          <img src={logoUrl} alt='Logo' className={logoSizeClass} />
+          <img src={logoUrl} alt='Logo' className={logoSizeClass} style={logoStyle} />
         ) : (
           <a href={isLogin ? '/' : 'stones'}>
-            <img src={logoUrl} alt='Logo' className={logoSizeClass} />
+            <img src={logoUrl} alt='Logo' className={logoSizeClass} style={logoStyle} />
           </a>
         )}
       </div>

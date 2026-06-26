@@ -16,3 +16,7 @@ export async function canEditAdminUsers(user: SessionUser): Promise<boolean> {
   )
   return rows.length > 0
 }
+
+export async function canManageCompanySettings(user: SessionUser): Promise<boolean> {
+  return canEditAdminUsers(user)
+}
