@@ -24,6 +24,7 @@ import { InventoryCatalogContentSkeleton } from '~/components/organisms/Inventor
 import { DataTable } from '~/components/ui/data-table'
 import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
 import { useScrollMainToTopWhenLoading } from '~/hooks/useScrollMainToTopWhenLoading'
+import { isDisplayableBundleNumber } from '~/schemas/general'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
 import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
@@ -387,7 +388,7 @@ export default function AdminStones() {
                       <p className='text-center text-sm'>
                         Price: ${stone.retail_price}/${stone.cost_per_sqft}
                       </p>
-                      {stone.bundle_number != null && stone.bundle_number !== '' && (
+                      {isDisplayableBundleNumber(stone.bundle_number) && (
                         <p className='text-center text-sm'>
                           Bundle: #{stone.bundle_number}
                         </p>

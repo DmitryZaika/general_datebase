@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
-import { coerceNumber, NullableId, StringBoolean } from './general'
+import { coerceNumber, NullableId, NullableString, StringBoolean } from './general'
 
 export const stoneSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -12,7 +12,7 @@ export const stoneSchema = z.object({
   width: coerceNumber,
   supplier_id: NullableId,
   bundle: z.string().optional(),
-  bundle_number: z.string().optional().nullable(),
+  bundle_number: NullableString.optional(),
   cost_per_sqft: coerceNumber,
   retail_price: coerceNumber,
   level: NullableId,

@@ -18,7 +18,7 @@ import { stoneSchema } from '~/schemas/stones'
 import { commitSession, getSession } from '~/sessions.server'
 import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
-import { parseMutliForm } from '~/utils/parseMultiForm'
+import { parseOptionalMultiForm } from '~/utils/parseMultiForm'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
@@ -38,7 +38,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, 'No stone id provided')
   }
   const stoneId = parseInt(params.stone, 10)
-  const { errors, data } = await parseMutliForm(request, stoneSchema, 'stones')
+  const { errors, data } = await parseOptionalMultiForm(request, stoneSchema, 'stones')
   if (errors || !data) {
     return { errors }
   }

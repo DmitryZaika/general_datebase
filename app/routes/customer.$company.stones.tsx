@@ -13,6 +13,7 @@ import { InventoryCatalogContentSkeleton } from '~/components/organisms/Inventor
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { db } from '~/db.server'
 import { cleanParams } from '~/hooks/use-safe-search-params'
+import { isDisplayableBundleNumber } from '~/schemas/general'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
 import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
@@ -115,7 +116,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         fieldList={{
           Size: `${displayedLength} x ${displayedWidth}`,
           Type: capitalizeFirstLetter(stone.type),
-          ...(stone.bundle_number != null && stone.bundle_number !== ''
+          ...(isDisplayableBundleNumber(stone.bundle_number)
             ? { Bundle: `#${stone.bundle_number}` }
             : {}),
         }}

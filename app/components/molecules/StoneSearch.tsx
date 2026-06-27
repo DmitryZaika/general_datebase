@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { isDisplayableBundleNumber } from '~/schemas/general'
 import type { StoneImage } from '~/types'
 import { SuperCarousel } from '../organisms/SuperCarousel'
 
@@ -179,11 +180,11 @@ export function StoneSearch({
 
                   <div className='text-sm text-gray-500'>
                     {(() => {
-                      const bundleSuffix =
-                        stone.bundle_number != null &&
-                        String(stone.bundle_number).trim() !== ''
-                          ? ` · Bundle#${stone.bundle_number}`
-                          : ''
+                      const bundleSuffix = isDisplayableBundleNumber(
+                        stone.bundle_number,
+                      )
+                        ? ` · Bundle#${stone.bundle_number}`
+                        : ''
                       if (userRole === 'admin') {
                         return stone.retail_price === 0
                           ? `Price per slab $${stone.cost_per_sqft}${bundleSuffix}`

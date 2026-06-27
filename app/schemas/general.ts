@@ -42,3 +42,11 @@ export const NullableString = z.preprocess(value => {
     return null
   return str
 }, z.string().nullable())
+
+export function isDisplayableBundleNumber(
+  value: string | null | undefined,
+): value is string {
+  if (value == null) return false
+  const trimmed = String(value).trim()
+  return trimmed !== '' && trimmed.toLowerCase() !== 'undefined'
+}

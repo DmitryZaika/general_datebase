@@ -23,6 +23,7 @@ import { StoneTable } from '~/components/organisms/StoneTable'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { cleanParams } from '~/hooks/use-safe-search-params'
+import { isDisplayableBundleNumber } from '~/schemas/general'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
 import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
@@ -117,7 +118,7 @@ function InteractiveCard({
             stone.retail_price === 0
               ? ` By slab $${stone.cost_per_sqft} sqft`
               : `$${stone.retail_price}`,
-          ...(stone.bundle_number != null && stone.bundle_number !== ''
+          ...(isDisplayableBundleNumber(stone.bundle_number)
             ? { Bundle: `#${stone.bundle_number}` }
             : {}),
         }}

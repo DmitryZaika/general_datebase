@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   type ActionFunctionArgs,
@@ -233,11 +234,14 @@ export default function CustomerDelete() {
 
       {step2Open ? (
         <>
+          <div className='flex justify-center pb-1'>
+            <AlertTriangle className='h-10 w-10 text-amber-500' aria-hidden='true' />
+          </div>
           <DialogHeader>
             <DialogTitle>Delete customer</DialogTitle>
             <DialogDescription>
               {customer_name
-                ? `This customer has ${dealCount} associated deal(s). Remove all deals and delete ${customer_name}?`
+                ? `This customer has ${dealCount} associated deal(s). The customer and their deals will be hidden — nothing is permanently deleted. Continue with ${customer_name}?`
                 : ''}
             </DialogDescription>
           </DialogHeader>

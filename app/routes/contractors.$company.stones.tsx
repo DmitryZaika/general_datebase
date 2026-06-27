@@ -6,6 +6,7 @@ import { ImageCard } from '~/components/organisms/ImageCard'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { db } from '~/db.server'
 import { cleanParams } from '~/hooks/use-safe-search-params'
+import { isDisplayableBundleNumber } from '~/schemas/general'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
 import { stoneQueryBuilder } from '~/utils/queries.server'
@@ -122,7 +123,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
             stone.retail_price === 0
               ? ` By slab $${stone.cost_per_sqft} sqft`
               : `$${stone.retail_price}`,
-          ...(stone.bundle_number != null && stone.bundle_number !== ''
+          ...(isDisplayableBundleNumber(stone.bundle_number)
             ? { Bundle: `#${stone.bundle_number}` }
             : {}),
         }}

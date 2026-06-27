@@ -237,7 +237,7 @@ export default function CustomerDelete() {
             <DialogTitle>Delete customer</DialogTitle>
             <DialogDescription>
               {customer_name
-                ? `This customer has ${dealCount} associated deal(s). Remove all deals and delete ${customer_name}?`
+                ? `This customer has ${dealCount} associated deal(s). The customer and their deals will be hidden — nothing is permanently deleted. Continue with ${customer_name}?`
                 : ''}
             </DialogDescription>
           </DialogHeader>

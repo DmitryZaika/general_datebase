@@ -9,9 +9,23 @@ const fileSchema = z.object({
   file: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
 })
 
+const uploadedFileSchema = z.union([
+  z.string().min(1),
+  z.array(z.string().min(1)).min(1),
+])
+
 const optionalFileSchema = z.object({
-  file: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
+  file: uploadedFileSchema.optional(),
 })
+
+function omitEmptyUploadFile<T extends Record<string, unknown>>(values: T): T {
+  const file = values.file
+  if (file === undefined || file === null || file === '') {
+    const { file: _removed, ...rest } = values
+    return rest as T
+  }
+  return values
+}
 
 export async function parseMutliForm<Shape extends z.ZodRawShape>(
   request: Request,
@@ -51,6 +65,8 @@ export async function parseOptionalMultiForm<Shape extends z.ZodRawShape>(
 
   csrf.validate(formData, request.headers)
 
-  const receivedValues = generateFormData(formData)
+  const receivedValues = omitEmptyUploadFile(
+    generateFormData(formData) as Record<string, unknown>,
+  )
   return await validateFormData(receivedValues, resolver)
 }

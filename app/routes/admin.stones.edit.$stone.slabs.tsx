@@ -1,4 +1,5 @@
 import { Check, LinkIcon, Pencil, X } from 'lucide-react'
+import type { ResultSetHeader } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
   type ActionFunctionArgs,
@@ -30,13 +31,21 @@ import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
-import { parseMutliForm } from '~/utils/parseMultiForm'
+import { parseOptionalMultiForm } from '~/utils/parseMultiForm'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import type { SlabData } from '~/utils/slabQRCode'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
+
+interface StoneSlab {
+  id: number
+  bundle: string
+  url: string | null
+  width: number
+  length: number
+}
 
 // Form schema
 const slabSchema = z.object({
@@ -459,19 +468,42 @@ export function AddSlab() {
 
   // Check for action data errors
   useEffect(() => {
+    if (!actionData) return
+
     if (
-      actionData?.error &&
+      actionData.error &&
       typeof actionData.error === 'string' &&
       actionData.error.includes('ReadableStream is locked')
     ) {
       setUploadError('There was an issue with the file upload. Please try again.')
+      return
+    }
+
+    if (actionData.error && typeof actionData.error === 'string') {
+      setUploadError(actionData.error)
+      return
+    }
+
+    if (actionData.errors) {
+      const firstError = Object.values(actionData.errors)[0]
+      if (typeof firstError === 'string') {
+        setUploadError(firstError)
+      } else if (
+        firstError &&
+        typeof firstError === 'object' &&
+        'message' in firstError &&
+        typeof firstError.message === 'string'
+      ) {
+        setUploadError(firstError.message)
+      } else {
+        setUploadError('Please check the form and try again.')
+      }
     }
   }, [actionData])
 
   const form = useCustomOptionalForm(slabSchema, {
     defaultValues: {
       bundle: '',
-      file: stone.url || undefined,
       length: stone?.length || 0,
       width: stone?.width || 0,
     },
@@ -709,7 +741,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     // Handle multipart form data (file uploads)
     if (contentType.includes('multipart/form-data')) {
       try {
-        const { errors, data: formData } = await parseMutliForm(
+        const { errors, data: formData } = await parseOptionalMultiForm(
           request,
           slabSchema,
           'stones',
@@ -730,21 +762,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
 
         // Insert new slab record
-        await db.execute(
+        const slabUrl =
+          formData.file && formData.file !== 'undefined' ? formData.file : null
+
+        const [insertResult] = await db.execute<ResultSetHeader>(
           'INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)',
-          [
-            formData.bundle,
-            stoneId,
-            formData.file ?? '',
-            formData.width,
-            formData.length,
-          ],
+          [formData.bundle, stoneId, slabUrl, formData.width, formData.length],
         )
+
+        const newSlab: StoneSlab = {
+          id: insertResult.insertId,
+          bundle: formData.bundle,
+          url: slabUrl,
+          width: formData.width,
+          length: formData.length,
+        }
 
         const session = await getSession(request.headers.get('Cookie'))
         session.flash('message', toastData('Success', 'Image Added'))
         return data(
-          { success: true },
+          { success: true as const, slab: newSlab },
           {
             headers: { 'Set-Cookie': await commitSession(session) },
           },
@@ -899,6 +936,8 @@ export default function EditStoneSlabs() {
     linkedStoneIds,
     reverseLinkedStoneIds,
   } = useLoaderData<typeof loader>()
+  const actionData = useActionData<typeof action>()
+  const [displaySlabs, setDisplaySlabs] = useState<StoneSlab[]>(slabs)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -912,6 +951,26 @@ export default function EditStoneSlabs() {
   const navigate = useNavigate()
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
+
+  useEffect(() => {
+    setDisplaySlabs(slabs)
+  }, [slabs])
+
+  useEffect(() => {
+    if (
+      actionData &&
+      'success' in actionData &&
+      actionData.success &&
+      actionData.slab
+    ) {
+      setDisplaySlabs(prev => {
+        if (prev.some(slab => slab.id === actionData.slab.id)) {
+          return prev
+        }
+        return [...prev, actionData.slab]
+      })
+    }
+  }, [actionData])
 
   // Event handlers
   const handleUnlinkClick = (sourceId: number, name: string) => {
@@ -981,7 +1040,7 @@ export default function EditStoneSlabs() {
           ALL QR codes
         </Button> */}
 
-        {slabs.map(slab => (
+        {displaySlabs.map(slab => (
           <SlabItem
             key={slab.id}
             slab={slab}
