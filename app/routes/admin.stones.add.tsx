@@ -105,8 +105,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const url = new URL(request.url)
-  const searchParams = url.searchParams.toString()
-  const searchString = searchParams ? `?${searchParams}` : ''
+  const returnParams = new URLSearchParams(url.searchParams)
+  returnParams.set('show_sold_out', 'true')
+  const searchString = returnParams.toString() ? `?${returnParams.toString()}` : ''
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Stone added'))
