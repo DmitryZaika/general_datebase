@@ -322,30 +322,28 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
   return (
     <>
       <header className='fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur'>
-        <div className='mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6'>
+        {/* Mobile: nav centered between logo and Get Demo */}
+        <div className='mx-auto flex max-w-6xl items-center gap-4 px-2 py-3 md:hidden md:px-6'>
           <Link to='/' className='flex shrink-0 items-center gap-3'>
             <img
               src={loginLogo}
               alt='Granite Manager'
               className='h-10 w-10 object-contain'
             />
-            <span className='hidden text-lg font-semibold tracking-tight text-slate-900 sm:inline'>
-              Granite Manager
-            </span>
           </Link>
-          <nav className='flex items-center gap-5 md:gap-4'>
+
+          <nav className='flex flex-1 items-center justify-center gap-5'>
             {isHomePage ? (
               <button
                 type='button'
                 onClick={scrollToMarketingTop}
                 className={cn(
-                  'cursor-pointer text-sm font-medium text-slate-900',
+                  'cursor-pointer text-sm font-medium',
                   navUnderline,
                   atMain && navUnderlineActive,
                 )}
               >
-                <span className='sm:hidden'>Main</span>
-                <span className='hidden sm:inline'>Main Page</span>
+                Main
               </button>
             ) : (
               <Link
@@ -355,27 +353,16 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
                   navUnderline,
                 )}
               >
-                <span className='sm:hidden'>Main</span>
-                <span className='hidden sm:inline'>Main Page</span>
+                Main
               </Link>
             )}
-            <a
-              href='https://docs.granite-manager.com/'
-              target='_blank'
-              rel='noopener noreferrer'
-              className={cn(
-                'hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
-                navUnderline,
-              )}
-            >
-              Documentation
-            </a>
+
             {isHomePage ? (
               <button
                 type='button'
                 onClick={() => scrollToMarketingSection('pricing')}
                 className={cn(
-                  'cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                  'cursor-pointer text-sm font-medium',
                   navUnderline,
                   atPricing && navUnderlineActive,
                 )}
@@ -386,17 +373,18 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
               <Link
                 to='/#pricing'
                 className={cn(
-                  'text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
                   navUnderline,
                 )}
               >
                 Pricing
               </Link>
             )}
+
             {isLoginPage ? (
               <span
                 className={cn(
-                  'inline-block text-sm font-medium text-slate-900',
+                  'text-sm font-medium text-slate-900',
                   navUnderline,
                   navUnderlineActive,
                 )}
@@ -407,17 +395,112 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
               <Link
                 to='/login'
                 className={cn(
-                  'inline-block text-sm font-medium text-slate-600 hover:text-slate-900',
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
                   navUnderline,
                 )}
               >
                 Login
               </Link>
             )}
+          </nav>
+
+          <button
+            type='button'
+            onClick={onDemo}
+            className='cursor-pointer shrink-0 rounded-full bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800'
+          >
+            Get Demo
+          </button>
+        </div>
+
+        {/* Desktop: nav on the right */}
+        <div className='mx-auto hidden max-w-6xl items-center justify-between gap-4 px-2 py-3 md:flex md:px-6'>
+          <Link to='/' className='flex shrink-0 items-center gap-3'>
+            <img
+              src={loginLogo}
+              alt='Granite Manager'
+              className='h-10 w-10 object-contain'
+            />
+            <span className='text-lg font-semibold tracking-tight text-slate-900'>
+              Granite Manager
+            </span>
+          </Link>
+
+          <nav className='flex items-center gap-4'>
+            {isHomePage ? (
+              <button
+                type='button'
+                onClick={scrollToMarketingTop}
+                className={cn(
+                  'cursor-pointer text-sm font-medium',
+                  navUnderline,
+                  atMain && navUnderlineActive,
+                )}
+              >
+                Main Page
+              </button>
+            ) : (
+              <Link
+                to='/'
+                className={cn(
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
+                  navUnderline,
+                )}
+              >
+                Main Page
+              </Link>
+            )}
+
+            {isHomePage ? (
+              <button
+                type='button'
+                onClick={() => scrollToMarketingSection('pricing')}
+                className={cn(
+                  'cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-900',
+                  navUnderline,
+                  atPricing && navUnderlineActive,
+                )}
+              >
+                Pricing
+              </button>
+            ) : (
+              <Link
+                to='/#pricing'
+                className={cn(
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
+                  navUnderline,
+                )}
+              >
+                Pricing
+              </Link>
+            )}
+
+            {isLoginPage ? (
+              <span
+                className={cn(
+                  'text-sm font-medium text-slate-900',
+                  navUnderline,
+                  navUnderlineActive,
+                )}
+              >
+                Login
+              </span>
+            ) : (
+              <Link
+                to='/login'
+                className={cn(
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
+                  navUnderline,
+                )}
+              >
+                Login
+              </Link>
+            )}
+
             <button
               type='button'
               onClick={onDemo}
-              className='cursor-pointer rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800'
+              className='cursor-pointer rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800'
             >
               Get Demo
             </button>
