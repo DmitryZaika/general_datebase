@@ -282,15 +282,26 @@ function useHomeSection(): 'main' | 'pricing' {
     const pricing = document.getElementById('pricing')
     if (!pricing) return
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setSection(entry.isIntersecting ? 'pricing' : 'main')
-      },
-      { threshold: 0, rootMargin: '0px 0px 0px 0px' },
-    )
+    const main = document.querySelector('main')
+    const scroller = main && main.scrollHeight > main.clientHeight + 1 ? main : null
 
-    observer.observe(pricing)
-    return () => observer.disconnect()
+    const update = () => {
+      const pricingRect = pricing.getBoundingClientRect()
+      const viewportHeight = scroller ? scroller.clientHeight : window.innerHeight
+      const scrollTop = scroller ? scroller.scrollTop : window.scrollY
+      const pricingTop =
+        scrollTop +
+        pricingRect.top -
+        (scroller ? scroller.getBoundingClientRect().top : 0)
+      const activationPoint = pricingTop - viewportHeight + 1
+
+      setSection(scrollTop >= activationPoint ? 'pricing' : 'main')
+    }
+
+    const scrollTarget = scroller ?? window
+    scrollTarget.addEventListener('scroll', update, { passive: true })
+    update()
+    return () => scrollTarget.removeEventListener('scroll', update)
   }, [])
 
   return section
