@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
-import { type FieldPath, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
   Form,
@@ -72,7 +72,7 @@ const userschema = z.object({
         if (!val) return []
         return val
           .split(',')
-          .map(id => parseInt(id.trim()))
+          .map(id => parseInt(id.trim(), 10))
           .filter(id => !Number.isNaN(id))
       }),
       z.array(z.coerce.number()),
@@ -141,7 +141,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!params.user) {
     return forceRedirectError(request.headers, 'No user id provided')
   }
-  const userId = parseInt(params.user)
+  const userId = parseInt(params.user, 10)
   const existingUser = await selectId<User>(
     db,
     'SELECT id, company_id, is_admin FROM users WHERE id = ? AND is_deleted = 0',
@@ -295,7 +295,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!params.user) {
     return forceRedirectError(request.headers, 'No user id provided')
   }
-  const userId = parseInt(params.user)
+  const userId = parseInt(params.user, 10)
   if (Number.isNaN(userId)) {
     return forceRedirectError(request.headers, 'Invalid user id')
   }
@@ -394,7 +394,7 @@ export default function User() {
   useEffect(() => {
     if (!actionData?.errors) return
     for (const [field, err] of Object.entries(actionData.errors)) {
-      form.setError(field as FieldPath<typeof form.formState.defaultValues>, {
+      form.setError(field as Parameters<typeof form.setError>[0], {
         type: 'server',
         message: err?.message ?? 'invalid',
       })
@@ -454,7 +454,11 @@ export default function User() {
                 control={form.control}
                 name='company_id'
                 render={({ field }) => (
-                  <input type='hidden' name={field.name} value={field.value} />
+                  <input
+                    type='hidden'
+                    name={field.name}
+                    value={String(field.value ?? '')}
+                  />
                 )}
               />
             )}

@@ -1,3 +1,4 @@
+import type { ChangeEvent } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -194,7 +195,7 @@ export default function AdminCompanySettings() {
               field={{
                 ...field,
                 value: field.value ?? '',
-                onChange: event => {
+                onChange: (event: ChangeEvent<HTMLInputElement>) => {
                   const value = event.target.value
                   field.onChange(value === '' ? null : Number(value))
                 },

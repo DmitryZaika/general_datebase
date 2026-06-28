@@ -1602,7 +1602,7 @@ export function EmailChat(props: EmailChatProps) {
             </ul>
           </div>
         )}
-        {canCompose ? (
+        {canCompose && employeeProps ? (
           <div className='flex flex-col md:flex-row flex-1 gap-2'>
             <div className='hidden md:flex items-end gap-2'>
               {showSelect ? (

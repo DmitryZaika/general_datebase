@@ -20,6 +20,11 @@ const CORE_FEATURES = [
   'Phone Call Recording',
   'Sales Rep Activity Tracking',
   'Documents, Images & Suppliers',
+  'Customer Display',
+  'Post-Installation Checklists',
+  'Marketing Page',
+  'Slab & Cutting Track',
+  'Consignment Reports',
 ]
 
 const WHY_CHOOSE = [
@@ -47,6 +52,26 @@ const WHY_CHOOSE = [
     title: 'See What Your Team Is Doing',
     body: 'Track sales rep activity, notes, and deal updates so owners always know what happened and what is next.',
   },
+  {
+    title: 'Customer Display Linked to Inventory',
+    body: 'Show live stone inventory on a customer-facing display in your showroom. Slabs, photos, and availability stay synced with what your team manages in the CRM.',
+  },
+  {
+    title: 'Post-Installation Checklists',
+    body: 'Installers submit job completion checklists from the field. Customers receive post-install survey links by email or SMS so you capture feedback while the job is fresh.',
+  },
+  {
+    title: 'Marketing Page for Lead Teams',
+    body: 'Give marketing staff a dedicated leads workspace. Track walk-ins, web leads, and deal progress without giving them full CRM access they do not need.',
+  },
+  {
+    title: 'Slab & Cutting Track',
+    body: 'Shop workers log transactions, mark slabs as cut, and track production progress so sales and the shop floor stay aligned on what is sold, cut, and ready.',
+  },
+  {
+    title: 'Consignment Reports',
+    body: 'Pull cut-slab reports by supplier, stone, and date range. Export what was used from consignment inventory so you can reconcile with suppliers without spreadsheets.',
+  },
 ]
 
 const FAQ = [
@@ -64,7 +89,7 @@ const FAQ = [
   },
   {
     q: 'What happens on a demo call?',
-    a: 'We walk through your current workflow, show how Granite Manager handles leads, deals, email, inventory, and AI tools, then answer your questions.',
+    a: 'We walk through your current workflow, show how Granite Manager handles leads, deals, email, inventory, customer displays, post-install checklists, marketing, slab and cutting tracking, consignment reports, and AI tools, then answer your questions.',
   },
 ]
 
@@ -116,8 +141,9 @@ export function GraniteManagerLanding() {
               The CRM built for countertop and stone sales teams
             </h1>
             <p className='mt-5 max-w-xl text-lg leading-relaxed text-slate-600'>
-              Run leads, deals, email, inventory, and rep activity in one focused
-              system. Less juggling. Fewer missed follow-ups. More jobs closed.
+              Run leads, deals, email, inventory, showroom displays, slab and cutting
+              tracking, and rep activity in one focused system. Less juggling. Fewer
+              missed follow-ups. More jobs closed.
             </p>
             <div className='mt-8 flex flex-wrap gap-3'>
               <button
@@ -216,7 +242,8 @@ export function GraniteManagerLanding() {
             <div>
               <p className='text-4xl font-bold'>1 CRM</p>
               <p className='mt-2 text-slate-300'>
-                Customers, deals, email, calls, and inventory connected
+                Customers, deals, email, calls, inventory, and showroom display
+                connected
               </p>
             </div>
             <div>
@@ -343,7 +370,8 @@ export function GraniteManagerLanding() {
           </h2>
           <p className='mt-4 text-lg text-slate-600'>
             Book a short intro call. We will show how your team can manage leads, deals,
-            email, inventory, and rep activity in one AI CRM.
+            email, inventory, showroom displays, install checklists, marketing, and slab
+            and cutting tracking in one AI CRM.
           </p>
           <button
             type='button'

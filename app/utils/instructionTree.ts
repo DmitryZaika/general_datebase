@@ -1,6 +1,6 @@
 export interface InstructionRow {
   id: number
-  title: string
+  title: string | null
   parent_id: number | null
   after_id: number | null
   rich_text: string
@@ -8,7 +8,7 @@ export interface InstructionRow {
 
 export interface InstructionNode {
   id: number
-  title: string
+  title: string | null
   parent_id: number | null
   after_id: number | null
   rich_text: string

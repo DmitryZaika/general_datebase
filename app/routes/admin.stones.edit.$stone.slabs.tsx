@@ -762,8 +762,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
 
         // Insert new slab record
+        const uploadedFile = formData.file
         const slabUrl =
-          formData.file && formData.file !== 'undefined' ? formData.file : null
+          uploadedFile && uploadedFile !== 'undefined'
+            ? Array.isArray(uploadedFile)
+              ? uploadedFile[0]
+              : uploadedFile
+            : null
 
         const [insertResult] = await db.execute<ResultSetHeader>(
           'INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)',
@@ -957,17 +962,13 @@ export default function EditStoneSlabs() {
   }, [slabs])
 
   useEffect(() => {
-    if (
-      actionData &&
-      'success' in actionData &&
-      actionData.success &&
-      actionData.slab
-    ) {
+    if (actionData && 'slab' in actionData && actionData.slab) {
+      const newSlab = actionData.slab as StoneSlab
       setDisplaySlabs(prev => {
-        if (prev.some(slab => slab.id === actionData.slab.id)) {
+        if (prev.some(slab => slab.id === newSlab.id)) {
           return prev
         }
-        return [...prev, actionData.slab]
+        return [...prev, newSlab]
       })
     }
   }, [actionData])

@@ -1,5 +1,8 @@
 ---
+description: 
 alwaysApply: true
 ---
 
 Don't you as to fix type problems
+Never use any in types
+if you are not 100% sure how to fix the type error, just tell about it and don't fix it

@@ -456,7 +456,7 @@ const searchAllInstructions = (
     if (visited.has(node.id)) continue
     visited.add(node.id)
 
-    const titleMatch = node.title.toLowerCase().includes(search)
+    const titleMatch = (node.title ?? '').toLowerCase().includes(search)
     const contentMatch = stripHtmlTags(node.rich_text).toLowerCase().includes(search)
 
     if (titleMatch) {
@@ -527,7 +527,7 @@ export default function AdminInstructions() {
     const selected = findInstructionById(id, instructionTree)
     if (!selected) return
     setSelectedId(id)
-    setSearchTerm(selected.title)
+    setSearchTerm(selected.title ?? '')
     setShowDropdown(false)
   }, [instructionIdParam, instructionTree])
 
@@ -545,7 +545,7 @@ export default function AdminInstructions() {
 
   const handleSelectInstruction = (instruction: SearchResult) => {
     setSelectedId(instruction.id)
-    setSearchTerm(instruction.title)
+    setSearchTerm(instruction.title ?? '')
     setShowDropdown(false)
   }
 

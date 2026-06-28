@@ -17,7 +17,7 @@ function loadCalendlyWidgetAssets(): Promise<void> {
   if (window.Calendly?.initPopupWidget) return Promise.resolve()
   if (calendlyWidgetReady) return calendlyWidgetReady
 
-  calendlyWidgetReady = new Promise((resolve, reject) => {
+  calendlyWidgetReady = new Promise<void>((resolve, reject) => {
     const finish = () => {
       if (window.Calendly?.initPopupWidget) {
         resolve()
