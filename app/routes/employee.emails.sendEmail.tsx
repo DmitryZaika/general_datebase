@@ -168,17 +168,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let dealId: number | undefined
   let email = ''
   let customerName = ''
+  let customerId: number | undefined
 
   if (params.dealId) {
     dealId = parseInt(params.dealId, 10)
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT c.email, c.name FROM deals d JOIN customers c ON d.customer_id = c.id WHERE d.id = ? AND d.deleted_at IS NULL`,
+      `SELECT c.id, c.email, c.name FROM deals d JOIN customers c ON d.customer_id = c.id WHERE d.id = ? AND d.deleted_at IS NULL`,
       [dealId],
     )
 
     if (rows && rows.length > 0) {
       email = rows[0].email || ''
       customerName = rows[0].name || ''
+      customerId = rows[0].id
     }
   }
 
@@ -191,6 +193,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     dealId,
     companyId: user.company_id ?? 0,
     userId: user.id,
+    customerId,
   }
 }
 
@@ -737,7 +740,7 @@ function sendEmail(
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, customerName, dealId, companyId, userId } =
+  const { email, customerName, customerId, dealId, companyId, userId } =
     useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [_isGenerating, setIsGenerating] = useState(false)
@@ -865,7 +868,7 @@ export default function DealEmailDialog() {
       const applied = await applyEmailTemplateContent(
         userId,
         dealId || null,
-        null,
+        customerId || null,
         template,
       )
       form.setValue('subject', applied.subject)

@@ -62,7 +62,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const [customerRows] = await selectMany<Customer>(
     db,
-    `SELECT c.name, c.email
+    `SELECT c.name, c.email, c.id
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ?`,
@@ -124,6 +124,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   })
 
   return {
+    customerId: customerRows.id,
     customerName: customerRows?.name || 'Customer',
     customerEmail,
     messages,
@@ -148,6 +149,7 @@ export default function AdminDealsProjectChatRoute() {
     <EmailChat
       variant='admin'
       customerName={data.customerName}
+      customerId={data.customerId}
       messages={data.messages}
       onClose={() =>
         navigate(`/admin/deals/edit/${data.dealId}/project${location.search}`)

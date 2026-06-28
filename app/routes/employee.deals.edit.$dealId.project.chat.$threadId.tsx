@@ -138,6 +138,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return {
     customerName: customerRows?.[0]?.name || 'Customer',
     customerEmail,
+    customerId: customerRows?.[0]?.id || null,
     messages,
     dealId,
     subject: emailRows?.[0]?.subject || null,
@@ -161,6 +162,7 @@ export default function EmployeeDealsProjectChatRoute() {
       userId={data.userId}
       variant='employee'
       customerName={data.customerName}
+      customerId={data.customerId}
       messages={data.messages}
       onClose={() =>
         navigate(`/employee/deals/edit/${data.dealId}/project${location.search}`)

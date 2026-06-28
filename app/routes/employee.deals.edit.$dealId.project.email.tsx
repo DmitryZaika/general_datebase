@@ -175,7 +175,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
 
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.email, c.name FROM deals d JOIN customers c ON d.customer_id = c.id WHERE d.id = ? AND d.deleted_at IS NULL`,
+    `SELECT c.id, c.email, c.name FROM deals d JOIN customers c ON d.customer_id = c.id WHERE d.id = ? AND d.deleted_at IS NULL`,
     [dealId],
   )
 
@@ -192,6 +192,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     dealId,
     companyId: user.company_id ?? 0,
     userId: user.id,
+    customerId: rows[0].id,
   }
 }
 
@@ -591,7 +592,7 @@ function sendEmail(
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, customerName, dealId, companyId, userId } =
+  const { email, customerName, customerId, dealId, companyId, userId } =
     useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [_isGenerating, setIsGenerating] = useState(false)
@@ -713,7 +714,12 @@ export default function DealEmailDialog() {
 
   const applyTemplate = useCallback(
     async (template: EmailTemplate) => {
-      const applied = await applyEmailTemplateContent(userId, dealId, null, template)
+      const applied = await applyEmailTemplateContent(
+        userId,
+        dealId,
+        customerId,
+        template,
+      )
       form.setValue('subject', applied.subject)
       form.setValue('text', applied.body)
       form.setValue('attachments', applied.attachments)

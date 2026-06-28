@@ -138,6 +138,7 @@ interface EmailChatDealNav {
 interface EmailChatBaseProps {
   variant: 'admin' | 'employee'
   customerName: string
+  customerId: number | null
   messages: EmailChatMessage[]
   onClose: () => void
   scrollToMessageId?: number | null
@@ -608,6 +609,7 @@ export function EmailChat(props: EmailChatProps) {
   const {
     variant,
     customerName,
+    customerId,
     messages,
     onClose,
     scrollToMessageId,
@@ -903,7 +905,7 @@ export function EmailChat(props: EmailChatProps) {
     const applied = await applyEmailTemplateContent(
       userId,
       employeeProps.dealId,
-      null,
+      customerId,
       template,
     )
     const plainText = htmlToPlainText(applied.body)
