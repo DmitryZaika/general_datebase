@@ -1,11 +1,5 @@
 import { Link, type Location, useLocation, useNavigation } from 'react-router'
-import {
-  defaultLogo,
-  gbColumbus,
-  gbIndianapolis,
-  gmqTops,
-  loginLogo,
-} from '~/constants/logos'
+import { getCompanyLogoUrl, loginLogo } from '~/constants/logos'
 import { LoadingButton } from '../molecules/LoadingButton'
 import { BurgerMenu } from './HeaderMobile'
 
@@ -39,24 +33,15 @@ export default function HeaderCustomers({
   const navigation = useNavigation()
   const loading = navigation.state === 'loading'
   const id = Number(companyId)
-  const logoUrl = isLogin
-    ? loginLogo
-    : id === 1
-      ? gbIndianapolis
-      : id === 3
-        ? gbColumbus
-        : id === 4
-          ? gmqTops
-          : defaultLogo
+  const logoUrl = isLogin ? loginLogo : getCompanyLogoUrl(id)
   const viewId = segments[0] === 'customer' && segments.length >= 3 ? segments[2] : ''
   const isStonesView = viewId === 'stones'
   const buttonLink = getButtonLink({ location, companyId })
   const isSurvey = location.pathname.includes('survey')
   const showStonesButton = !isLogin && !isSurvey && !isCustomersCompanies
-  const logoSizeClass =
-    isLogin || isCustomersCompanies
-      ? 'h-36 md:h-44 object-contain'
-      : 'h-12 md:h-16 object-contain'
+  const logoSizeClass = isLogin
+    ? 'h-36 md:h-44 object-contain'
+    : 'h-12 md:h-16 object-contain'
   return (
     <header className='flex justify-between items-center'>
       <div className='flex items-center gap-2'>
@@ -70,13 +55,9 @@ export default function HeaderCustomers({
         )}
       </div>
       <div className='flex-1 flex justify-center'>
-        {isCustomersCompanies ? (
+        <a href={isLogin ? '/' : 'stones'}>
           <img src={logoUrl} alt='Logo' className={logoSizeClass} />
-        ) : (
-          <a href={isLogin ? '/' : 'stones'}>
-            <img src={logoUrl} alt='Logo' className={logoSizeClass} />
-          </a>
-        )}
+        </a>
       </div>
       <div className='md:hidden'>{hideBurgerMenu ? null : <BurgerMenu />}</div>
     </header>

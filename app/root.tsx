@@ -353,6 +353,10 @@ export default function App() {
   const { toast } = useToast()
   const _isMobile = useIsMobile()
   const isLogin = pathname === '/login'
+  const isLandingPage = pathname === '/'
+  const isCustomersCompanies = pathname === '/customers/companies'
+  const isMarketingPublicPage = isLandingPage || isLogin || isCustomersCompanies
+  const isCompactMarketingPage = isLogin || isCustomersCompanies
   const isDraw = pathname.startsWith('/employee/draw')
   const isCheckIn = pathname.includes('/check-in')
   const isExternalMarketing = pathname.includes(`/external/marketing/`)
@@ -360,7 +364,6 @@ export default function App() {
   const isShopRoute = pathname.startsWith('/shop')
   const isShopWorker = position === 'shop_worker'
   const isContractors = pathname.startsWith('/contractors')
-  const isCustomersCompanies = pathname === '/customers/companies'
   const segments = pathname.split('/').filter(Boolean)
   const isCustomerSurveyPage =
     segments[0] === 'customer' && segments.length === 3 && segments[2] === 'survey'
@@ -392,7 +395,7 @@ export default function App() {
   const sidebarIconHoverShell = (isEmployeeRoute || isAdminRoute) && !isSidebarPinned
   const showSidebar =
     !!basePath &&
-    !isLogin &&
+    !isMarketingPublicPage &&
     !isInstallerRoute &&
     !isCheckIn &&
     !isExternalMarketing &&
@@ -427,12 +430,20 @@ export default function App() {
                   colors={colors}
                 />
               )}
-              <main className='h-screen overflow-y-auto bg-gray-100 w-full'>
-                {isExternalMarketing ||
-                isCheckIn ||
-                isInstallerRoute ||
-                (isShopRoute && isShopWorker) ||
-                isContractors ? (
+              <main
+                className={`w-full ${
+                  isCompactMarketingPage
+                    ? 'h-dvh overflow-hidden bg-white'
+                    : isMarketingPublicPage
+                      ? 'min-h-dvh overflow-y-auto scroll-smooth bg-white'
+                      : 'h-screen overflow-y-auto bg-gray-100'
+                }`}
+              >
+                {isMarketingPublicPage ? null : isExternalMarketing ||
+                  isCheckIn ||
+                  isInstallerRoute ||
+                  (isShopRoute && isShopWorker) ||
+                  isContractors ? (
                   <MarketingHeader companyName={companyName ?? undefined} />
                 ) : (
                   <Header

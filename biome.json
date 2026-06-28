@@ -11,6 +11,11 @@
     "lineWidth": 88,
     "useEditorconfig": true
   },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
   "javascript": {
     "formatter": {
       "arrowParentheses": "asNeeded",

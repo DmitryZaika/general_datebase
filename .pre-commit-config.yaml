@@ -1,10 +1,11 @@
 repos:
-  - repo: https://github.com/biomejs/pre-commit
-    rev: v2.4.16 # Use the sha / tag you want to point at
-    hooks:
-      - id: biome-check
   - repo: local
     hooks:
+      - id: biome-check
+        name: biome check
+        entry: bunx biome check --write --staged --no-errors-on-unmatched --files-ignore-unknown=true
+        language: system
+        pass_filenames: false
       - id: ts-build
         name: bun run build
         entry: bun run build

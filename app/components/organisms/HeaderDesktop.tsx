@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { Link, useLoaderData, useLocation } from 'react-router'
 import { Button } from '~/components/ui/button'
-import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
+import { getCompanyLogoUrl } from '~/constants/logos'
 import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { HeaderProps } from '~/types'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
@@ -31,8 +31,7 @@ export function HeaderDesktop({
     ? location.pathname.split('/').filter(Boolean)[1]
     : (activeCompanyId ?? data?.user?.company_id)
   const id = Number(companyId)
-  const companyLogo =
-    id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
+  const companyLogo = getCompanyLogoUrl(id)
 
   const customerSwitchUrl =
     companyId === undefined

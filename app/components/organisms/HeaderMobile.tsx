@@ -11,7 +11,7 @@ import clsx from 'clsx'
 import { Menu } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { useSidebar } from '~/components/ui/sidebar'
-import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
+import { getCompanyLogoUrl } from '~/constants/logos'
 
 export function BurgerMenu() {
   const { toggleSidebar } = useSidebar()
@@ -39,8 +39,7 @@ export function HeaderMobile({ className }: HeaderMobileProps) {
     ? location.pathname.split('/').filter(Boolean)[1]
     : (data?.activeCompanyId ?? data?.user?.company_id)
   const id = Number(companyId)
-  const companyLogo =
-    id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
+  const companyLogo = getCompanyLogoUrl(id)
 
   return (
     <header className={clsx('flex justify-between', className)}>

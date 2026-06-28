@@ -15,8 +15,14 @@ import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { PasswordInput } from '~/components/molecules/PasswordInput'
+import {
+  GraniteManagerMarketingBackground,
+  GraniteManagerMarketingHeader,
+  useGraniteManagerCalendly,
+} from '~/components/organisms/GraniteManagerMarketingShell'
 import { DialogFooter } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
+import { loginLogo } from '~/constants/logos'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
@@ -110,6 +116,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Login() {
   const navigation = useNavigation()
+  const openDemo = useGraniteManagerCalendly()
   const { error } = useLoaderData<{ error: string | null }>()
   const actionData = useActionData<typeof action>()
   const { email, password } = actionData?.defaultValues || { email: '', password: '' }
@@ -122,43 +129,58 @@ export default function Login() {
   const isSubmitting = navigation.state !== 'idle'
 
   return (
-    <div className='flex flex-col items-center justify-center p-5'>
-      <Link
-        to='/customers/companies'
-        className='pb-4 text-blue-500 underline cursor-pointer'
-      >
-        For Customers
-      </Link>
-      <FormProvider {...form}>
-        <Form
-          className='w-full max-w-sm bg-white p-6 shadow-md rounded'
-          method='post'
-          onSubmit={fullSubmit}
+    <GraniteManagerMarketingBackground fillViewport>
+      <GraniteManagerMarketingHeader onDemo={openDemo} />
+      <div className='flex min-h-0 flex-1 flex-col items-center justify-start gap-4 overflow-y-auto px-4 py-6'>
+        <img
+          src={loginLogo}
+          alt='Granite Manager'
+          className=' shrink-0  object-contain h-20 sm:h-30 md:h-40 '
+        />
+        <Link
+          to='/customers/companies'
+          className='shrink-0 text-md font-medium text-slate-600 underline hover:text-slate-900'
         >
-          {(error || actionData?.error) && (
-            <div className='mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded'>
-              {error || actionData?.error}
+          For Customers
+        </Link>
+        <FormProvider {...form}>
+          <Form
+            className='w-full max-w-sm rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg backdrop-blur'
+            method='post'
+            onSubmit={fullSubmit}
+          >
+            <div className='mb-6 text-center'>
+              <h1 className='mt-2 text-2xl font-bold tracking-tight text-slate-900'>
+                Sign in to Granite Manager
+              </h1>
             </div>
-          )}
-          <FormField
-            control={form.control}
-            name='email'
-            render={({ field }) => (
-              <InputItem name='Email' placeholder='Email' field={field} />
+            {(error || actionData?.error) && (
+              <div className='mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-red-600'>
+                {error || actionData?.error}
+              </div>
             )}
-          />
-          <FormField
-            control={form.control}
-            name='password'
-            render={({ field }) => (
-              <PasswordInput name='password' placeholder='Password' field={field} />
-            )}
-          />
-          <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Login</LoadingButton>
-          </DialogFooter>
-        </Form>
-      </FormProvider>
-    </div>
+            <FormField
+              control={form.control}
+              name='email'
+              render={({ field }) => (
+                <InputItem name='Email' placeholder='Email' field={field} />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='password'
+              render={({ field }) => (
+                <PasswordInput name='password' placeholder='Password' field={field} />
+              )}
+            />
+            <DialogFooter>
+              <LoadingButton loading={isSubmitting} className='w-full'>
+                Login
+              </LoadingButton>
+            </DialogFooter>
+          </Form>
+        </FormProvider>
+      </div>
+    </GraniteManagerMarketingBackground>
   )
 }
