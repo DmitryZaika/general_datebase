@@ -1,14 +1,21 @@
-import { ArrowRight, Check, ChevronDown, Minus, Plus } from 'lucide-react'
+import { Check, Minus, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import {
   GraniteManagerMarketingBackground,
   GraniteManagerMarketingHeader,
+  MarketingDemoArrow,
   MarketingSlideDown,
   scrollToMarketingSection,
   useGraniteManagerCalendly,
   useGraniteManagerCalendlyConfigured,
 } from '~/components/organisms/GraniteManagerMarketingShell'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '~/components/ui/accordion'
 import { loginLogo } from '~/constants/logos'
 import { calculateMonthlyPrice, pricingSummary } from '~/utils/graniteManagerPricing'
 
@@ -93,25 +100,6 @@ const FAQ = [
   },
 ]
 
-function FaqItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className='border-b border-slate-200'>
-      <button
-        type='button'
-        className='flex w-full items-center justify-between gap-4 py-5 text-left'
-        onClick={() => setOpen(value => !value)}
-      >
-        <span className='font-medium text-slate-900'>{q}</span>
-        <ChevronDown
-          className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open ? <p className='pb-5 text-sm leading-relaxed text-slate-600'>{a}</p> : null}
-    </div>
-  )
-}
-
 export function GraniteManagerLanding() {
   const location = useLocation()
   const openDemo = useGraniteManagerCalendly()
@@ -149,10 +137,10 @@ export function GraniteManagerLanding() {
               <button
                 type='button'
                 onClick={openDemo}
-                className='inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+                className='group inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800'
               >
                 Get a Free Demo
-                <ArrowRight className='h-4 w-4' />
+                <MarketingDemoArrow />
               </button>
               <button
                 type='button'
@@ -164,19 +152,21 @@ export function GraniteManagerLanding() {
             </div>
           </MarketingSlideDown>
           <MarketingSlideDown delay={120} className='flex items-center justify-center'>
-            <div className='aspect-[4/3] w-full max-w-lg rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 shadow-sm'>
-              <div className='flex h-full flex-col justify-between rounded-xl bg-white p-6 shadow-sm'>
+            <div className='w-full max-w-lg rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 shadow-sm sm:p-6 md:aspect-[4/3] md:p-8'>
+              <div className='flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm sm:gap-5 sm:p-6 md:h-full md:justify-between'>
                 <div>
                   <p className='text-xs font-semibold uppercase tracking-wide text-slate-400'>
                     Dashboard preview
                   </p>
-                  <p className='mt-2 text-xl font-semibold'>Your shop at a glance</p>
+                  <p className='mt-2 text-lg font-semibold sm:text-xl'>
+                    Your shop at a glance
+                  </p>
                 </div>
-                <div className='grid grid-cols-2 gap-3 text-sm'>
-                  <div className='rounded-lg bg-slate-100 p-3'>Open deals</div>
-                  <div className='rounded-lg bg-slate-100 p-3'>New leads</div>
-                  <div className='rounded-lg bg-slate-100 p-3'>Unread email</div>
-                  <div className='rounded-lg bg-slate-100 p-3'>Rep activity</div>
+                <div className='grid grid-cols-2 gap-2 text-xs sm:gap-3 sm:text-sm'>
+                  <div className='rounded-lg bg-slate-100 p-2 sm:p-3'>Open deals</div>
+                  <div className='rounded-lg bg-slate-100 p-2 sm:p-3'>New leads</div>
+                  <div className='rounded-lg bg-slate-100 p-2 sm:p-3'>Unread email</div>
+                  <div className='rounded-lg bg-slate-100 p-2 sm:p-3'>Rep activity</div>
                 </div>
                 <p className='text-xs text-slate-500'>
                   Product screenshots coming soon
@@ -351,9 +341,12 @@ export function GraniteManagerLanding() {
               <button
                 type='button'
                 onClick={openDemo}
-                className='mt-8 w-full cursor-pointer rounded-full bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+                className='group mt-8 w-full cursor-pointer rounded-full bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800'
               >
-                Schedule a Demo
+                <span className='inline-flex items-center justify-center gap-2'>
+                  Schedule a Demo
+                  <MarketingDemoArrow />
+                </span>
               </button>
             </div>
           </MarketingSlideDown>
@@ -376,10 +369,10 @@ export function GraniteManagerLanding() {
           <button
             type='button'
             onClick={openDemo}
-            className='mt-8 inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+            className='group mt-8 inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800'
           >
             Get Demo
-            <ArrowRight className='h-4 w-4' />
+            <MarketingDemoArrow />
           </button>
           {hasCalendly ? null : (
             <p className='mt-4 text-sm text-slate-500'>
@@ -397,14 +390,27 @@ export function GraniteManagerLanding() {
 
       <section className='py-16 md:py-20'>
         <div className='mx-auto max-w-3xl px-4 md:px-6'>
-          <h2 className='text-center text-3xl font-bold tracking-tight'>
-            Questions & answers
-          </h2>
-          <div className='mt-10'>
-            {FAQ.map(item => (
-              <FaqItem key={item.q} q={item.q} a={item.a} />
-            ))}
-          </div>
+          <MarketingSlideDown whenVisible delay={0} className='text-center'>
+            <h2 className='text-3xl font-bold tracking-tight'>Questions & answers</h2>
+          </MarketingSlideDown>
+          <MarketingSlideDown whenVisible delay={120} className='mt-10'>
+            <Accordion type='single' collapsible className='w-full'>
+              {FAQ.map((item, index) => (
+                <AccordionItem
+                  key={item.q}
+                  value={`faq-${index}`}
+                  className='border-slate-200'
+                >
+                  <AccordionTrigger className='py-5 text-base font-medium text-slate-900 hover:no-underline before:hidden data-[state=open]:before:scale-x-0'>
+                    {item.q}
+                  </AccordionTrigger>
+                  <AccordionContent className='pb-5 text-sm leading-relaxed text-slate-600'>
+                    {item.a}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </MarketingSlideDown>
         </div>
       </section>
 
@@ -432,9 +438,10 @@ export function GraniteManagerLanding() {
             <button
               type='button'
               onClick={openDemo}
-              className='cursor-pointer hover:text-slate-900'
+              className='group inline-flex cursor-pointer items-center gap-1.5 hover:text-slate-900'
             >
               Get Demo
+              <MarketingDemoArrow />
             </button>
             <a href='mailto:sales@granite-manager.com' className='hover:text-slate-900'>
               sales@granite-manager.com

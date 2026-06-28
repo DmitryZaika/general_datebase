@@ -137,7 +137,7 @@ export default function Login() {
           <img
             src={loginLogo}
             alt='Granite Manager'
-            className=' shrink-0  object-contain h-20 sm:h-30 md:h-40 '
+            className=' shrink-0  object-contain h-30 sm:h-35 md:h-40 '
           />
         </MarketingSlideDown>
         <MarketingSlideDown delay={100}>
@@ -155,8 +155,8 @@ export default function Login() {
               method='post'
               onSubmit={fullSubmit}
             >
-              <div className='mb-6 text-center'>
-                <h1 className='mt-2 text-2xl font-bold tracking-tight text-slate-900'>
+              <div className='mb-2 text-center'>
+                <h1 className='mt-2 text-md sm:text-lg md:text-2xl font-bold tracking-tight text-slate-900'>
                   Sign in to Granite Manager
                 </h1>
               </div>

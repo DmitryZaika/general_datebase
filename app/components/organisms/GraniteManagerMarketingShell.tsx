@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import {
   type ReactNode,
   useCallback,
@@ -15,6 +16,48 @@ import {
   openCalendlyScheduling,
   openDemoSection,
 } from '~/utils/calendlyClient'
+
+export function MarketingDemoArrow() {
+  const wrapRef = useRef<HTMLSpanElement>(null)
+  const [travelX, setTravelX] = useState(0)
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const button = wrap.closest('button')
+    if (!button) return
+
+    const update = () => {
+      const buttonRect = button.getBoundingClientRect()
+      const wrapRect = wrap.getBoundingClientRect()
+      const paddingRight =
+        Number.parseFloat(window.getComputedStyle(button).paddingRight) || 0
+      const targetLeft = buttonRect.right - paddingRight - wrapRect.width
+      setTravelX(Math.max(0, targetLeft - wrapRect.left))
+    }
+
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(button)
+    window.addEventListener('resize', update)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
+  return (
+    <span
+      ref={wrapRef}
+      aria-hidden
+      className='relative ml-2 inline-flex h-4 w-4 shrink-0'
+      style={{ ['--demo-arrow-travel' as string]: `${travelX}px` }}
+    >
+      <ArrowRight className='h-4 w-4 transition-all duration-300 ease-out group-hover:translate-x-[var(--demo-arrow-travel)] group-hover:opacity-0' />
+      <ArrowRight className='absolute inset-0 h-4 w-4 -translate-x-[var(--demo-arrow-travel)] opacity-0 transition-all duration-300 ease-out group-hover:translate-x-[var(--demo-arrow-travel)] group-hover:opacity-100' />
+    </span>
+  )
+}
 
 type RootLoaderData = {
   calendlyDemoUrl?: string | null
@@ -278,9 +321,10 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
             <button
               type='button'
               onClick={onDemo}
-              className='cursor-pointer rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800'
+              className='group inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800'
             >
               Get Demo
+              <MarketingDemoArrow />
             </button>
           </nav>
         </div>
