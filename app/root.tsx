@@ -29,6 +29,7 @@ import type { ISupplier } from '~/schemas/suppliers'
 import { canManageCompanySettings } from '~/utils/adminUsersAccess.server'
 import { queryClient } from '~/utils/api'
 import { renderAppNavigationSkeleton } from '~/utils/appNavigationSkeleton'
+import { resolveCalendlyDemoSchedulingUrl } from '~/utils/calendly.server'
 import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import {
   DEFAULT_COMPANY_LOGO_HEIGHT,
@@ -240,6 +241,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     ? canManageCompanySettings(user)
     : Promise.resolve(false)
 
+  const isMarketingPublicPage =
+    url.pathname === '/' ||
+    url.pathname === '/login' ||
+    url.pathname === '/customers/companies'
+
+  const calendlyDemoUrlPromise = isMarketingPublicPage
+    ? resolveCalendlyDemoSchedulingUrl()
+    : Promise.resolve(null)
+
   const [
     colors,
     stoneSuppliers,
@@ -248,6 +258,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     positionResult,
     hasCloudtalkApi,
     canManageCompany,
+    calendlyDemoUrl,
   ] = await Promise.all([
     colorsPromise,
     stoneSuppliersPromise,
@@ -256,6 +267,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     positionPromise,
     hasCloudtalkApiPromise,
     canManageCompanyPromise,
+    calendlyDemoUrlPromise,
   ])
 
   if (user && positionResult) {
@@ -332,6 +344,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       userIsSuperAdmin,
       hasCloudtalkApi,
       canManageCompany,
+      calendlyDemoUrl,
     },
 
     { headers },

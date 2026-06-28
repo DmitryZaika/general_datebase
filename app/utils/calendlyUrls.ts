@@ -1,3 +1,5 @@
+export const DEFAULT_CALENDLY_DEMO_URL = 'https://calendly.com/granite-manager/demo'
+
 export function parseCalendlySchedulingUrl(raw: unknown): string {
   if (typeof raw !== 'string') return ''
   const trimmed = raw.trim()
@@ -13,5 +15,12 @@ export function parseCalendlySchedulingUrl(raw: unknown): string {
     return ''
   }
 
+  return ''
+}
+
+export function getProductionCalendlyDemoFallback(): string {
+  if (process.env.NODE_ENV === 'production') {
+    return DEFAULT_CALENDLY_DEMO_URL
+  }
   return ''
 }

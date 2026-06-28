@@ -42,9 +42,13 @@ setup-host:
 		sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose"
 
 VITE_POSTHOG_KEY := $(shell grep '^VITE_POSTHOG_KEY=' .env.prod | cut -d= -f2-)
+CALENDLY_DEMO_URL := $(shell grep -E '^(CALENDLY_DEMO_URL|VITE_CALENDLY_DEMO_URL)=' .env.prod 2>/dev/null | head -1 | cut -d= -f2-)
 
 build-push: login
-	docker build --build-arg VITE_POSTHOG_KEY=$(VITE_POSTHOG_KEY) -t $(REPO_NAME) .
+	docker build \
+		--build-arg VITE_POSTHOG_KEY=$(VITE_POSTHOG_KEY) \
+		--build-arg VITE_CALENDLY_DEMO_URL=$(CALENDLY_DEMO_URL) \
+		-t $(REPO_NAME) .
 	docker tag $(REPO_NAME):latest $(IMAGE_URI)
 	docker push $(IMAGE_URI)
 

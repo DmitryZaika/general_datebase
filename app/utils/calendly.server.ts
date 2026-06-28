@@ -1,4 +1,7 @@
-import { parseCalendlySchedulingUrl } from '~/utils/calendlyUrls'
+import {
+  getProductionCalendlyDemoFallback,
+  parseCalendlySchedulingUrl,
+} from '~/utils/calendlyUrls'
 
 type CalendlyUserResponse = {
   resource?: {
@@ -12,6 +15,35 @@ type CalendlyEventTypesResponse = {
     scheduling_url?: string
     active?: boolean
   }>
+}
+
+export function getConfiguredCalendlyDemoUrl(): string {
+  return (
+    parseCalendlySchedulingUrl(process.env.CALENDLY_DEMO_URL) ||
+    parseCalendlySchedulingUrl(process.env.VITE_CALENDLY_DEMO_URL) ||
+    ''
+  )
+}
+
+let cachedResolvedUrl: string | null | undefined
+
+export async function resolveCalendlyDemoSchedulingUrl(): Promise<string | null> {
+  const configured = getConfiguredCalendlyDemoUrl()
+  if (configured) return configured
+
+  if (cachedResolvedUrl) return cachedResolvedUrl
+
+  const fetched = await fetchCalendlyDemoSchedulingUrl()
+  if (fetched) {
+    cachedResolvedUrl = fetched
+    return fetched
+  }
+
+  return getProductionCalendlyDemoFallback() || null
+}
+
+export function resetCalendlyDemoUrlCache() {
+  cachedResolvedUrl = undefined
 }
 
 export async function fetchCalendlyDemoSchedulingUrl(): Promise<string | null> {

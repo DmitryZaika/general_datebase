@@ -6,50 +6,47 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useRouteLoaderData } from 'react-router'
 import { loginLogo } from '~/constants/logos'
 import { cn } from '~/lib/utils'
 import {
+  ensureCalendlyWidgetReady,
   getCalendlySchedulingUrl,
   openCalendlyScheduling,
   openDemoSection,
 } from '~/utils/calendlyClient'
 
-function loadCalendlyAssets() {
-  if (document.querySelector('script[data-calendly]')) return
-  const link = document.createElement('link')
-  link.href = 'https://assets.calendly.com/assets/external/widget.css'
-  link.rel = 'stylesheet'
-  document.head.appendChild(link)
-  const script = document.createElement('script')
-  script.src = 'https://assets.calendly.com/assets/external/widget.js'
-  script.async = true
-  script.dataset.calendly = 'true'
-  document.body.appendChild(script)
+type RootLoaderData = {
+  calendlyDemoUrl?: string | null
+}
+
+function useRootCalendlyDemoUrl(): string {
+  const rootData = useRouteLoaderData('root') as RootLoaderData | undefined
+  return rootData?.calendlyDemoUrl?.trim() ?? ''
 }
 
 export function useGraniteManagerCalendly() {
   const location = useLocation()
-  const [schedulingUrl, setSchedulingUrl] = useState(() => getCalendlySchedulingUrl())
+  const rootUrl = useRootCalendlyDemoUrl()
+  const [fetchedUrl, setFetchedUrl] = useState('')
+  const schedulingUrl = rootUrl || getCalendlySchedulingUrl() || fetchedUrl
 
   useEffect(() => {
-    if (schedulingUrl) {
-      loadCalendlyAssets()
-      return
+    if (!schedulingUrl) {
+      let cancelled = false
+      void fetch('/api/calendly/scheduling-url')
+        .then(response => (response.ok ? response.json() : null))
+        .then((data: { url?: string | null } | null) => {
+          if (cancelled || !data?.url) return
+          setFetchedUrl(data.url)
+        })
+
+      return () => {
+        cancelled = true
+      }
     }
 
-    let cancelled = false
-    void fetch('/api/calendly/scheduling-url')
-      .then(response => (response.ok ? response.json() : null))
-      .then((data: { url?: string | null } | null) => {
-        if (cancelled || !data?.url) return
-        setSchedulingUrl(data.url)
-        loadCalendlyAssets()
-      })
-
-    return () => {
-      cancelled = true
-    }
+    void ensureCalendlyWidgetReady()
   }, [schedulingUrl])
 
   return useCallback(() => {
@@ -61,14 +58,13 @@ export function useGraniteManagerCalendly() {
           const data = (await response.json()) as { url?: string | null }
           if (data.url) {
             url = data.url
-            setSchedulingUrl(data.url)
-            loadCalendlyAssets()
+            setFetchedUrl(data.url)
           }
         }
       }
 
       if (url) {
-        openCalendlyScheduling(url)
+        await openCalendlyScheduling(url)
         return
       }
       openDemoSection(location.pathname)
@@ -81,12 +77,17 @@ export function graniteManagerHasCalendlyScheduling(): boolean {
 }
 
 export function useGraniteManagerCalendlyConfigured() {
+  const rootUrl = useRootCalendlyDemoUrl()
   const [configured, setConfigured] = useState(
-    () => getCalendlySchedulingUrl().length > 0,
+    () => rootUrl.length > 0 || getCalendlySchedulingUrl().length > 0,
   )
 
   useEffect(() => {
-    if (configured) return
+    if (configured || rootUrl) {
+      setConfigured(true)
+      return
+    }
+
     let cancelled = false
     void fetch('/api/calendly/scheduling-url')
       .then(response => (response.ok ? response.json() : null))
@@ -97,9 +98,9 @@ export function useGraniteManagerCalendlyConfigured() {
     return () => {
       cancelled = true
     }
-  }, [configured])
+  }, [configured, rootUrl])
 
-  return configured
+  return configured || rootUrl.length > 0
 }
 
 export function scrollToMarketingTop() {
