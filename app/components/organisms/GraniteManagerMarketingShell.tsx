@@ -279,27 +279,18 @@ function useHomeSection(): 'main' | 'pricing' {
   const [section, setSection] = useState<'main' | 'pricing'>('main')
 
   useEffect(() => {
-    const main = document.querySelector('main')
-    const scroller = main && main.scrollHeight > main.clientHeight + 1 ? main : window
+    const pricing = document.getElementById('pricing')
+    if (!pricing) return
 
-    const onScroll = () => {
-      const pricing = document.getElementById('pricing')
-      if (!pricing) {
-        setSection('main')
-        return
-      }
-      const scrollY =
-        scroller === window ? window.scrollY : (scroller as HTMLElement).scrollTop
-      const pricingTop =
-        scroller === window
-          ? pricing.getBoundingClientRect().top + window.scrollY - 120
-          : pricing.offsetTop - 120
-      setSection(scrollY >= pricingTop ? 'pricing' : 'main')
-    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setSection(entry.isIntersecting ? 'pricing' : 'main')
+      },
+      { threshold: 0, rootMargin: '0px 0px 0px 0px' },
+    )
 
-    scroller.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => scroller.removeEventListener('scroll', onScroll)
+    observer.observe(pricing)
+    return () => observer.disconnect()
   }, [])
 
   return section
@@ -327,7 +318,7 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
               alt='Granite Manager'
               className='h-10 w-10 object-contain'
             />
-            <span className='text-lg font-semibold tracking-tight text-slate-900'>
+            <span className='hidden text-lg font-semibold tracking-tight text-slate-900 sm:inline'>
               Granite Manager
             </span>
           </Link>
@@ -337,22 +328,24 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
                 type='button'
                 onClick={scrollToMarketingTop}
                 className={cn(
-                  'hidden cursor-pointer text-sm font-medium text-slate-900 sm:inline-block',
+                  'cursor-pointer text-sm font-medium text-slate-900',
                   navUnderline,
                   atMain && navUnderlineActive,
                 )}
               >
-                Main Page
+                <span className='sm:hidden'>Main</span>
+                <span className='hidden sm:inline'>Main Page</span>
               </button>
             ) : (
               <Link
                 to='/'
                 className={cn(
-                  'hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
                   navUnderline,
                 )}
               >
-                Main Page
+                <span className='sm:hidden'>Main</span>
+                <span className='hidden sm:inline'>Main Page</span>
               </Link>
             )}
             <a
@@ -371,7 +364,7 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
                 type='button'
                 onClick={() => scrollToMarketingSection('pricing')}
                 className={cn(
-                  'hidden cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                  'cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
                   navUnderline,
                   atPricing && navUnderlineActive,
                 )}
@@ -382,7 +375,7 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
               <Link
                 to='/#pricing'
                 className={cn(
-                  'hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                  'text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
                   navUnderline,
                 )}
               >
