@@ -1,6 +1,6 @@
 import { defaultLogo } from '~/constants/logos'
 
-export const DEFAULT_COMPANY_LOGO_HEIGHT = 96
+export const DEFAULT_COMPANY_LOGO_HEIGHT = 48
 export const MIN_COMPANY_LOGO_HEIGHT = 32
 export const MAX_COMPANY_LOGO_HEIGHT = 192
 
