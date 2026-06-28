@@ -265,12 +265,14 @@ export interface ContactPayload {
 }
 
 export class CloudTalkApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
+  status: number
+  apiMessage: Nullable<string>
+
+  constructor(status: number, message: string, apiMessage: Nullable<string> = null) {
     super(message)
     this.name = 'CloudTalkApiError'
+    this.status = status
+    this.apiMessage = apiMessage
   }
 }
 
@@ -316,7 +318,7 @@ export class RateLimiter {
   }
 }
 
-let rateLimiter: RateLimiter | null = null
+let rateLimiter: Nullable<RateLimiter> = null
 
 function getRateLimiter(): RateLimiter {
   if (rateLimiter === null) {
@@ -330,10 +332,10 @@ export function resetRateLimiter(): void {
   rateLimiter = null
 }
 
-async function cloudtalkRequest(
+export async function cloudtalkRequest(
   path: string,
   companyId: number,
-  init: { method: CtMethod; body?: unknown },
+  init: { method: CtMethod; body?: unknown; extraHeaders?: Record<string, string> },
 ): Promise<Response> {
   const auth = await getAuthString(companyId)
   const requestInit: RequestInit = {
@@ -342,6 +344,7 @@ async function cloudtalkRequest(
       Authorization: `Basic ${auth}`,
       Accept: 'application/json',
       ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(init.extraHeaders ?? {}),
     },
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   }
@@ -379,6 +382,20 @@ async function cloudtalkRequest(
     }
 
     const body = await response.text().catch(() => '')
+    let apiMessage: Nullable<string> = null
+    try {
+      const parsed = JSON.parse(body) as { responseData?: unknown }
+      const rd = parsed.responseData
+      if (Array.isArray(rd) && rd.length > 0 && typeof rd[0] === 'object' && rd[0]) {
+        const first = rd[0] as { message?: unknown }
+        if (typeof first.message === 'string') apiMessage = first.message
+      } else if (rd && typeof rd === 'object') {
+        const obj = rd as { message?: unknown }
+        if (typeof obj.message === 'string') apiMessage = obj.message
+      }
+    } catch {
+      // Body wasn't JSON or didn't contain a message — keep apiMessage null.
+    }
     if (body) {
       // biome-ignore lint/suspicious/noConsole: server-only PII-safe ops log
       console.error('[cloudtalk-error-body]', {
@@ -391,6 +408,7 @@ async function cloudtalkRequest(
     throw new CloudTalkApiError(
       response.status,
       `CloudTalk API error: ${response.status} ${response.statusText}`,
+      apiMessage,
     )
   }
 }
@@ -437,7 +455,8 @@ export async function createCloudTalkContact(
   const idFromResponse = findContactId(json)
   if (idFromResponse !== null) return idFromResponse
 
-  // Response shape unfamiliar; the contact still exists with the phone we sent.
+  // Some CloudTalk responses omit the id even on success — fall back to a
+  // phone-keyed lookup against the contact we just created.
   const phone = payload.ContactNumber[0]?.public_number
   if (phone) {
     for (let attempt = 0; attempt < POST_CREATE_LOOKUP_RETRIES; attempt++) {

@@ -1,19 +1,8 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
-import { getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getUserBySessionId } from '~/utils/session.server'
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const session = await getSession(request.headers.get('Cookie'))
-  const sessionId = session.data.sessionId
-  if (!sessionId) {
-    return Response.json({ images: [] }, { status: 401 })
-  }
-  const user = await getUserBySessionId(sessionId)
-  if (!user) {
-    return Response.json({ images: [] }, { status: 401 })
-  }
+export async function loader({ params }: LoaderFunctionArgs) {
   if (!params.stone) {
     return new Response('Bad url', { status: 400 })
   }

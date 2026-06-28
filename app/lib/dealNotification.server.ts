@@ -58,6 +58,23 @@ function isoToMysqlUtc(iso: string): string | null {
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
 }
 
+export async function removeActivityDeadlineReminder(
+  db: Pool,
+  dealId: number,
+  activityName: string,
+): Promise<void> {
+  try {
+    await db.execute(
+      `DELETE FROM notifications
+       WHERE deal_id = ? AND notification_type = 'activity_deadline_reminder'
+         AND message = ? AND is_done = 0`,
+      [dealId, activityName.slice(0, 255)],
+    )
+  } catch {
+    void 0
+  }
+}
+
 export async function scheduleActivityDeadlineReminder(
   db: Pool,
   dealId: number,
@@ -76,12 +93,7 @@ export async function scheduleActivityDeadlineReminder(
     const targetUserId = assignedUserId || actorUserId
 
     const nameToClean = oldActivityName ?? activityName
-    await db.execute(
-      `DELETE FROM notifications
-       WHERE deal_id = ? AND notification_type = 'activity_deadline_reminder'
-         AND message = ? AND is_done = 0`,
-      [dealId, nameToClean.slice(0, 255)],
-    )
+    await removeActivityDeadlineReminder(db, dealId, nameToClean)
 
     if (!deadlineUtcIso) return
     const dueAt = isoToMysqlUtc(deadlineUtcIso)

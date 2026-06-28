@@ -2,11 +2,12 @@ import type { ResultSetHeader } from 'mysql2'
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { data, redirect } from 'react-router'
 import { db } from '~/db.server'
+import { MYSQL_LOCAL_DATETIME_FORMAT } from '~/lib/dateHelpers'
 import {
   notifyDealAssignee,
+  removeActivityDeadlineReminder,
   scheduleActivityDeadlineReminder,
 } from '~/lib/dealNotification.server'
-import type { Nullable } from '~/types/utils'
 import {
   badRequest,
   handleAuthError,
@@ -53,9 +54,12 @@ function toMySQLDatetime(dateString: string): Nullable<string> {
     return `${y}-${mo}-${d} 00:00:00`
   }
 
-  const parsed = new Date(dateString)
-  if (!Number.isNaN(parsed.getTime()) && dateString.includes('T')) {
-    return `${parsed.getUTCFullYear()}-${pad2(parsed.getUTCMonth() + 1)}-${pad2(parsed.getUTCDate())} ${pad2(parsed.getUTCHours())}:${pad2(parsed.getUTCMinutes())}:${pad2(parsed.getUTCSeconds())}`
+  const spaceFull = dateString.match(
+    /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/,
+  )
+  if (spaceFull) {
+    const [, y, mo, d, h, mi, s] = spaceFull
+    return `${y}-${mo}-${d} ${h}:${mi}:${s}`
   }
 
   const full = dateString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
@@ -64,12 +68,21 @@ function toMySQLDatetime(dateString: string): Nullable<string> {
     return `${y}-${mo}-${d} ${h}:${mi}:${s}`
   }
 
+  const parsed = new Date(dateString)
+  if (!Number.isNaN(parsed.getTime()) && dateString.includes('T')) {
+    return `${parsed.getUTCFullYear()}-${pad2(parsed.getUTCMonth() + 1)}-${pad2(parsed.getUTCDate())} ${pad2(parsed.getUTCHours())}:${pad2(parsed.getUTCMinutes())}:${pad2(parsed.getUTCSeconds())}`
+  }
+
   return null
 }
 
 function deadlineForReminder(rawDeadline: Nullable<string>): Nullable<string> {
   if (!rawDeadline) return null
-  return rawDeadline.includes('T') ? rawDeadline : null
+  if (rawDeadline.includes('T')) return rawDeadline
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rawDeadline)) {
+    return rawDeadline.replace(' ', 'T')
+  }
+  return null
 }
 
 interface ActivityInput {
@@ -125,7 +138,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const activities = await selectMany<DealActivity>(
       db,
       `SELECT id, deal_id, company_id, name,
-              DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline,
+              DATE_FORMAT(deadline, '${MYSQL_LOCAL_DATETIME_FORMAT}') AS deadline,
               priority, is_completed,
               DATE_FORMAT(completed_at, '%Y-%m-%dT%H:%i:%sZ') AS completed_at,
               DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
@@ -237,9 +250,9 @@ async function handleUpdate(
   if (!parsed.ok) return badRequest(parsed.error)
   const { name, rawDeadline, deadlineValue, priority } = parsed.value
 
-  const rows = await selectMany<{ id: number; name: string }>(
+  const rows = await selectMany<{ id: number; name: string; is_completed: number }>(
     db,
-    'SELECT id, name FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
+    'SELECT id, name, is_completed FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
     [Number(activityId), dealId, companyId],
   )
 
@@ -248,6 +261,7 @@ async function handleUpdate(
   }
 
   const oldName = rows[0].name
+  const isCompleted = rows[0].is_completed === 1
 
   await db.execute(
     `UPDATE deal_activities SET name = ?, deadline = ?, priority = ? WHERE id = ? AND deal_id = ? AND company_id = ?`,
@@ -263,7 +277,7 @@ async function handleUpdate(
     dealId,
     userId,
     name,
-    deadlineForReminder(rawDeadline),
+    isCompleted ? null : deadlineForReminder(rawDeadline),
     oldName,
   )
 
@@ -302,12 +316,7 @@ async function handleToggle(
   )
 
   if (newStatus) {
-    await db.execute(
-      `DELETE FROM notifications
-       WHERE deal_id = ? AND notification_type = 'activity_deadline_reminder'
-         AND message = ? AND is_done = 0`,
-      [dealId, rows[0].name.slice(0, 255)],
-    )
+    await removeActivityDeadlineReminder(db, dealId, rows[0].name)
   }
 
   return success()
@@ -341,12 +350,7 @@ async function handleDelete(
     [Number(activityId), dealId, companyId],
   )
 
-  await db.execute(
-    `DELETE FROM notifications
-     WHERE deal_id = ? AND notification_type = 'activity_deadline_reminder'
-       AND message = ? AND is_done = 0`,
-    [dealId, rows[0].name.slice(0, 255)],
-  )
+  await removeActivityDeadlineReminder(db, dealId, rows[0].name)
 
   if (createdBy) {
     await notifyDealAssignee(

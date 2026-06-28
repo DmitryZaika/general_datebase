@@ -3,6 +3,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import sharp from 'sharp'
 import { db } from '~/db.server'
 import { getSession } from '~/sessions.server'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { selectMany } from '~/utils/queryHelpers'
 import { downloadFileAsBuffer } from '~/utils/s3.server'
 import { getUserBySessionId } from '~/utils/session.server'
@@ -450,9 +451,9 @@ async function analyzeStoneAppearance(
     const dataUrl = bufferToDataUrl(swatchBuffer, swatchContentType)
     const materialLabel = stoneType ? `${stoneName} (${stoneType})` : stoneName
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       temperature: 0,
-      max_tokens: 500,
+      max_completion_tokens: 500,
       messages: [
         {
           role: 'user',

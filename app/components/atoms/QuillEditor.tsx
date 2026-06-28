@@ -8,6 +8,7 @@ interface IQuillEditorProps {
   value: string
   onChange: (value: string) => void
   onFilesDrop?: (files: File[]) => void
+  onSubmitShortcut?: () => void
 }
 
 const QUILL_MODULES = {
@@ -21,10 +22,17 @@ const QUILL_MODULES = {
   ],
 }
 
-export function QuillEditor({ value, onChange, onFilesDrop }: IQuillEditorProps) {
+export function QuillEditor({
+  value,
+  onChange,
+  onFilesDrop,
+  onSubmitShortcut,
+}: IQuillEditorProps) {
   const { quill, quillRef } = useQuill({ modules: QUILL_MODULES })
   const isInternalChange = useRef(false)
   const imageHandlerSetup = useRef(false)
+  const onSubmitShortcutRef = useRef(onSubmitShortcut)
+  onSubmitShortcutRef.current = onSubmitShortcut
 
   useEffect(() => {
     if (quill && !imageHandlerSetup.current) {
@@ -59,6 +67,24 @@ export function QuillEditor({ value, onChange, onFilesDrop }: IQuillEditorProps)
       }
     }
   }, [quill, handleTextChange])
+
+  useEffect(() => {
+    if (!quill || !onSubmitShortcut) return
+    const editor = quill.root
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        event.preventDefault()
+        event.stopPropagation()
+        onSubmitShortcutRef.current?.()
+      }
+    }
+
+    editor.addEventListener('keydown', handleKeyDown, true)
+    return () => {
+      editor.removeEventListener('keydown', handleKeyDown, true)
+    }
+  }, [quill, onSubmitShortcut])
 
   const handleDropCapture = useCallback(
     (e: React.DragEvent) => {

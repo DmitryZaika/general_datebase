@@ -129,7 +129,12 @@ export default function CustomerInfoTab() {
           <CopyText value={customer.name} title={customer.name} />
         </div>
         <div className='text-sm text-slate-600 mt-2'>
-          {customer.company_name && <div>Company: {customer.company_name}</div>}
+          {customer.company_name && (
+            <div>
+              Company:{' '}
+              <CopyText value={customer.company_name} title={customer.company_name} />
+            </div>
+          )}
           <div>
             Email:{' '}
             {customer.email ? (
@@ -222,7 +227,7 @@ export default function CustomerInfoTab() {
       </div>
 
       <div className='border rounded p-4'>
-        <div className='text-md font-semibold mb-2'>Activity</div>
+        <div className='text-md font-semibold mb-1'>Activity</div>
         <DealActivityPanel
           dealId={0}
           activities={dealActivities}
@@ -231,6 +236,7 @@ export default function CustomerInfoTab() {
           customerEmails={[]}
           currentUserName={viewerName}
           readOnly
+          customerId={customer.id}
           customerPhones={{ phone: customer.phone, phone2: customer.phone_2 }}
         />
       </div>

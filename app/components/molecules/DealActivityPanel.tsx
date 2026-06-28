@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion, type Variants } from 'framer-motion'
 import {
   AlertCircle,
@@ -40,6 +40,10 @@ import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
 import { CallItemContent } from '~/components/molecules/CallItemContent'
 import {
+  IosTimePicker,
+  isNestedSelectTarget,
+} from '~/components/molecules/IosTimePicker'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -54,23 +58,18 @@ import { Button, buttonVariants } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 import { Skeleton } from '~/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Textarea } from '~/components/ui/textarea'
 import { useToast } from '~/hooks/use-toast'
+import { useHasCloudtalkApi } from '~/hooks/useHasCloudtalkApi'
 import { useNoteAction } from '~/hooks/useNoteAction'
 import {
   buildDeadlinePayload,
   formatDeadlineLabel,
   formatPickerDeadline,
   formatTimestamp,
+  isDateOnlyDeadline,
   localCalendarDate,
 } from '~/lib/dateHelpers'
 import { buildActivityApiAction } from '~/lib/dealApiHelpers'
@@ -101,24 +100,6 @@ const PRIORITY_WEIGHT: Readonly<Record<ActivityPriority, number>> = {
   [ActivityPriority.High]: 0,
   [ActivityPriority.Medium]: 1,
   [ActivityPriority.Low]: 2,
-}
-
-const PRIORITY_STYLE: Readonly<Record<ActivityPriority, string>> = {
-  [ActivityPriority.High]: 'bg-red-100 text-red-700 border-red-200',
-  [ActivityPriority.Medium]: 'bg-amber-100 text-amber-700 border-amber-200',
-  [ActivityPriority.Low]: 'bg-gray-100 text-gray-600 border-gray-200',
-}
-
-const PRIORITY_LABEL: Readonly<Record<ActivityPriority, string>> = {
-  [ActivityPriority.High]: 'High',
-  [ActivityPriority.Medium]: 'Medium',
-  [ActivityPriority.Low]: 'Low',
-}
-
-const PRIORITY_DOT_COLOR: Readonly<Record<ActivityPriority, string>> = {
-  [ActivityPriority.High]: 'bg-red-500',
-  [ActivityPriority.Medium]: 'bg-amber-500',
-  [ActivityPriority.Low]: 'bg-gray-400',
 }
 
 function shouldShowCreatorAttribution(
@@ -218,6 +199,7 @@ const partitionActivities = (
 interface FormState {
   name: string
   deadline: Date | undefined
+  deadlineHasTime: boolean
   priority: ActivityPriority
 }
 
@@ -225,6 +207,7 @@ type FormAction =
   | { type: 'SET_NAME'; payload: string }
   | { type: 'SET_DEADLINE_DATE'; payload: Date | undefined }
   | { type: 'SET_DEADLINE_TIME'; payload: { hours: number; minutes: number } }
+  | { type: 'CLEAR_DEADLINE_TIME' }
   | { type: 'SET_PRIORITY'; payload: ActivityPriority }
   | { type: 'SET_EDIT'; payload: DealActivity }
   | { type: 'RESET' }
@@ -232,13 +215,16 @@ type FormAction =
 const INITIAL_FORM_STATE: FormState = {
   name: '',
   deadline: undefined,
+  deadlineHasTime: false,
   priority: ActivityPriority.Medium,
 }
 
 function useRevalidateAfterActivityFetcherSubmit(
   fetcher: ReturnType<typeof useFetcher>,
+  options?: { invalidateNotifications?: boolean },
 ) {
   const revalidator = useRevalidator()
+  const queryClient = useQueryClient()
   const wasSubmittingRef = useRef(false)
 
   useEffect(() => {
@@ -251,7 +237,16 @@ function useRevalidateAfterActivityFetcherSubmit(
     const action = fetcher.formAction ?? ''
     if (!action.includes('/api/deal-activities/')) return
     revalidator.revalidate()
-  }, [fetcher.state, fetcher.formAction, revalidator])
+    if (options?.invalidateNotifications) {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    }
+  }, [
+    fetcher.state,
+    fetcher.formAction,
+    revalidator,
+    queryClient,
+    options?.invalidateNotifications,
+  ])
 }
 
 const formReducer = (state: FormState, action: FormAction): FormState => {
@@ -259,18 +254,32 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     case 'SET_NAME':
       return { ...state, name: action.payload }
     case 'SET_DEADLINE_DATE': {
-      if (!action.payload) return { ...state, deadline: undefined }
-      const next = new Date(action.payload)
-      if (state.deadline) {
-        next.setHours(state.deadline.getHours(), state.deadline.getMinutes())
+      if (!action.payload) {
+        return { ...state, deadline: undefined, deadlineHasTime: false }
       }
-      return { ...state, deadline: next }
+      const next = new Date(action.payload)
+      if (state.deadline && state.deadlineHasTime) {
+        next.setHours(state.deadline.getHours(), state.deadline.getMinutes())
+        return { ...state, deadline: next, deadlineHasTime: true }
+      }
+      if (state.deadline && !state.deadlineHasTime) {
+        next.setHours(0, 0, 0, 0)
+        return { ...state, deadline: next, deadlineHasTime: false }
+      }
+      next.setHours(0, 0, 0, 0)
+      return { ...state, deadline: next, deadlineHasTime: false }
     }
     case 'SET_DEADLINE_TIME': {
       if (!state.deadline) return state
       const updated = new Date(state.deadline)
       updated.setHours(action.payload.hours, action.payload.minutes)
-      return { ...state, deadline: updated }
+      return { ...state, deadline: updated, deadlineHasTime: true }
+    }
+    case 'CLEAR_DEADLINE_TIME': {
+      if (!state.deadline) return { ...state, deadlineHasTime: false }
+      const updated = new Date(state.deadline)
+      updated.setHours(0, 0, 0, 0)
+      return { ...state, deadline: updated, deadlineHasTime: false }
     }
     case 'SET_PRIORITY':
       return { ...state, priority: action.payload }
@@ -281,6 +290,9 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
       return {
         name: action.payload.name,
         deadline: d,
+        deadlineHasTime: action.payload.deadline
+          ? !isDateOnlyDeadline(action.payload.deadline)
+          : false,
         priority: action.payload.priority,
       }
     }
@@ -305,8 +317,8 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
     const formData = new FormData()
     formData.set('intent', isEditing ? 'update' : 'create')
     formData.set('name', form.name.trim())
-    formData.set('deadline', buildDeadlinePayload(form.deadline))
-    formData.set('priority', form.priority)
+    formData.set('deadline', buildDeadlinePayload(form.deadline, form.deadlineHasTime))
+    formData.set('priority', ActivityPriority.Medium)
     formData.set('csrf', token)
 
     if (isEditing) {
@@ -327,8 +339,12 @@ function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
 function useActivityAction(dealId: number) {
   const toggleFetcher = useFetcher()
   const deleteFetcher = useFetcher()
-  useRevalidateAfterActivityFetcherSubmit(toggleFetcher)
-  useRevalidateAfterActivityFetcherSubmit(deleteFetcher)
+  useRevalidateAfterActivityFetcherSubmit(toggleFetcher, {
+    invalidateNotifications: true,
+  })
+  useRevalidateAfterActivityFetcherSubmit(deleteFetcher, {
+    invalidateNotifications: true,
+  })
   const token = useAuthenticityToken()
   const { toast } = useToast()
 
@@ -426,20 +442,22 @@ function ActivityItemReadOnly({
   const when = formatTimestamp(activity.completed_at || activity.created_at)
 
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-0.5 rounded-md px-2 py-1.5',
-        !done && URGENCY_BORDER_STYLE[urgency],
-      )}
-    >
+    <div className={cn('rounded-md px-2 py-1', !done && URGENCY_BORDER_STYLE[urgency])}>
       <div className='flex items-start justify-between gap-2'>
-        <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2'>
+        <div className='min-w-0 flex-1'>
           {done ? (
-            <Badge className='h-4 shrink-0 border border-gray-200 bg-gray-100 px-1.5 py-0 text-[10px] text-gray-700'>
+            <Badge className='mb-1 h-4 shrink-0 border border-gray-200 bg-gray-100 px-1.5 py-0 text-[10px] text-gray-700'>
               Done
             </Badge>
           ) : null}
-          <PriorityBadge priority={activity.priority} />
+          <p className='whitespace-pre-wrap break-words text-sm leading-snug text-gray-800'>
+            {activity.name}
+          </p>
+          {!done && activity.deadline ? (
+            <div className='mt-0.5 flex flex-wrap items-center gap-1.5'>
+              <DeadlineLabel deadline={activity.deadline} />
+            </div>
+          ) : null}
         </div>
         {when ? (
           <div className='flex shrink-0 flex-col items-end gap-0.5'>
@@ -455,29 +473,7 @@ function ActivityItemReadOnly({
           </div>
         ) : null}
       </div>
-      <p className='mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800'>
-        {activity.name}
-      </p>
-      {!done && activity.deadline ? (
-        <div className='mt-0.5 flex flex-wrap items-center gap-1.5'>
-          <DeadlineLabel deadline={activity.deadline} />
-        </div>
-      ) : null}
     </div>
-  )
-}
-
-function PriorityDot({ priority }: { priority: ActivityPriority }) {
-  return <span className={cn('h-2 w-2 rounded-full', PRIORITY_DOT_COLOR[priority])} />
-}
-
-function PriorityBadge({ priority }: { priority: ActivityPriority }) {
-  return (
-    <Badge
-      className={cn('text-[10px] px-1.5 py-0 h-4 border', PRIORITY_STYLE[priority])}
-    >
-      {PRIORITY_LABEL[priority]}
-    </Badge>
   )
 }
 
@@ -660,10 +656,12 @@ function SectionHeader({
 function TimelineItem({
   icon: Icon,
   isLast = false,
+  compact = false,
   children,
 }: {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
   isLast?: boolean
+  compact?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -676,7 +674,7 @@ function TimelineItem({
           <div className='flex-1 w-px border-l border-dashed border-gray-300 my-0.5' />
         )}
       </div>
-      <div className='flex-1 min-w-0 pb-3'>{children}</div>
+      <div className={cn('flex-1 min-w-0', compact ? 'pb-1' : 'pb-3')}>{children}</div>
     </div>
   )
 }
@@ -785,7 +783,6 @@ function ActivityItem({
             <Badge className='h-4 shrink-0 border border-gray-200 bg-gray-100 px-1.5 py-0 text-[10px] text-gray-700'>
               Done
             </Badge>
-            <PriorityBadge priority={activity.priority} />
           </div>
           <div className='flex shrink-0 flex-col items-end gap-0.5'>
             <div className='flex items-center gap-1'>
@@ -839,7 +836,6 @@ function ActivityItem({
         </button>
 
         <div className='mt-0.5 flex flex-wrap items-center gap-1.5'>
-          <PriorityBadge priority={activity.priority} />
           {activity.deadline ? <DeadlineLabel deadline={activity.deadline} /> : null}
         </div>
       </div>
@@ -870,124 +866,53 @@ function ActivityItem({
   )
 }
 
-const HOURS_12 = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i))
-const MINUTES_5 = Array.from({ length: 12 }, (_, i) => i * 5)
-
-function to12Hour(h24: number): { hour: number; period: 'AM' | 'PM' } {
-  const period = h24 >= 12 ? ('PM' as const) : ('AM' as const)
-  const hour = h24 % 12 || 12
-  return { hour, period }
-}
-
-function to24Hour(hour: number, period: 'AM' | 'PM'): number {
-  if (period === 'AM') return hour === 12 ? 0 : hour
-  return hour === 12 ? 12 : hour + 12
-}
-
 function DeadlineControls({
   deadline,
+  hasTime,
+  openTimeOnMount,
   onTimeChange,
+  onEnableTime,
   onClearTime,
   onClearDate,
 }: {
   deadline: Date | undefined
+  hasTime: boolean
+  openTimeOnMount: boolean
   onTimeChange: (hours: number, minutes: number) => void
+  onEnableTime: () => void
   onClearTime: () => void
   onClearDate: () => void
 }) {
   if (!deadline) return null
 
-  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0
-  const current = to12Hour(deadline.getHours())
-  const currentMin = deadline.getMinutes()
-  // Preserve any non-5-min value from the saved deadline as an extra option
-  // so it shows as the selected item without silently rounding.
-  const minuteOptions = MINUTES_5.includes(currentMin)
-    ? MINUTES_5
-    : [...MINUTES_5, currentMin].sort((a, b) => a - b)
-
-  const handleHour = (val: string) => {
-    const h24 = to24Hour(Number(val), current.period)
-    onTimeChange(h24, currentMin)
-  }
-
-  const handleMinute = (val: string) => {
-    const h24 = to24Hour(current.hour, current.period)
-    onTimeChange(h24, Number(val))
-  }
-
-  const handlePeriod = (val: string) => {
-    const h24 = to24Hour(current.hour, val as 'AM' | 'PM')
-    onTimeChange(h24, currentMin)
-  }
-
   return (
-    <div className='px-3 pb-3 border-t pt-2 space-y-2'>
+    <div className='space-y-2 border-t px-2 pb-3 pt-2'>
       {hasTime ? (
-        <div className='flex items-center gap-1.5'>
-          <Clock className='h-3.5 w-3.5 text-gray-600 shrink-0' />
-          <Select value={String(current.hour)} onValueChange={handleHour}>
-            <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {HOURS_12.map(h => (
-                <SelectItem key={h} value={String(h)}>
-                  {h}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className='text-sm font-medium text-gray-500'>:</span>
-          <Select value={String(currentMin)} onValueChange={handleMinute}>
-            <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {minuteOptions.map(m => (
-                <SelectItem key={m} value={String(m)}>
-                  {String(m).padStart(2, '0')}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={current.period} onValueChange={handlePeriod}>
-            <SelectTrigger className='w-[62px] h-7 text-sm px-2'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='AM'>AM</SelectItem>
-              <SelectItem value='PM'>PM</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant='ghost'
-            size='icon'
-            type='button'
-            className='h-7 w-7 shrink-0 text-gray-400 hover:text-red-500'
-            onClick={onClearTime}
-          >
-            <X className='h-3.5 w-3.5' />
-          </Button>
-        </div>
+        <IosTimePicker
+          hours24={deadline.getHours()}
+          minutes={deadline.getMinutes()}
+          onChange={onTimeChange}
+          onClear={onClearTime}
+          openTimeOnMount={openTimeOnMount}
+        />
       ) : (
         <Button
-          variant='ghost'
+          variant='outline'
           type='button'
-          className='h-7 text-xs text-gray-500 hover:text-gray-700 px-2'
-          onClick={() => onTimeChange(9, 0)}
+          className='h-8 w-full text-xs text-zinc-600'
+          onClick={onEnableTime}
         >
-          <Clock className='h-3 w-3 mr-1.5' />
+          <Clock className='mr-1.5 h-3.5 w-3.5' />
           Add time
         </Button>
       )}
       <Button
         variant='ghost'
         type='button'
-        className='h-6 text-xs text-red-400 hover:text-red-600 px-2 w-full'
+        className='h-6 w-full px-2 text-xs text-red-400 hover:text-red-600'
         onClick={onClearDate}
       >
-        <X className='h-3 w-3 mr-1' />
+        <X className='mr-1 h-3 w-3' />
         Clear deadline
       </Button>
     </div>
@@ -1011,6 +936,7 @@ function ActivityForm({
   const loadedEditActivityIdRef = useRef<Nullable<number>>(null)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
   const [deadlineCalendarKey, setDeadlineCalendarKey] = useState(0)
+  const [openTimeOnMount, setOpenTimeOnMount] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -1023,6 +949,12 @@ function ActivityForm({
     dispatch({ type: 'SET_EDIT', payload: editingActivity })
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [editingActivity])
+
+  useEffect(() => {
+    if (!openTimeOnMount) return
+    const id = window.setTimeout(() => setOpenTimeOnMount(false), 0)
+    return () => window.clearTimeout(id)
+  }, [openTimeOnMount])
 
   const handleCancel = () => {
     dispatch({ type: 'RESET' })
@@ -1081,78 +1013,79 @@ function ActivityForm({
         className='resize-none text-sm w-full min-h-9 py-1.5 leading-snug break-words [field-sizing:content]'
       />
 
-      <div className='flex gap-2'>
-        <Popover
-          open={deadlineOpen}
-          onOpenChange={open => {
-            setDeadlineOpen(open)
-            if (open) setDeadlineCalendarKey(k => k + 1)
+      <Popover
+        modal={false}
+        open={deadlineOpen}
+        onOpenChange={open => {
+          setDeadlineOpen(open)
+          if (open) setDeadlineCalendarKey(k => k + 1)
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            variant='outline'
+            type='button'
+            className={cn(
+              'w-full h-9 justify-start text-left text-sm font-normal',
+              !form.deadline && 'text-muted-foreground',
+            )}
+          >
+            <CalendarIcon className='mr-1.5 h-3.5 w-3.5 shrink-0' />
+            <span className='truncate'>
+              {form.deadline
+                ? formatPickerDeadline(form.deadline, form.deadlineHasTime)
+                : 'Deadline'}
+            </span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          className='w-auto p-0'
+          align='start'
+          onOpenAutoFocus={event => event.preventDefault()}
+          onInteractOutside={event => {
+            if (isNestedSelectTarget(event.target)) event.preventDefault()
+          }}
+          onPointerDownOutside={event => {
+            if (isNestedSelectTarget(event.target)) event.preventDefault()
+          }}
+          onFocusOutside={event => {
+            if (isNestedSelectTarget(event.target)) event.preventDefault()
           }}
         >
-          <PopoverTrigger asChild>
-            <Button
-              variant='outline'
-              type='button'
-              className={cn(
-                'flex-1 h-9 justify-start text-left text-sm font-normal',
-                !form.deadline && 'text-muted-foreground',
-              )}
-            >
-              <CalendarIcon className='mr-1.5 h-3.5 w-3.5 shrink-0' />
-              <span className='truncate'>
-                {form.deadline ? formatPickerDeadline(form.deadline) : 'Deadline'}
-              </span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className='w-auto p-0' align='start'>
-            <Calendar
-              key={deadlineCalendarKey}
-              mode='single'
-              defaultMonth={form.deadline ?? new Date()}
-              selected={form.deadline}
-              onSelect={d => dispatch({ type: 'SET_DEADLINE_DATE', payload: d })}
-            />
-            <DeadlineControls
-              deadline={form.deadline}
-              onTimeChange={(hours, minutes) =>
-                dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours, minutes } })
-              }
-              onClearTime={() =>
-                dispatch({
-                  type: 'SET_DEADLINE_TIME',
-                  payload: { hours: 0, minutes: 0 },
-                })
-              }
-              onClearDate={() => {
-                dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
-                setDeadlineCalendarKey(k => k + 1)
-                setDeadlineOpen(false)
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-
-        <Select
-          value={form.priority}
-          onValueChange={v =>
-            dispatch({ type: 'SET_PRIORITY', payload: v as ActivityPriority })
-          }
-        >
-          <SelectTrigger className='w-[110px] h-9 text-sm'>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.values(ActivityPriority).map(p => (
-              <SelectItem key={p} value={p}>
-                <span className='flex items-center gap-1.5'>
-                  <PriorityDot priority={p} />
-                  {PRIORITY_LABEL[p]}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          <Calendar
+            key={deadlineCalendarKey}
+            mode='single'
+            defaultMonth={form.deadline ?? new Date()}
+            selected={form.deadline}
+            onSelect={d => dispatch({ type: 'SET_DEADLINE_DATE', payload: d })}
+          />
+          <DeadlineControls
+            deadline={form.deadline}
+            hasTime={form.deadlineHasTime}
+            openTimeOnMount={openTimeOnMount}
+            onTimeChange={(hours, minutes) =>
+              dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours, minutes } })
+            }
+            onEnableTime={() => {
+              dispatch({
+                type: 'SET_DEADLINE_TIME',
+                payload: { hours: 9, minutes: 0 },
+              })
+              setOpenTimeOnMount(true)
+            }}
+            onClearTime={() => {
+              dispatch({ type: 'CLEAR_DEADLINE_TIME' })
+              setOpenTimeOnMount(false)
+            }}
+            onClearDate={() => {
+              dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
+              setDeadlineCalendarKey(k => k + 1)
+              setOpenTimeOnMount(false)
+              setDeadlineOpen(false)
+            }}
+          />
+        </PopoverContent>
+      </Popover>
 
       <Button
         onClick={handleSubmit}
@@ -1250,9 +1183,13 @@ function SmsHistoryRow({ message }: { message: SmsEntry }) {
 function EmailHistoryRow({
   email,
   viewerName,
+  readOnly = false,
+  customerId,
 }: {
   email: DealEmailHistoryItem
   viewerName?: Nullable<string>
+  readOnly?: boolean
+  customerId?: number
 }) {
   const location = useLocation()
   const params = useParams()
@@ -1262,7 +1199,10 @@ function EmailHistoryRow({
   const emailDealId = email.deal_id ? String(email.deal_id) : currentDealId
   const searchParams = new URLSearchParams(location.search)
   searchParams.set('messageId', String(email.id))
-  const to = `${basePath}/edit/${emailDealId}/project/chat/${email.thread_id}?${searchParams.toString()}`
+  const to =
+    readOnly && customerId
+      ? `${isAdmin ? '/admin' : '/employee'}/customers/info/${customerId}/chat/${email.thread_id}?${searchParams.toString()}`
+      : `${basePath}/edit/${emailDealId}/project/chat/${email.thread_id}?${searchParams.toString()}`
 
   const sentLabel = formatTimestamp(email.sent_at)
   const isSent = !!email.sender_user_id
@@ -1337,6 +1277,8 @@ function HistoryTabButtons({
   actionsCount,
   smsCount,
   emailsCount,
+  showSms,
+  compact = false,
 }: {
   activeTab: HistoryTab
   onTabChange: (tab: HistoryTab) => void
@@ -1345,18 +1287,20 @@ function HistoryTabButtons({
   actionsCount: number
   smsCount: number
   emailsCount: number
+  showSms: boolean
+  compact?: boolean
 }) {
   const tabs: { key: HistoryTab; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'activities', label: `Activities (${activitiesCount})` },
     { key: 'notes', label: `Notes (${notesCount})` },
     { key: 'actions', label: `Actions (${actionsCount})` },
-    { key: 'sms', label: `SMS (${smsCount})` },
+    ...(showSms ? [{ key: 'sms' as const, label: `SMS (${smsCount})` }] : []),
     { key: 'emails', label: `Emails (${emailsCount})` },
   ]
 
   return (
-    <div className='flex gap-1 mb-2'>
+    <div className={cn('flex gap-1', compact ? 'mb-1' : 'mb-2')}>
       {tabs.map(tab => (
         <button
           key={tab.key}
@@ -1412,6 +1356,8 @@ function ActivityList({
   isActionsPending,
   isSmsPending,
   readOnly = false,
+  showSms,
+  customerId,
 }: {
   dealId: number
   activities: DealActivity[]
@@ -1427,6 +1373,8 @@ function ActivityList({
   isActionsPending: boolean
   isSmsPending: boolean
   readOnly?: boolean
+  showSms: boolean
+  customerId?: number
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
   const toggleHistoryOpen = useCallback(() => setIsHistoryOpen(prev => !prev), [])
@@ -1501,15 +1449,17 @@ function ActivityList({
             isPinned: false,
           }) satisfies HistoryItem,
       ),
-      ...smsMessages.map(
-        message =>
-          ({
-            type: 'sms',
-            data: message,
-            date: message.createdDate,
-            isPinned: false,
-          }) satisfies HistoryItem,
-      ),
+      ...(showSms
+        ? smsMessages.map(
+            message =>
+              ({
+                type: 'sms',
+                data: message,
+                date: message.createdDate,
+                isPinned: false,
+              }) satisfies HistoryItem,
+          )
+        : []),
       ...displayedEmails.map(
         e =>
           ({
@@ -1528,13 +1478,13 @@ function ActivityList({
     })
 
     return items
-  }, [activitiesForHistoryTabs, notes, actions, smsMessages, displayedEmails])
+  }, [activitiesForHistoryTabs, notes, actions, smsMessages, displayedEmails, showSms])
 
   const historyCount =
     activitiesForHistoryTabs.length +
     notes.length +
     actions.length +
-    smsMessages.length +
+    (showSms ? smsMessages.length : 0) +
     displayedEmails.length
 
   const renderHistoryItem = useCallback(
@@ -1542,7 +1492,7 @@ function ActivityList({
       switch (item.type) {
         case 'activity':
           return (
-            <TimelineItem icon={ClipboardIcon} isLast={isLast}>
+            <TimelineItem icon={ClipboardIcon} isLast={isLast} compact={readOnly}>
               {readOnly ? (
                 <ActivityItemReadOnly activity={item.data} viewerName={viewerName} />
               ) : (
@@ -1561,7 +1511,7 @@ function ActivityList({
             return <NoteHistorySkeletonItem isLast={isLast} />
           }
           return (
-            <TimelineItem icon={NoteIcon} isLast={isLast}>
+            <TimelineItem icon={NoteIcon} isLast={isLast} compact={readOnly}>
               {readOnly ? (
                 <NoteHistoryReadOnly note={item.data} viewerName={viewerName} />
               ) : (
@@ -1575,7 +1525,7 @@ function ActivityList({
           )
         case 'action':
           return (
-            <TimelineItem icon={Phone} isLast={isLast}>
+            <TimelineItem icon={Phone} isLast={isLast} compact={readOnly}>
               <CallItemContent
                 call={item.data}
                 audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
@@ -1587,14 +1537,19 @@ function ActivityList({
           )
         case 'sms':
           return (
-            <TimelineItem icon={MessageSquare} isLast={isLast}>
+            <TimelineItem icon={MessageSquare} isLast={isLast} compact={readOnly}>
               <SmsHistoryRow message={item.data} />
             </TimelineItem>
           )
         case 'email':
           return (
-            <TimelineItem icon={Mail} isLast={isLast}>
-              <EmailHistoryRow email={item.data} viewerName={viewerName} />
+            <TimelineItem icon={Mail} isLast={isLast} compact={readOnly}>
+              <EmailHistoryRow
+                email={item.data}
+                viewerName={viewerName}
+                readOnly={readOnly}
+                customerId={customerId}
+              />
             </TimelineItem>
           )
       }
@@ -1607,6 +1562,7 @@ function ActivityList({
       updatingNoteId,
       viewerName,
       readOnly,
+      customerId,
     ],
   )
 
@@ -1626,6 +1582,7 @@ function ActivityList({
                 <TimelineItem
                   icon={ClipboardIcon}
                   isLast={index === activitiesForHistoryTabs.length - 1}
+                  compact={readOnly}
                 >
                   {readOnly ? (
                     <ActivityItemReadOnly activity={activity} viewerName={viewerName} />
@@ -1662,7 +1619,7 @@ function ActivityList({
               }
               return (
                 <motion.div key={`note-${note.id}`} variants={EMAIL_ROW_VARIANTS}>
-                  <TimelineItem icon={NoteIcon} isLast={isLast}>
+                  <TimelineItem icon={NoteIcon} isLast={isLast} compact={readOnly}>
                     {readOnly ? (
                       <NoteHistoryReadOnly note={note} viewerName={viewerName} />
                     ) : (
@@ -1688,7 +1645,11 @@ function ActivityList({
           <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
             {actions.map((call, index) => (
               <motion.div key={`action-${call.callId}`} variants={EMAIL_ROW_VARIANTS}>
-                <TimelineItem icon={Phone} isLast={index === actions.length - 1}>
+                <TimelineItem
+                  icon={Phone}
+                  isLast={index === actions.length - 1}
+                  compact={readOnly}
+                >
                   <CallItemContent
                     call={call}
                     audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
@@ -1714,6 +1675,7 @@ function ActivityList({
                 <TimelineItem
                   icon={MessageSquare}
                   isLast={index === smsMessages.length - 1}
+                  compact={readOnly}
                 >
                   <SmsHistoryRow message={message} />
                 </TimelineItem>
@@ -1738,8 +1700,17 @@ function ActivityList({
                   key={`email-${email.thread_id}-${email.id}`}
                   variants={EMAIL_ROW_VARIANTS}
                 >
-                  <TimelineItem icon={Mail} isLast={index === sortedEmails.length - 1}>
-                    <EmailHistoryRow email={email} viewerName={viewerName} />
+                  <TimelineItem
+                    icon={Mail}
+                    isLast={index === sortedEmails.length - 1}
+                    compact={readOnly}
+                  >
+                    <EmailHistoryRow
+                      email={email}
+                      viewerName={viewerName}
+                      readOnly={readOnly}
+                      customerId={customerId}
+                    />
                   </TimelineItem>
                 </motion.div>
               ))}
@@ -1789,7 +1760,7 @@ function ActivityList({
   )
 
   return (
-    <div className='space-y-4'>
+    <div className={readOnly ? 'space-y-2' : 'space-y-4'}>
       {!readOnly ? (
         <div>
           <SectionHeader label='To Do' count={todo.length} />
@@ -1849,6 +1820,8 @@ function ActivityList({
               actionsCount={actions.length}
               smsCount={smsMessages.length}
               emailsCount={displayedEmails.length}
+              showSms={showSms}
+              compact={readOnly}
             />
             {customerEmails.length > 0 ? (
               <div className='flex justify-center mb-2'>
@@ -1881,8 +1854,10 @@ export function DealActivityPanel({
   customerEmails = [],
   currentUserName = '',
   readOnly = false,
+  customerId,
   customerPhones,
 }: DealActivityPanelProps) {
+  const hasCloudtalkApi = useHasCloudtalkApi()
   const location = useLocation()
   const navigate = useNavigate()
   const [editingActivity, setEditingActivity] = useState<Nullable<DealActivity>>(null)
@@ -1952,7 +1927,7 @@ export function DealActivityPanel({
         customerPhoneDigits: string[]
       }
     },
-    enabled: !readOnly && !!dealId,
+    enabled: hasCloudtalkApi && !readOnly && !!dealId,
     staleTime: 60_000,
   })
 
@@ -1975,7 +1950,7 @@ export function DealActivityPanel({
         customerPhoneDigits: string[]
       }
     },
-    enabled: readOnly && hasCustomerPhones,
+    enabled: hasCloudtalkApi && readOnly && hasCustomerPhones,
     staleTime: 60_000,
   })
 
@@ -2096,6 +2071,8 @@ export function DealActivityPanel({
           isActionsPending={isCallsPendingResolved}
           isSmsPending={isSmsPendingResolved}
           readOnly={readOnly}
+          showSms={hasCloudtalkApi}
+          customerId={customerId}
         />
       </div>
     </div>

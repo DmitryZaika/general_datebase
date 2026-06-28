@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db } from '~/db.server'
 import { auditDisplayName } from '~/utils/customerAudit.server'
 import { findCustomerDealsForUser } from '~/utils/customerDeals.server'
+import { isEmailAttachmentImage } from '~/utils/emailAttachmentUi'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -19,6 +20,7 @@ interface EmailAttachmentRow {
   url: string
   content_type: string
   content_subtype: string
+  filename: string
 }
 
 async function addAttachmentToDeal(
@@ -28,7 +30,7 @@ async function addAttachmentToDeal(
 ) {
   const attachments = await selectMany<EmailAttachmentRow>(
     db,
-    'SELECT id, url, content_type, content_subtype FROM email_attachments WHERE id = ? LIMIT 1',
+    'SELECT id, url, content_type, content_subtype, filename FROM email_attachments WHERE id = ? LIMIT 1',
     [attachmentId],
   )
   const attachment = attachments[0]
@@ -37,11 +39,9 @@ async function addAttachmentToDeal(
     return data({ error: 'Attachment not found' }, { status: 404 })
   }
 
-  const contentType = attachment.content_type.toLowerCase()
-  const tableName =
-    contentType === 'image' || contentType.startsWith('image/')
-      ? 'deals_images'
-      : 'deals_documents'
+  const tableName = isEmailAttachmentImage(attachment)
+    ? 'deals_images'
+    : 'deals_documents'
 
   if (tableName === 'deals_images') {
     await db.execute(

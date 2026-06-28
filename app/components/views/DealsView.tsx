@@ -118,6 +118,7 @@ interface DealsViewProps {
   notesMap?: Record<number, boolean>
   groupListSelect?: React.ReactNode
   readonly?: boolean
+  searchOwnCustomersOnly?: boolean
   toolbarLeft?: React.ReactNode
   showAddDeal?: boolean
   animateBoard?: boolean
@@ -140,6 +141,7 @@ export default function DealsView({
   showAddDeal = !readonly,
   animateBoard = false,
   groupQueryParam = 'view',
+  searchOwnCustomersOnly = false,
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -561,6 +563,12 @@ export default function DealsView({
       </div>
       <FindCustomer
         disableRowClick={!readonly}
+        buildSearchUrl={
+          searchOwnCustomersOnly
+            ? (term, searchType) =>
+                `/api/customers/search?term=${encodeURIComponent(term)}&searchType=${searchType}&ownOnly=1`
+            : undefined
+        }
         onEdit={(customerId, customer) => {
           const dealId = findDealIdByCustomer(customerId, customer)
           if (dealId) navigate(`edit/${dealId}/information${location.search}`)

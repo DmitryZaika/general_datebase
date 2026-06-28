@@ -29,9 +29,22 @@ export function decodeHtmlEntities(text: string): string {
   })
 }
 
+const HTML_ANCHOR_REGEX =
+  /<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi
+
+function expandHtmlLinks(html: string): string {
+  return html.replace(HTML_ANCHOR_REGEX, (_match, href1, href2, href3, innerHtml) => {
+    const href = String(href1 || href2 || href3 || '').trim()
+    const label = stripHtmlTags(String(innerHtml)).replace(/\s+/g, ' ').trim()
+    if (!href) return label
+    if (!label || label === href) return href
+    return `${label} (${href})`
+  })
+}
+
 export function htmlToPlainText(html: string): string {
   const text = stripHtmlTags(
-    html
+    expandHtmlLinks(html)
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/p>/gi, '\n')
       .replace(/<\/div>/gi, '\n'),

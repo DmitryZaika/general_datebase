@@ -17,7 +17,11 @@ export async function loader({ params }: LoaderFunctionArgs) {
     `SELECT id, url 
        FROM email_attachments 
       WHERE email_id = ? 
-        AND LOWER(content_type) = 'image'`,
+        AND (
+          LOWER(content_type) = 'image'
+          OR LOWER(filename) LIKE '%.heic'
+          OR LOWER(filename) LIKE '%.heif'
+        )`,
     [emailId],
   )
 

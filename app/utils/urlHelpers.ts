@@ -10,3 +10,9 @@ export const getBase = (pathname: string) => {
   }
   return undefined
 }
+
+// Base path for the CloudTalk SMS page; any non-admin base resolves to /employee.
+export const cloudtalkBasePath = (
+  pathname: string,
+): '/admin/cloudtalk' | '/employee/cloudtalk' =>
+  getBase(pathname) === 'admin' ? '/admin/cloudtalk' : '/employee/cloudtalk'

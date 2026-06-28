@@ -1,10 +1,13 @@
-import Compressor from 'compressorjs'
 import { X } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { cn } from '~/lib/utils'
+import {
+  compressImageFile,
+  isCompressibleImageFile,
+} from '~/utils/compressImage.client'
 import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
 type BaseFileInputProps = {
@@ -39,41 +42,6 @@ const acceptsMap: Record<FileInputType, string> = {
   all: '*/*',
 }
 
-function getQuality(size: number): number {
-  const SEVEN_MB = 7 * 1024 * 1024
-  const FIVE_MB = 5 * 1024 * 1024
-  const THREE_MB = 3 * 1024 * 1024
-  const ONE_MB = 1 * 1024 * 1024
-
-  if (size > SEVEN_MB) {
-    return 0.3
-  } else if (size > FIVE_MB) {
-    return 0.35
-  } else if (size > THREE_MB) {
-    return 0.4
-  } else if (size > ONE_MB) {
-    return 0.5
-  } else {
-    return 0.7
-  }
-}
-
-function compressToFile(file: File): Promise<File> {
-  return new Promise((resolve, reject) => {
-    new Compressor(file, {
-      quality: getQuality(file.size),
-      success(result) {
-        if (result instanceof File) {
-          resolve(result)
-        } else {
-          resolve(new File([result], file.name, { type: file.type || 'image/jpeg' }))
-        }
-      },
-      error: reject,
-    })
-  })
-}
-
 function clearNativeInput(id: string) {
   const el = document.getElementById(id)
   if (el instanceof HTMLInputElement) {
@@ -106,8 +74,8 @@ export function FileInput(props: FileInputProps) {
     const list = Array.from(files)
     const out: File[] = []
     for (const file of list) {
-      if (type === 'image' || (type === 'all' && file.type.startsWith('image/'))) {
-        out.push(await compressToFile(file))
+      if (type === 'image' || (type === 'all' && isCompressibleImageFile(file))) {
+        out.push(await compressImageFile(file))
       } else {
         out.push(file)
       }
@@ -124,18 +92,10 @@ export function FileInput(props: FileInputProps) {
       return
     }
     setInternalHasFiles(true)
-    if (type === 'image' || (type === 'all' && file.type.startsWith('image/'))) {
-      new Compressor(file, {
-        quality: getQuality(file.size),
-        success(result) {
-          if (result instanceof File) {
-            props.onChange(result)
-          } else {
-            const tempFile = new File([result], 'temp.jpg')
-            props.onChange(tempFile)
-          }
-          setInternalHasFiles(true)
-        },
+    if (type === 'image' || (type === 'all' && isCompressibleImageFile(file))) {
+      void compressImageFile(file).then(compressed => {
+        props.onChange(compressed)
+        setInternalHasFiles(true)
       })
     } else {
       props.onChange(file)

@@ -345,6 +345,7 @@ export default function EmployeeDeals() {
           activitiesMap={activitiesMap}
           activitiesIconMap={activitiesIconMap}
           notesMap={notesMap}
+          searchOwnCustomersOnly
           groupListSelect={
             <div className='flex gap-2 '>
               {groupSelect}

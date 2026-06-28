@@ -11,9 +11,10 @@ export function Header({
   isSuperAdmin,
   superadminCompanies,
   activeCompanyId,
+  hideCustomerBurgerMenu,
 }: HeaderProps) {
   if (!isEmployee && !isAdmin && !isSuperUser && !isSuperAdmin) {
-    return <HeaderCustomers />
+    return <HeaderCustomers hideBurgerMenu={hideCustomerBurgerMenu} />
   }
   return (
     <div className='bg-white'>

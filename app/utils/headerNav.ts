@@ -32,6 +32,7 @@ export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
     'transactions',
     'teach-mode',
     'emails',
+    'cloudtalk',
   ]
 
   if (supportedSections.includes(currentSection)) {

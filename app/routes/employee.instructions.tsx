@@ -18,6 +18,10 @@ import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import '~/styles/instructions.css'
 import type { Instruction } from '~/types'
+import {
+  buildInstructionTree,
+  type InstructionNode as SharedInstructionNode,
+} from '~/utils/instructionTree'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -28,6 +32,17 @@ interface InstructionNode {
   after_id: number | null
   children: InstructionNode[]
   parent_id?: number | null
+}
+
+function mapInstructionTree(nodes: SharedInstructionNode[]): InstructionNode[] {
+  return nodes.map(node => ({
+    id: node.id,
+    title: node.title,
+    text: node.rich_text,
+    after_id: node.after_id,
+    parent_id: node.parent_id,
+    children: mapInstructionTree(node.children),
+  }))
 }
 
 interface InstructionItemProps {
@@ -197,50 +212,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
 }
 
 function cleanData(instructions: Instruction[]): InstructionNode[] {
-  const nodeMap = new Map<number, InstructionNode>()
-
-  // Создаем узлы
-  instructions.forEach(item => {
-    nodeMap.set(item.id, {
-      id: item.id,
-      title: item.title,
-      text: item.rich_text,
-      after_id: item.after_id,
-      parent_id: item.parent_id,
-      children: [],
-    })
-  })
-
-  const rootNodes: InstructionNode[] = []
-  const insertNodeInOrder = (nodes: InstructionNode[], node: InstructionNode) => {
-    if (node.after_id === null) {
-      nodes.unshift(node)
-    } else {
-      const index = nodes.findIndex(n => n.id === node.after_id)
-      if (index !== -1) {
-        nodes.splice(index + 1, 0, node)
-      } else {
-        nodes.push(node)
-      }
-    }
-  }
-
-  instructions.forEach(item => {
-    const node = nodeMap.get(item.id)
-    if (!node) {
-      return
-    }
-    if (item.parent_id === null) {
-      insertNodeInOrder(rootNodes, node)
-    } else {
-      const parentNode = nodeMap.get(item.parent_id)
-      if (parentNode) {
-        insertNodeInOrder(parentNode.children, node)
-      }
-    }
-  })
-
-  return rootNodes
+  return mapInstructionTree(buildInstructionTree(instructions))
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

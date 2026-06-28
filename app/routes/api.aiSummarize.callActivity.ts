@@ -3,10 +3,13 @@ import type { ActionFunctionArgs } from 'react-router'
 import { z } from 'zod'
 import {
   countWords,
+  customerWillSendMaterialPhoto,
+  extractBudgetFromTranscript,
   isVoicemailGreetingOnly,
   resolveIsVoicemail,
   VOICEMAIL_GREETING_ACTIVITY_NAME,
 } from '~/lib/callAiHelpers'
+import { GPT_MINI_MODEL } from '~/utils/openaiModels'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -51,6 +54,7 @@ const STORE_CLOSE_HOUR = 18
 const DEADLINE_HOURS_BEFORE_STORE_CLOSE = 2
 const QUOTE_MINIMUM_LEAD_MINUTES = 60
 const ONSITE_ESTIMATE_LEAD_MINUTES = 30
+const ONSITE_ESTIMATE_MIN_REMINDER_HOUR = 9
 const CONFIRMED_ONSITE_ESTIMATE_NAME = 'Be on-site for estimate'
 const EXPLICIT_TIME_PATTERN = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i
 
@@ -321,7 +325,9 @@ const AGREED_WEEKS_IN_TEXT_PATTERN = new RegExp(
 )
 
 const CALL_BACK_TIMING_CONTEXT_PATTERN =
-  /\b(?:would you like (?:me|us) to )?(?:call|follow\s+(?:you\s+)?up)\b|\bfollow\s+(?:you\s+)?up\b|\bcall\s+you\b|\bfollow\s+up\b|\bcall\s+(?:you|me|back)\b|\bwould you like\b/
+  /\b(?:would you like (?:me|us) to )?(?:call|follow\s+(?:you\s+)?up)\b|\bfollow\s+(?:you\s+)?up\b|\bcall\s+(?:you|me|back)\b|\bcall\s+me\s+back\b|\bfollow\s+up\b|\bwould you like\b/
+
+const MERIDIEM_PATTERN = '(?:a\\.?\\s*m\\.?|p\\.?\\s*m\\.?)'
 
 function parseWeekCount(raw: string): number | null {
   const lower = raw.toLowerCase().trim()
@@ -454,12 +460,64 @@ function inferAgreedCallBackDeadlineFromTranscript(
   return null
 }
 
+function resolveMeridiem(
+  meridiem: string | undefined,
+  matchedText: string,
+): string | undefined {
+  const compact = meridiem?.replace(/\./g, '').replace(/\s+/g, '').toLowerCase()
+  if (compact === 'pm' || compact === 'am') return compact
+  if (/\bp\.?\s*m\.?\b/i.test(matchedText)) return 'pm'
+  if (/\ba\.?\s*m\.?\b/i.test(matchedText)) return 'am'
+  return undefined
+}
+
+function inferCallBackTimedDeadlineFromTranscript(
+  transcript: string,
+  committedAt: Date,
+): string | null {
+  const lower = transcript.toLowerCase()
+  if (!CALL_BACK_TIMING_CONTEXT_PATTERN.test(lower)) return null
+
+  const callbackChunks = transcript
+    .split(/(?<=[.?!])\s+/)
+    .map(chunk => chunk.trim())
+    .filter(chunk =>
+      /\b(?:call\s+(?:me\s+)?back|call\s+(?:you|me)|we(?:'ll| will)\s+(?:do|call))\b/i.test(
+        chunk,
+      ),
+    )
+
+  const searchTexts = callbackChunks.length > 0 ? callbackChunks : [transcript]
+
+  for (const text of searchTexts) {
+    const parsed = parseExplicitDeadlineFromText(text, committedAt)
+    if (parsed && isTimedDeadline(parsed)) return parsed
+  }
+
+  const fullParsed = parseExplicitDeadlineFromText(transcript, committedAt)
+  if (fullParsed && isTimedDeadline(fullParsed)) return fullParsed
+
+  return null
+}
+
 function applyAgreedCallBackActivity(
   activity: ExtractedCallActivity,
   committedAt: Date,
   transcript: string,
 ): ExtractedCallActivity {
   if (!isCallBackActivity(activity.name)) return activity
+
+  const timedCallback = inferCallBackTimedDeadlineFromTranscript(
+    transcript,
+    committedAt,
+  )
+  if (timedCallback) {
+    return {
+      name: buildCallBackActivityName(transcript),
+      deadline: timedCallback,
+    }
+  }
+
   const deadline = inferAgreedCallBackDeadlineFromTranscript(transcript, committedAt)
   return {
     name: buildCallBackActivityName(transcript),
@@ -531,26 +589,111 @@ function isOnSiteEstimateActivity(name: string): boolean {
   )
 }
 
-function transcriptConfirmsOnsiteEstimateAtTime(transcript: string): boolean {
+interface ScheduledAppointment {
+  iso: string
+  hasExplicitTime: boolean
+}
+
+function transcriptConfirmsScheduledVisit(transcript: string): boolean {
   const lower = transcript.toLowerCase()
-  const estimateContext =
-    /\b(?:estimate|measurement|measure|take some measurements)\b/.test(lower) ||
-    /\b(?:stop by|come over|be here)\b/.test(lower)
-  if (!estimateContext) return false
+  const visitContext =
+    /\b(?:estimate|measurement|measure|showroom|appointment|visit)\b/.test(lower) ||
+    /\b(?:stop by|come over|be here|see you)\b/.test(lower)
+  if (!visitContext) return false
   return (
+    /\b(?:saturday|sunday|monday|tuesday|wednesday|thursday|friday)\b/.test(lower) ||
     /\b(?:see you|i(?:'ll| will) be there|be here|stop by)\b[^.]{0,60}\b(?:at\s+)?\d{1,2}/i.test(
       transcript,
     ) ||
     /\bif you can be here at\s+\d/i.test(lower) ||
     (/\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:pm|am)\b/.test(lower) &&
-      /\b(?:awesome|works|good|yes|today)\b/.test(lower))
+      /\b(?:awesome|works|good|yes|today)\b/.test(lower)) ||
+    /\b\d{1,2}\s*o['']?clock\b/i.test(lower) ||
+    /\baround\s+\d{1,2}\b/.test(lower) ||
+    /\b\d{1,2}\s+is\s+good\b/.test(lower)
   )
 }
 
-function parseOnsiteEstimateAppointmentTime(
+function parseScheduledWeekdayOffset(text: string, committedAt: Date): number | null {
+  const lower = text.toLowerCase()
+
+  const nextWeekday = lower.match(
+    /\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )
+  if (nextWeekday?.[1]) {
+    return daysUntilWeekdayLabel(committedAt, nextWeekday[1], true)
+  }
+
+  const weekdayOnly = lower.match(
+    /\b(?:on\s+(?:a\s+)?)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  )
+  if (weekdayOnly?.[1]) {
+    return daysUntilWeekdayLabel(committedAt, weekdayOnly[1], false)
+  }
+
+  return null
+}
+
+function inferAppointmentWallTime(
+  text: string,
+): { hour: number; minute: number } | null {
+  const patterns = [
+    /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i,
+    /\b(\d{1,2})\s*o['']?clock\b/i,
+    /\baround\s+(\d{1,2})(?::(\d{2}))?\b/i,
+    /\b(\d{1,2})\s+is\s+good\b/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (!match) continue
+    const hourRaw = Number(match[1])
+    const minute = match[2] ? Number(match[2]) : 0
+    if (!Number.isFinite(hourRaw) || !Number.isFinite(minute)) continue
+    return {
+      hour: to24Hour(hourRaw, match[3], match[0]),
+      minute,
+    }
+  }
+
+  return null
+}
+
+function parseScheduledAppointmentTime(
   transcript: string,
   committedAt: Date,
-): string | null {
+): ScheduledAppointment | null {
+  const dayOffset = parseScheduledWeekdayOffset(transcript, committedAt)
+  const wallTime = inferAppointmentWallTime(transcript)
+
+  if (dayOffset !== null) {
+    const { year, month, day } = addStoreCalendarDays(committedAt, dayOffset)
+    if (wallTime) {
+      return {
+        iso: zonedWallTimeToUtcIso(
+          year,
+          month,
+          day,
+          wallTime.hour,
+          wallTime.minute,
+          STORE_BUSINESS_TIMEZONE,
+        ),
+        hasExplicitTime: true,
+      }
+    }
+    return {
+      iso: zonedWallTimeToUtcIso(
+        year,
+        month,
+        day,
+        ONSITE_ESTIMATE_MIN_REMINDER_HOUR,
+        0,
+        STORE_BUSINESS_TIMEZONE,
+      ),
+      hasExplicitTime: false,
+    }
+  }
+
   const chunks = transcript
     .split(/(?<=[.?!])\s+/)
     .map(chunk => chunk.trim())
@@ -558,36 +701,91 @@ function parseOnsiteEstimateAppointmentTime(
 
   const timedChunks = chunks.filter(chunk => {
     const lower = chunk.toLowerCase()
-    if (!EXPLICIT_TIME_PATTERN.test(lower)) return false
+    if (
+      !EXPLICIT_TIME_PATTERN.test(lower) &&
+      !/\b\d{1,2}\s*o['']?clock\b/i.test(lower)
+    ) {
+      return false
+    }
     if (/\b(?:shop|store|business)\s+close/.test(lower)) return false
-    return /\b(?:estimate|measurement|measure|be here|stop by|see you|there at|come|5:?\d{2})\b/.test(
+    return /\b(?:estimate|measurement|measure|showroom|appointment|be here|stop by|see you|there at|come|visit)\b/.test(
       lower,
     )
   })
 
   for (const chunk of timedChunks) {
     const parsed = parseExplicitDeadlineFromText(chunk.toLowerCase(), committedAt)
-    if (parsed && isTimedDeadline(parsed)) return parsed
+    if (parsed && isTimedDeadline(parsed)) {
+      return { iso: parsed, hasExplicitTime: true }
+    }
   }
 
-  if (/\b(?:estimate|measurement|measure|take some measurements)\b/i.test(transcript)) {
+  if (
+    /\b(?:estimate|measurement|measure|showroom|appointment|visit)\b/i.test(transcript)
+  ) {
     const parsed = parseExplicitDeadlineFromText(transcript.toLowerCase(), committedAt)
-    if (parsed && isTimedDeadline(parsed)) return parsed
+    if (parsed && isTimedDeadline(parsed)) {
+      return { iso: parsed, hasExplicitTime: true }
+    }
   }
 
   return null
 }
 
+function clampReminderToMinimumStoreHour(
+  reminderIso: string,
+  appointmentIso: string,
+): string {
+  const appointmentParts = getZonedParts(
+    new Date(appointmentIso),
+    STORE_BUSINESS_TIMEZONE,
+  )
+  const reminderParts = getZonedParts(new Date(reminderIso), STORE_BUSINESS_TIMEZONE)
+
+  if (
+    reminderParts.hour > ONSITE_ESTIMATE_MIN_REMINDER_HOUR ||
+    (reminderParts.hour === ONSITE_ESTIMATE_MIN_REMINDER_HOUR &&
+      reminderParts.minute >= 0)
+  ) {
+    return reminderIso
+  }
+
+  return zonedWallTimeToUtcIso(
+    appointmentParts.year,
+    appointmentParts.month,
+    appointmentParts.day,
+    ONSITE_ESTIMATE_MIN_REMINDER_HOUR,
+    0,
+    STORE_BUSINESS_TIMEZONE,
+  )
+}
+
 function onsiteEstimateReminderDeadline(
   appointmentIso: string,
   committedAt: Date,
+  hasExplicitAppointmentTime: boolean,
 ): string {
+  if (!hasExplicitAppointmentTime) {
+    const parts = getZonedParts(new Date(appointmentIso), STORE_BUSINESS_TIMEZONE)
+    return zonedWallTimeToUtcIso(
+      parts.year,
+      parts.month,
+      parts.day,
+      ONSITE_ESTIMATE_MIN_REMINDER_HOUR,
+      0,
+      STORE_BUSINESS_TIMEZONE,
+    )
+  }
+
   const appointmentMs = new Date(appointmentIso).getTime()
   const reminderMs = Math.max(
     appointmentMs - ONSITE_ESTIMATE_LEAD_MINUTES * 60_000,
     committedAt.getTime(),
   )
-  return formatUtcIsoDateTime(new Date(reminderMs))
+  return clampReminderToMinimumStoreHour(
+    formatUtcIsoDateTime(new Date(reminderMs)),
+    appointmentIso,
+  )
 }
 
 function inferOnsiteEstimateReminderDeadline(
@@ -596,10 +794,14 @@ function inferOnsiteEstimateReminderDeadline(
   committedAt: Date,
 ): string | null {
   if (!isOnSiteEstimateActivity(activityName)) return null
-  if (!transcriptConfirmsOnsiteEstimateAtTime(transcript)) return null
-  const appointment = parseOnsiteEstimateAppointmentTime(transcript, committedAt)
+  if (!transcriptConfirmsScheduledVisit(transcript)) return null
+  const appointment = parseScheduledAppointmentTime(transcript, committedAt)
   if (!appointment) return null
-  return onsiteEstimateReminderDeadline(appointment, committedAt)
+  return onsiteEstimateReminderDeadline(
+    appointment.iso,
+    committedAt,
+    appointment.hasExplicitTime,
+  )
 }
 
 function applyOnSiteEstimateActivity(
@@ -608,12 +810,15 @@ function applyOnSiteEstimateActivity(
   transcript: string,
 ): ExtractedCallActivity {
   if (!isOnSiteEstimateActivity(activity.name)) return activity
-  if (!transcriptConfirmsOnsiteEstimateAtTime(transcript)) return activity
-  const appointment = parseOnsiteEstimateAppointmentTime(transcript, committedAt)
+  const appointment = parseScheduledAppointmentTime(transcript, committedAt)
   if (!appointment) return activity
   return {
     name: CONFIRMED_ONSITE_ESTIMATE_NAME,
-    deadline: onsiteEstimateReminderDeadline(appointment, committedAt),
+    deadline: onsiteEstimateReminderDeadline(
+      appointment.iso,
+      committedAt,
+      appointment.hasExplicitTime,
+    ),
   }
 }
 
@@ -675,6 +880,113 @@ function isSendLinkStyleActivity(name: string): boolean {
 function isSalespersonSendActivity(name: string): boolean {
   const lower = name.toLowerCase()
   return /\bsend\b/.test(lower) && !isCustomerPhotoRequestActivity(lower)
+}
+
+function transcriptTomorrowIsCustomerCommitment(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  return (
+    /\b(?:pictures?|photos?|pics?|measurements?|kitchen)\b[^.]{0,140}\btomorrow\b/.test(
+      lower,
+    ) ||
+    /\btomorrow\b[^.]{0,140}\b(?:pictures?|photos?|pics?|measurements?)/.test(lower) ||
+    /\bhusband\b[^.]{0,100}\btomorrow\b/.test(lower) ||
+    (/\b(?:send|get)\b[^.]{0,100}\b(?:pictures?|photos?|measurements?)\b/.test(lower) &&
+      /\btomorrow\b/.test(lower) &&
+      /\b(?:we would|i could|can have|from him|my husband)\b/.test(lower))
+  )
+}
+
+function activityWindowIsRepSendContext(window: string): boolean {
+  const lower = window.toLowerCase()
+  if (!/\bsend\b/.test(lower)) return false
+  const customerSending =
+    /\b(?:husband|she|he|they|my husband|we would send you)\b/.test(lower) &&
+    !/\b(?:i(?:'ll| will)|we will)\s+send\b/.test(lower)
+  if (customerSending) return false
+  return (
+    /\b(?:i(?:'ll| will)|we will|i can|we can)\s+send\b/.test(lower) ||
+    /\b(?:i(?:'ll| will)|we can)\s+send you\b/.test(lower) ||
+    /\bsend you (?:the |our )?(?:address|link|inventory|live|pictures?|photos?)\b/.test(
+      lower,
+    )
+  )
+}
+
+function repCommittedToSendItem(activityName: string, transcript: string): boolean {
+  const nameLower = activityName.toLowerCase()
+  const lower = transcript.toLowerCase()
+  const repOffersSend =
+    /\b(?:i(?:'ll| will)|i can|we can|we will)\s+send\b/.test(lower) ||
+    /\b(?:i(?:'ll| will)|we can)\s+send you\b/.test(lower)
+  if (!repOffersSend) return false
+
+  if (/\b(?:inventory|link)\b/.test(nameLower)) {
+    return /\b(?:inventory|live inventory|link)\b/.test(lower)
+  }
+  if (/\bsink\b/.test(nameLower)) {
+    return /\bsink/.test(lower)
+  }
+  if (/\b(?:address|showroom)\b/.test(nameLower)) {
+    return /\b(?:address|showroom)\b/.test(lower)
+  }
+  if (isEdgePhotoSendActivityName(nameLower)) {
+    return /\b(?:sink|edge|profile)\b/.test(lower)
+  }
+  return /\bsend\b/.test(nameLower)
+}
+
+function transcriptRepSendSaysTomorrow(
+  activityName: string,
+  transcript: string,
+): boolean {
+  const lower = transcript.toLowerCase()
+  const repSendTomorrow =
+    /\b(?:i(?:'ll| will)|we will|i can|we can)\s+send\b[^.]{0,140}\btomorrow\b/.test(
+      lower,
+    ) || /\bsend\b[^.]{0,80}\btomorrow\b[^.]{0,40}\b(?:you|the )/.test(lower)
+  if (!repSendTomorrow) return false
+  return repCommittedToSendItem(activityName, transcript)
+}
+
+function inferRepSendDefaultDeadline(
+  activityName: string,
+  transcript: string,
+  committedAt: Date,
+): string | null {
+  const nameLower = activityName.toLowerCase()
+  if (
+    !isSalespersonSendActivity(nameLower) ||
+    isCustomerPhotoRequestActivity(nameLower)
+  ) {
+    return null
+  }
+
+  if (isQuoteOrEstimateActivity(nameLower)) {
+    const lower = transcript.toLowerCase()
+    if (
+      transcriptTomorrowIsCustomerCommitment(transcript) &&
+      /\b(?:measurements?|measure|pictures?|photos?)\b/.test(lower)
+    ) {
+      return formatStoreDateOnlyPlusDays(committedAt, 1)
+    }
+    if (
+      /\b(?:whenever|when|after|once)\b[^.]{0,80}\bmeasurements?\b/.test(lower) &&
+      transcriptTomorrowIsCustomerCommitment(transcript)
+    ) {
+      return formatStoreDateOnlyPlusDays(committedAt, 1)
+    }
+    return null
+  }
+
+  if (transcriptRepSendSaysTomorrow(activityName, transcript)) {
+    return formatStoreDateOnlyPlusDays(committedAt, 1)
+  }
+
+  if (repCommittedToSendItem(activityName, transcript)) {
+    return formatStoreDateOnlyPlusDays(committedAt, 0)
+  }
+
+  return null
 }
 
 function isSoonSendDeadline(activityName: string, transcriptLower: string): boolean {
@@ -756,13 +1068,7 @@ function to24Hour(
   meridiem: string | undefined,
   matchedText: string,
 ): number {
-  const normalizedMeridiem =
-    meridiem?.toLowerCase() ??
-    (/\bpm\b/i.test(matchedText)
-      ? 'pm'
-      : /\bam\b/i.test(matchedText)
-        ? 'am'
-        : undefined)
+  const normalizedMeridiem = resolveMeridiem(meridiem, matchedText)
   let hour = hour12
   if (normalizedMeridiem === 'pm' && hour < 12) hour += 12
   if (normalizedMeridiem === 'am' && hour === 12) hour = 0
@@ -812,14 +1118,32 @@ function getActivityTranscriptWindows(
       'estimate',
       'measurement',
       'measure',
+      'showroom',
+      'appointment',
+      'saturday',
       'be here',
       'stop by',
       'see you',
       'today',
     )
   }
+  if (isStoneColorPhotoRequestActivity(lower)) {
+    terms.push(
+      'photo',
+      'picture',
+      'pic',
+      'color',
+      'quartz',
+      'stone',
+      'material',
+      'menards',
+    )
+  }
+  if (isKitchenPhotoRequestActivity(lower)) {
+    terms.push('photo', 'picture', 'pic', 'kitchen', 'layout', 'countertop')
+  }
   if (isLongLeadRequestActivity(lower) || isCustomerPhotoRequestActivity(lower)) {
-    terms.push('photo', 'picture', 'pic', 'kitchen', 'send', 'material', 'countertop')
+    terms.push('photo', 'picture', 'pic', 'send', 'afternoon', 'today')
   }
   if (terms.length === 0) {
     terms.push(...lower.split(/\s+/).filter(word => word.length > 3))
@@ -874,10 +1198,9 @@ function parseExplicitDeadlineFromText(text: string, committedAt: Date): string 
   else if (/\b(?:this\s+afternoon|this\s+evening|tonight)\b/.test(lower)) dayOffset = 0
 
   const timePatterns = [
-    /\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i,
-    /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i,
-    /\b(\d{1,2})\s*pm\b/i,
-    /\b(\d{1,2})\s*am\b/i,
+    new RegExp(`\\bat\\s+(\\d{1,2})(?::(\\d{2}))?\\s*(${MERIDIEM_PATTERN})\\b`, 'i'),
+    new RegExp(`\\b(\\d{1,2})(?::(\\d{2}))?\\s*(${MERIDIEM_PATTERN})\\b`, 'i'),
+    new RegExp(`\\b(\\d{1,2})\\s*(${MERIDIEM_PATTERN})\\b`, 'i'),
   ]
 
   for (const pattern of timePatterns) {
@@ -914,6 +1237,19 @@ function inferExplicitDeadlineForActivity(
   committedAt: Date,
 ): string | null {
   const windows = getActivityTranscriptWindows(activityName, transcript)
+
+  if (
+    isSalespersonSendActivity(activityName) &&
+    !isCustomerPhotoRequestActivity(activityName)
+  ) {
+    const repWindows = windows.filter(window => activityWindowIsRepSendContext(window))
+    for (const window of repWindows) {
+      const parsed = parseExplicitDeadlineFromText(window, committedAt)
+      if (parsed) return parsed
+    }
+    return null
+  }
+
   for (const window of windows) {
     const parsed = parseExplicitDeadlineFromText(window, committedAt)
     if (parsed) return parsed
@@ -925,6 +1261,9 @@ function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60_000)
 }
 
+const STONE_COLOR_PHOTO_ACTIVITY_NAME = 'Request picture of preferred stone'
+const KITCHEN_PHOTO_ACTIVITY_NAME = 'Request kitchen photos'
+
 function isPhotoRequestActivity(name: string): boolean {
   return (
     /\b(request|wait for|receive)\b/.test(name) &&
@@ -932,12 +1271,28 @@ function isPhotoRequestActivity(name: string): boolean {
   )
 }
 
-function isCustomerPhotoRequestActivity(name: string): boolean {
+function isStoneColorPhotoRequestActivity(name: string): boolean {
+  const lower = name.toLowerCase()
   return (
-    isPhotoRequestActivity(name) ||
-    (/\b(photo|picture|pic)/.test(name) &&
-      /\b(kitchen|countertop|counter)\b/.test(name))
+    (/\b(?:request|wait for|receive)\b/.test(lower) &&
+      /\b(?:color|stone|quartz|granite|material)\b/.test(lower) &&
+      /\b(?:photo|picture|pic)\b/.test(lower)) ||
+    /\b(?:preferred|exact)\s+(?:stone|color|quartz)\b/.test(lower)
   )
+}
+
+function isKitchenPhotoRequestActivity(name: string): boolean {
+  const lower = name.toLowerCase()
+  if (isStoneColorPhotoRequestActivity(lower)) return false
+  return (
+    isPhotoRequestActivity(lower) ||
+    (/\b(photo|picture|pic)/.test(lower) &&
+      /\b(kitchen|countertop|counter|layout)\b/.test(lower))
+  )
+}
+
+function isCustomerPhotoRequestActivity(name: string): boolean {
+  return isStoneColorPhotoRequestActivity(name) || isKitchenPhotoRequestActivity(name)
 }
 
 function sanitizeActivityName(name: string): string {
@@ -970,8 +1325,11 @@ function canonicalEdgePhotoSendName(lower: string): string {
 function canonicalActivityName(name: string): string {
   const sanitized = sanitizeActivityName(name)
   const lower = sanitized.toLowerCase()
-  if (isCustomerPhotoRequestActivity(lower)) {
-    return 'Request kitchen photos'
+  if (isStoneColorPhotoRequestActivity(lower)) {
+    return STONE_COLOR_PHOTO_ACTIVITY_NAME
+  }
+  if (isKitchenPhotoRequestActivity(lower)) {
+    return KITCHEN_PHOTO_ACTIVITY_NAME
   }
   if (isEdgePhotoSendActivityName(lower)) {
     return canonicalEdgePhotoSendName(lower)
@@ -981,8 +1339,11 @@ function canonicalActivityName(name: string): string {
 
 function normalizeActivityDedupKey(name: string): string {
   const lower = canonicalActivityName(name).toLowerCase()
-  if (isCustomerPhotoRequestActivity(lower)) {
-    return 'request-customer-photos'
+  if (isStoneColorPhotoRequestActivity(lower)) {
+    return 'request-stone-color-photo'
+  }
+  if (isKitchenPhotoRequestActivity(lower)) {
+    return 'request-kitchen-photos'
   }
   if (/\bsend\b/.test(lower) && /\b(link|option|inventory|website)\b/.test(lower)) {
     return 'send-options-link'
@@ -1052,6 +1413,45 @@ function supplementEdgePhotoSendActivity(
   return [...activities, { name, deadline }]
 }
 
+function transcriptCustomerWillSendStoneColorPhoto(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  return (
+    /\b(?:picture|photo|pic)\b[^.]{0,140}\b(?:color(?:ing)?|quartz|stone|granite|material)\b/.test(
+      lower,
+    ) ||
+    /\b(?:color(?:ing)?|quartz|stone)\b[^.]{0,140}\b(?:picture|photo|pic)\b/.test(
+      lower,
+    ) ||
+    (transcriptHasSpecificColorSelection(transcript) &&
+      /\b(?:i(?:'ll| will)|going to|can)\b[^.]{0,140}\b(?:picture|photo|pic|send)\b/.test(
+        lower,
+      ))
+  )
+}
+
+function hasStoneColorPhotoRequestActivity(
+  activities: ExtractedCallActivity[],
+): boolean {
+  return activities.some(activity => isStoneColorPhotoRequestActivity(activity.name))
+}
+
+function supplementStoneColorPhotoRequestActivity(
+  activities: ExtractedCallActivity[],
+  committedAt: Date,
+  transcript: string,
+): ExtractedCallActivity[] {
+  if (!transcriptCustomerWillSendStoneColorPhoto(transcript)) return activities
+  if (hasStoneColorPhotoRequestActivity(activities)) return activities
+
+  const deadline = applyActivityDeadlineRules(
+    null,
+    STONE_COLOR_PHOTO_ACTIVITY_NAME,
+    committedAt,
+    transcript,
+  )
+  return [...activities, { name: STONE_COLOR_PHOTO_ACTIVITY_NAME, deadline }]
+}
+
 function inferDeadlineFromTranscript(
   activityName: string,
   transcript: string,
@@ -1068,11 +1468,20 @@ function inferDeadlineFromTranscript(
   if (explicit) return explicit
 
   if (isCustomerPhotoRequestActivity(nameLower)) {
+    if (
+      /\b(?:this\s+afternoon|by this afternoon|today|at the latest)\b/.test(
+        transcriptLower,
+      ) &&
+      /\b(?:picture|photo|pic|send)\b/.test(transcriptLower)
+    ) {
+      return formatStoreDateOnlyPlusDays(committedAt, 0)
+    }
+
     const customerSendsTomorrow =
-      /\b(?:she|he|they|customer)\b[^.]{0,120}\btomorrow\b[^.]{0,120}\b(?:photo|picture|pic|kitchen|countertop)\b/.test(
+      /\b(?:she|he|they|customer)\b[^.]{0,120}\btomorrow\b[^.]{0,120}\b(?:photo|picture|pic|kitchen|countertop|color|quartz|stone)\b/.test(
         transcriptLower,
       ) ||
-      /\b(?:photo|picture|pic|kitchen|countertop)\b[^.]{0,120}\btomorrow\b/.test(
+      /\b(?:photo|picture|pic|kitchen|countertop|color|quartz|stone)\b[^.]{0,120}\btomorrow\b/.test(
         transcriptLower,
       ) ||
       (/\bi(?:'ll| will) send (?:you )?(?:the )?(?:photo|picture|pic|kitchen)/.test(
@@ -1140,6 +1549,12 @@ function applyActivityDeadlineRules(
   }
 
   if (isCallBackActivity(activityName)) {
+    const timedCallback = inferCallBackTimedDeadlineFromTranscript(
+      transcript,
+      committedAt,
+    )
+    if (timedCallback) return timedCallback
+
     const agreedCallBack = inferAgreedCallBackDeadlineFromTranscript(
       transcript,
       committedAt,
@@ -1150,6 +1565,18 @@ function applyActivityDeadlineRules(
   const nameHaystack = activityName.toLowerCase()
   const deadlineHaystack = (deadline ?? '').toLowerCase()
   const transcriptLower = transcript.toLowerCase()
+
+  if (
+    isSalespersonSendActivity(activityName) &&
+    !isCustomerPhotoRequestActivity(activityName)
+  ) {
+    const repSendDeadline = inferRepSendDefaultDeadline(
+      activityName,
+      transcript,
+      committedAt,
+    )
+    if (repSendDeadline) return repSendDeadline
+  }
 
   const explicitFromTranscript = inferExplicitDeadlineForActivity(
     activityName,
@@ -1204,6 +1631,23 @@ function applyActivityDeadlineRules(
     TOMORROW_DEADLINE_PATTERN.test(nameHaystack) ||
     TOMORROW_DEADLINE_PATTERN.test(deadlineHaystack)
   ) {
+    if (isCustomerPhotoRequestActivity(activityName)) {
+      if (transcriptTomorrowIsCustomerCommitment(transcript)) {
+        return formatStoreDateOnlyPlusDays(committedAt, 1)
+      }
+    } else if (isQuoteOrEstimateActivity(nameHaystack)) {
+      if (transcriptTomorrowIsCustomerCommitment(transcript)) {
+        return formatStoreDateOnlyPlusDays(committedAt, 1)
+      }
+    } else if (isSalespersonSendActivity(activityName)) {
+      const repSendDeadline = inferRepSendDefaultDeadline(
+        activityName,
+        transcript,
+        committedAt,
+      )
+      if (repSendDeadline) return repSendDeadline
+      return formatStoreDateOnlyPlusDays(committedAt, 0)
+    }
     return formatStoreDateOnlyPlusDays(committedAt, 1)
   }
 
@@ -1250,7 +1694,8 @@ function isTimedDeadline(deadline: string): boolean {
 function isLongLeadRequestActivity(name: string): boolean {
   const lower = name.toLowerCase()
   return (
-    isCustomerPhotoRequestActivity(lower) ||
+    isKitchenPhotoRequestActivity(lower) ||
+    isStoneColorPhotoRequestActivity(lower) ||
     (/\brequest\b/.test(lower) && !/\bsend\b/.test(lower))
   )
 }
@@ -1351,14 +1796,75 @@ function staggerTimedDeadlines(
   })
 }
 
+function transcriptHasSpecificColorSelection(transcript: string): boolean {
+  const lower = transcript.toLowerCase()
+  return (
+    /\b(?:menards|home depot|lowe'?s)\b/.test(lower) ||
+    /\b(?:riviera coast|exact color|specific color|color (?:we|they) (?:want|like|chose))\b/.test(
+      lower,
+    ) ||
+    /\bhave\s+(?:a\s+)?color\b/.test(lower)
+  )
+}
+
+function filterUnacceptedInventoryLinkActivities(
+  activities: ExtractedCallActivity[],
+  transcript: string,
+): ExtractedCallActivity[] {
+  if (!customerWillSendMaterialPhoto(transcript)) return activities
+  if (!transcriptHasSpecificColorSelection(transcript)) return activities
+  return activities.filter(activity => !isSendLinkStyleActivity(activity.name))
+}
+
+function injectBudgetIntoEstimateActivities(
+  activities: ExtractedCallActivity[],
+  transcript: string,
+): ExtractedCallActivity[] {
+  const budget = extractBudgetFromTranscript(transcript)
+  if (!budget) return activities
+
+  return activities.map(activity => {
+    const lower = activity.name.toLowerCase()
+    if (!isQuoteOrEstimateActivity(lower)) return activity
+    if (/\$\s*[\d,]+/.test(activity.name)) return activity
+    if (/\bunder\s+budget\b/.test(lower)) {
+      return {
+        ...activity,
+        name: activity.name.replace(/\bunder\s+budget\b/i, `under ${budget}`),
+      }
+    }
+    if (/\b(?:prepare|send)\b/.test(lower) && /\b(?:estimate|quote)\b/.test(lower)) {
+      return { ...activity, name: `${activity.name} under ${budget}` }
+    }
+    return activity
+  })
+}
+
 function finalizeExtractedActivities(
   activities: ExtractedCallActivity[],
   committedAt: Date,
   transcript: string,
 ): ExtractedCallActivity[] {
   const deduped = deduplicateActivities(activities)
-  const supplemented = supplementEdgePhotoSendActivity(deduped, committedAt, transcript)
-  const dedupedAgain = deduplicateActivities(supplemented)
+  const withEdgePhotos = supplementEdgePhotoSendActivity(
+    deduped,
+    committedAt,
+    transcript,
+  )
+  const withStonePhoto = supplementStoneColorPhotoRequestActivity(
+    withEdgePhotos,
+    committedAt,
+    transcript,
+  )
+  const withoutInventoryLink = filterUnacceptedInventoryLinkActivities(
+    withStonePhoto,
+    transcript,
+  )
+  const withBudget = injectBudgetIntoEstimateActivities(
+    withoutInventoryLink,
+    transcript,
+  )
+  const dedupedAgain = deduplicateActivities(withBudget)
   const sorted = [...dedupedAgain].sort(
     (a, b) => activitySchedulingOrder(a.name) - activitySchedulingOrder(b.name),
   )
@@ -1521,8 +2027,8 @@ Return JSON only: {"activities": [{"name": string, "deadline": string | null}, .
 Create a separate activity for each distinct commitment (different action or different due date). Never merge unrelated tasks into one activity.
 
 Include when stated:
-- Salesperson will send something (inventory link, website, granite/stone options, quote, edge photos, samples)
-- Customer will send something (kitchen photos, countertop photos, material photos)
+- Salesperson will send something (inventory link, website, granite/stone options, quote, edge photos, samples)—only when the rep committed and the customer did not choose a different path (e.g. if the customer will send their own color or kitchen photos for matching, do not create a send-inventory-link activity for a mere offer the customer declined)
+- Customer will send something—create separate activities when commitments differ: kitchen layout photos ("Request kitchen photos") and preferred stone or color photos when they have a specific material in mind ("Request picture of preferred stone")
 - Salesperson offers or agrees to call back (including "call you in two or three weeks")
 - On-site estimate when the rep will go to the customer to measure or quote (not when only scheduling is still being negotiated)
 - Other follow-up the rep committed to
@@ -1537,7 +2043,8 @@ Rules for name:
 - For "two or three weeks" call-back from the salesperson with no customer pick: set deadline null; server uses about two weeks
 - For an agreed call-back in N weeks (a week, in a week, about a week, one week, two weeks, three weeks, etc.): set deadline null; server computes the date from the transcript
 - This company sells stone countertops. When sending stone options, samples, links, or pricing, include the stone type if specified (granite, quartz, marble, etc.)
-- Examples: "Send granite inventory link", "Request kitchen photos", "Send edge profile photos", "Call back, follow up after vacation", "Call back, follow up on countertop project after vacation to Colombia"
+- When preparing or sending an estimate or quote, include the customer's stated budget amount in the activity name if they gave one (e.g. "Prepare and send estimate under $8,000")
+- Examples: "Send granite inventory link", "Request kitchen photos", "Request picture of preferred stone", "Send edge profile photos", "Prepare and send estimate under $8,000", "Call back, follow up after vacation", "Call back, follow up on countertop project after vacation to Colombia"
 - When the rep already agreed to be on-site at a specific time for an estimate, use name "Be on-site for estimate"—not "Schedule on-site measurement visit" or "Schedule on-site estimate visit"
 - Only use "Schedule ... estimate" when an estimate time is not yet agreed
 
@@ -1551,11 +2058,14 @@ Rules for deadline (prefer setting a deadline when timing was discussed; null on
 - Quote the call literally when choosing the day: if they said tomorrow, the deadline day must be tomorrow relative to the call date
 - "Right away", "now", "immediately", "ASAP", "shortly", "a little later", "a little bit later" when sending a link or options → omit deadline; server sets 30 minutes from activity creation
 - "I'll send the link today" (or similar send-today, no time) → YYYY-MM-DD for the call day only, never a datetime
-- "Tomorrow" for non-quote tasks (e.g. customer sends photos) → YYYY-MM-DD for the day after the call
+- "Tomorrow" only when that party said tomorrow for that task—customer sending kitchen photos tomorrow → Request kitchen photos due tomorrow; rep sending inventory, address, or sink photos during the call with no tomorrow stated → due today (call day), never tomorrow just because the customer mentioned tomorrow for something else
+- Quote due after customer sends measurements tomorrow → due tomorrow, not today
 - Quote or estimate with "by tomorrow" or before the store closes → omit deadline; server sets due today at 4:00 PM store time (two hours before 6:00 PM close), but never earlier than one hour after activity creation
 - Salesperson: "Would you like me to call you in two or three weeks?" while customer is in litigation → {"name":"Call back, check if litigation is finished","deadline":null}
-- Rep and customer agree rep will be on-site today at 5:30 pm for an estimate → {"name":"Be on-site for estimate","deadline":null} (server sets due 30 minutes before the appointment time)
+- Rep and customer agree rep will be on-site today at 5:30 pm for an estimate → {"name":"Be on-site for estimate","deadline":null} (server sets due 30 minutes before the appointment time, but never earlier than 9:00 AM store time)
+- Rep and customer agree on Saturday with no specific time → {"name":"Be on-site for estimate","deadline":null} (server sets due 9:00 AM store time on that day)
 - Rep offers to call Friday; customer says "call me next Friday" and rep agrees → {"name":"Call back, follow up on quote","deadline":"YYYY-MM-DD for next Friday after call date"}
+- Customer: "can you call me back in a couple hours? We'll do at 2 p.m." and rep agrees → {"name":"Call back, follow up on kitchen project","deadline":null} (server sets due 2:00 PM store time on the call day)
 
 Examples:
 - Salesperson discusses square edges, then says "I can also send you pictures"
@@ -1564,6 +2074,12 @@ Examples:
   -> {"activities":[
     {"name":"Send granite inventory link","deadline":"YYYY-MM-DD call day"},
     {"name":"Request kitchen photos","deadline":"YYYY-MM-DD day after call"}
+  ]}
+- Customer has exact quartz color from Menards and will send color photo plus kitchen layout
+  -> {"activities":[
+    {"name":"Request kitchen photos","deadline":"YYYY-MM-DD call day"},
+    {"name":"Request picture of preferred stone","deadline":"YYYY-MM-DD call day"},
+    {"name":"Prepare and send estimate under $8,000","deadline":"YYYY-MM-DD call day"}
   ]}
 - Salesperson: "I'll send you the link a little bit later"
   -> {"name":"Send granite inventory link","deadline":null}
@@ -1576,7 +2092,7 @@ ${callReference}`
 
   try {
     const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: GPT_MINI_MODEL,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -1585,7 +2101,7 @@ ${callReference}`
         },
         { role: 'user', content: transcript },
       ],
-      ...(isVoicemail ? { max_tokens: 250 } : {}),
+      ...(isVoicemail ? { max_completion_tokens: 250 } : {}),
     })
 
     const rawContent = completion.choices[0]?.message?.content ?? '{}'

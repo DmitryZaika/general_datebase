@@ -1,37 +1,38 @@
 import dotenv from 'dotenv'
-import mysql from 'mysql2/promise'
-import { afterEach, beforeEach, vi } from 'vitest'
-import { type MysqlData, TEST_DB_CONFIG } from './tests/testDatabase'
 
-// Load environment variables
+// Load .env before importing any module whose top level reads process.env
+// (e.g. tests/testDatabase.ts's TEST_DB_CONFIG).
 dotenv.config()
 
-// Ensure we're using a test database
+import mysql from 'mysql2/promise'
+import { afterEach, beforeEach, vi } from 'vitest'
+import { TEST_DB_CONFIG } from './tests/testDatabase'
+
 if (!process.env.DB_DATABASE?.includes('test')) {
   // biome-ignore lint/suspicious/noConsole: for tests
   console.warn('Warning: Database name should contain "test" for safety')
 }
 
-// Set test environment variables if not already set
 if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = 'test'
 }
 
+// Pool so each query gets a fresh connection — mysql2's per-connection
+// prepared-statement cache otherwise goes stale across helper.setup()'s
+// DROP/CREATE cycles.
 vi.mock('~/db.server', () => {
-  let testConnection: mysql.Connection | null = null
-
-  const getTestConnection = async () => {
-    if (!testConnection) {
-      testConnection = await mysql.createConnection(TEST_DB_CONFIG)
-    }
-    return testConnection
-  }
-
+  const pool = mysql.createPool({
+    ...TEST_DB_CONFIG,
+    connectionLimit: 5,
+    waitForConnections: true,
+  })
   return {
     db: {
-      execute: async (sql: string, params: MysqlData[]) => {
-        const connection = await getTestConnection()
-        return await connection.execute(sql, params)
+      execute: async (sql: string, params: unknown[]) => {
+        return await pool.execute(sql, params)
+      },
+      query: async (sql: string, params: unknown[]) => {
+        return await pool.query(sql, params)
       },
     },
   }

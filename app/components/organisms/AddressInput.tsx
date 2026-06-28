@@ -20,10 +20,29 @@ import {
 } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
 import type { FinalSuggestion } from '~/services/types'
+import { replaceZipInAddressText, stripCountryFromAddressText } from '~/utils/address'
 
-function replaceZipCode(address: string, zipCode: string) {
-  if (address.includes(zipCode)) return address
-  return address.replace('USA', zipCode)
+function formatAddressText(address: string, zipCode: string) {
+  return replaceZipInAddressText(address, zipCode)
+}
+
+function zipFromAddress(address: string): string {
+  const match = stripCountryFromAddressText(address).match(/\b(\d{5}(?:-\d{4})?)\b/)
+  return match?.[1] ?? ''
+}
+
+function effectiveZip(zipFieldValue: string, address: string): string {
+  if (zipFieldValue) return zipFieldValue
+  return zipFromAddress(address)
+}
+
+async function fetchPlaceZip(placeId: string): Promise<string> {
+  const res = await fetch(
+    `/api/google/place-details?place_id=${encodeURIComponent(placeId)}`,
+  )
+  if (!res.ok) return ''
+  const json: { zip_code?: string } = await res.json()
+  return json.zip_code ?? ''
 }
 
 async function completeAddress(
@@ -56,22 +75,30 @@ export function AddressInput<T extends FieldValues>({
 }: Props<T>) {
   const [open, setOpen] = useState(false)
 
-  const value = form.watch(field)
-  const [debounced] = useDebounce(value, 150)
+  const rawValue = form.watch(field) ?? ''
+  const zipFieldValue = zipField ? (form.watch(zipField) ?? '') : ''
+  const resolvedZip = effectiveZip(zipFieldValue, rawValue)
+  const searchQuery = stripCountryFromAddressText(rawValue).trim()
+  const [debounced] = useDebounce(searchQuery, 150)
 
   const { data = [], isFetching } = useQuery({
     queryKey: ['google', 'address', debounced],
     queryFn: ({ signal }) => completeAddress(debounced, signal),
-    enabled: (debounced?.length ?? 0) >= 3,
+    enabled: debounced.length >= 3,
     staleTime: 60_000,
     placeholderData: previousData => previousData,
   })
 
-  function handleSelect(address: string, zipCode: string) {
-    const addressWithZip = replaceZipCode(address, zipCode ?? '') as FieldPathValue<
-      T,
-      StringPath<T>
-    >
+  async function handleSelect(suggestion: FinalSuggestion) {
+    let zip = suggestion.address.zip ?? ''
+    if (!zip) {
+      zip = await fetchPlaceZip(suggestion.place_id)
+    }
+
+    const addressWithZip = formatAddressText(
+      suggestion.description.text,
+      zip,
+    ) as FieldPathValue<T, StringPath<T>>
 
     form.setValue(field, addressWithZip, {
       shouldValidate: true,
@@ -79,18 +106,16 @@ export function AddressInput<T extends FieldValues>({
     })
 
     if (zipField) {
-      form.setValue(zipField, zipCode as PathValue<T, StringPath<T>>, {
+      form.setValue(zipField, zip as PathValue<T, StringPath<T>>, {
         shouldValidate: true,
         shouldDirty: true,
       })
     }
-    // requestAnimationFrame(() => setOpen(false));
   }
 
   const toUpperCase = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
 
-  const isDebouncing =
-    open && (value?.length ?? 0) >= 3 && (value ?? '') !== (debounced ?? '')
+  const isDebouncing = open && searchQuery.length >= 3 && searchQuery !== debounced
   const isSearching = isFetching || isDebouncing
 
   return (
@@ -105,24 +130,30 @@ export function AddressInput<T extends FieldValues>({
               <Input
                 className={isSearching ? 'pr-9' : undefined}
                 placeholder={`Enter ${toUpperCase(type)} address (min 3 characters)`}
-                value={
-                  zipField
-                    ? replaceZipCode(rhf.value ?? '', form.watch(zipField) ?? '')
-                    : rhf.value
-                }
+                value={rawValue}
                 onChange={e => {
-                  rhf.onChange(e)
+                  rhf.onChange(stripCountryFromAddressText(e.target.value))
                   setOpen(true)
                 }}
                 onFocus={() => rhf.value && setOpen(true)}
                 onBlur={() => {
                   rhf.onBlur()
+                  const normalized = formatAddressText(rhf.value ?? '', resolvedZip)
+                  if (normalized !== rhf.value) {
+                    form.setValue(
+                      field,
+                      normalized as FieldPathValue<T, StringPath<T>>,
+                      {
+                        shouldDirty: true,
+                      },
+                    )
+                  }
                   setTimeout(() => setOpen(false), 200)
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Tab' && open && data.length > 0) {
                     e.preventDefault()
-                    handleSelect(data[0].description.text, data[0].address.zip ?? '')
+                    void handleSelect(data[0])
                     setOpen(false)
                   }
                 }}
@@ -146,13 +177,8 @@ export function AddressInput<T extends FieldValues>({
               ) : (
                 <CommandGroup heading={isSearching ? 'Searching…' : 'Suggestions'}>
                   {data.map(s => (
-                    <CommandItem
-                      key={s.place_id}
-                      onSelect={() =>
-                        handleSelect(s.description.text, s.address.zip ?? '')
-                      }
-                    >
-                      {replaceZipCode(s.description.text, s.address.zip ?? '')}
+                    <CommandItem key={s.place_id} onSelect={() => void handleSelect(s)}>
+                      {formatAddressText(s.description.text, s.address.zip ?? '')}
                     </CommandItem>
                   ))}
                 </CommandGroup>

@@ -195,6 +195,22 @@ export default function CustomerInfoDialog() {
   } = useLoaderData<typeof loader>()
 
   const currentTab = location.pathname.split('/').pop() || 'info'
+  const isEmailChat = location.pathname.includes('/chat/')
+
+  const outletContext = {
+    customer,
+    deals,
+    project,
+    emails,
+    reassignments,
+    dealActivities,
+    dealNotes,
+    viewerName,
+  }
+
+  if (isEmailChat) {
+    return <Outlet context={outletContext} />
+  }
 
   return (
     <>
@@ -213,34 +229,12 @@ export default function CustomerInfoDialog() {
             <TabsTrigger value='projects'>Projects</TabsTrigger>
           </TabsList>
           <div className='mt-4'>
-            <Outlet
-              context={{
-                customer,
-                deals,
-                project,
-                emails,
-                reassignments,
-                dealActivities,
-                dealNotes,
-                viewerName,
-              }}
-            />
+            <Outlet context={outletContext} />
           </div>
         </Tabs>
       ) : (
         <div className='mt-4'>
-          <Outlet
-            context={{
-              customer,
-              deals,
-              project,
-              emails,
-              reassignments,
-              dealActivities,
-              dealNotes,
-              viewerName,
-            }}
-          />
+          <Outlet context={outletContext} />
         </div>
       )}
     </>

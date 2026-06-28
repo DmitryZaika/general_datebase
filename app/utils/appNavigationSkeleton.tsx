@@ -8,6 +8,7 @@ import { EmailsPageSkeleton } from '~/components/organisms/EmailsPageSkeleton'
 import { EmployeePageSkeleton } from '~/components/organisms/EmployeePageSkeleton'
 import { InventoryCatalogSkeleton } from '~/components/organisms/InventoryCatalogSkeleton'
 import { MediaGridSkeleton } from '~/components/organisms/MediaGridSkeleton'
+import { CloudTalkPageSkeleton } from '~/components/organisms/SmsPage/CloudTalkPageSkeleton'
 
 export function renderAppNavigationSkeleton(section: string | null, navPath: string) {
   const isAdmin = navPath.startsWith('/admin')
@@ -74,6 +75,9 @@ export function renderAppNavigationSkeleton(section: string | null, navPath: str
   }
   if (section === 'suppliers') {
     return <SuppliersPageSkeleton />
+  }
+  if (section === 'cloudtalk') {
+    return <CloudTalkPageSkeleton readOnly={isAdmin} />
   }
   return <EmployeePageSkeleton />
 }

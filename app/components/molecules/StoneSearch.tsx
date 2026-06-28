@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
 import { CheckIcon, ChevronRight, Edit, MinusIcon, Search, Trash } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -16,6 +17,13 @@ interface StoneSearchProps {
   mode?: 'default' | 'samples'
   onMinus?: (stoneId: number) => void
 }
+
+const RESULTS_PANEL_VARIANTS = {
+  hidden: { opacity: 0, y: -10 },
+  visible: { opacity: 1, y: 0 },
+}
+
+const RESULTS_PANEL_TRANSITION = { duration: 0.2, ease: 'easeOut' as const }
 
 const highlightStyles = `
   @keyframes pulse-highlight {
@@ -131,122 +139,132 @@ export function StoneSearch({
         </div>
       </div>
 
-      {isInputFocused && (
-        <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
-          {displayStones.map(stone => (
-            <div
-              key={stone.id}
-              onClick={e => {
-                if (mode === 'samples' && onMinus) {
-                  e.stopPropagation()
-                  onMinus(stone.id)
-                  setDoneStoneId(stone.id)
-                  setTimeout(() => setDoneStoneId(null), 1000)
-                } else {
-                  handleResultClick(stone.id)
-                }
-              }}
-              className='p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center'
-            >
-              <div className='flex-1 flex-col'>
-                <div className='font-medium text-gray-800'>
-                  {stone.name}
-                  {(mode === 'samples'
-                    ? Number(stone.samples_amount ?? 0) <= 0
-                    : stone.available === 0 && !stone.regular_stock) && (
-                    <span className='ml-2 text-xs font-bold text-red-500'>
-                      Out of Stock
-                    </span>
-                  )}
-                </div>
-
-                <div className='text-sm text-gray-500'>
-                  {(() => {
-                    const bundleSuffix =
-                      stone.bundle_number != null &&
-                      String(stone.bundle_number).trim() !== ''
-                        ? ` · Bundle#${stone.bundle_number}`
-                        : ''
-                    if (userRole === 'admin') {
-                      return stone.retail_price === 0
-                        ? `Price per slab $${stone.cost_per_sqft}${bundleSuffix}`
-                        : `Price: $${stone.retail_price} / $${stone.cost_per_sqft}${bundleSuffix}`
-                    }
-                    if (userRole === 'employee') {
-                      return stone.retail_price === 0
-                        ? `Price per slab $${stone.cost_per_sqft}${bundleSuffix}`
-                        : `Price: $${stone.retail_price}${bundleSuffix}`
-                    }
-                    return ''
-                  })()}
-                </div>
-              </div>
-
-              {userRole === 'employee' && mode === 'default' && (
-                <div className='flex items-center flex-col'>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    onClick={e => handleSlabsClick(stone.id, e)}
-                    className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                  >
-                    Slabs
-                  </Button>
-                </div>
-              )}
-
-              {userRole === 'employee' && mode === 'samples' && (
-                <div className='flex items-center flex-col'>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    onClick={e => {
-                      e.stopPropagation()
-                      if (onMinus) {
-                        onMinus(stone.id)
-                        setDoneStoneId(stone.id)
-                        setTimeout(() => setDoneStoneId(null), 1000)
-                      }
-                    }}
-                    className='h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-100'
-                  >
-                    {doneStoneId === stone.id ? (
-                      <CheckIcon className='w-4 h-4 text-green-600' />
-                    ) : (
-                      <MinusIcon className='w-4 h-4' />
+      <AnimatePresence initial={false}>
+        {isInputFocused && displayStones.length > 0 && (
+          <motion.div
+            key='stone-search-results'
+            variants={RESULTS_PANEL_VARIANTS}
+            initial='hidden'
+            animate='visible'
+            exit='hidden'
+            transition={RESULTS_PANEL_TRANSITION}
+            className='absolute z-50 w-full mt-2 origin-top bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'
+          >
+            {displayStones.map(stone => (
+              <div
+                key={stone.id}
+                onClick={e => {
+                  if (mode === 'samples' && onMinus) {
+                    e.stopPropagation()
+                    onMinus(stone.id)
+                    setDoneStoneId(stone.id)
+                    setTimeout(() => setDoneStoneId(null), 1000)
+                  } else {
+                    handleResultClick(stone.id)
+                  }
+                }}
+                className='p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center'
+              >
+                <div className='flex-1 flex-col'>
+                  <div className='font-medium text-gray-800'>
+                    {stone.name}
+                    {(mode === 'samples'
+                      ? Number(stone.samples_amount ?? 0) <= 0
+                      : stone.available === 0 && !stone.regular_stock) && (
+                      <span className='ml-2 text-xs font-bold text-red-500'>
+                        Out of Stock
+                      </span>
                     )}
-                  </Button>
+                  </div>
+
+                  <div className='text-sm text-gray-500'>
+                    {(() => {
+                      const bundleSuffix =
+                        stone.bundle_number != null &&
+                        String(stone.bundle_number).trim() !== ''
+                          ? ` · Bundle#${stone.bundle_number}`
+                          : ''
+                      if (userRole === 'admin') {
+                        return stone.retail_price === 0
+                          ? `Price per slab $${stone.cost_per_sqft}${bundleSuffix}`
+                          : `Price: $${stone.retail_price} / $${stone.cost_per_sqft}${bundleSuffix}`
+                      }
+                      if (userRole === 'employee') {
+                        return stone.retail_price === 0
+                          ? `Price per slab $${stone.cost_per_sqft}${bundleSuffix}`
+                          : `Price: $${stone.retail_price}${bundleSuffix}`
+                      }
+                      return ''
+                    })()}
+                  </div>
                 </div>
-              )}
 
-              {userRole === 'admin' && (
-                <>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    onClick={e => handleEditClick(stone.id, e)}
-                    className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                  >
-                    <Edit style={{ minWidth: '20px', minHeight: '20px' }} />
-                  </Button>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    onClick={e => handleDeleteClick(stone.id, e)}
-                    className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                  >
-                    <Trash style={{ minWidth: '20px', minHeight: '20px' }} />
-                  </Button>
-                </>
-              )}
+                {userRole === 'employee' && mode === 'default' && (
+                  <div className='flex items-center flex-col'>
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      onClick={e => handleSlabsClick(stone.id, e)}
+                      className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                    >
+                      Slabs
+                    </Button>
+                  </div>
+                )}
 
-              {userRole === 'customer' && (
-                <ChevronRight className='h-4 w-4 text-gray-400' />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+                {userRole === 'employee' && mode === 'samples' && (
+                  <div className='flex items-center flex-col'>
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      onClick={e => {
+                        e.stopPropagation()
+                        if (onMinus) {
+                          onMinus(stone.id)
+                          setDoneStoneId(stone.id)
+                          setTimeout(() => setDoneStoneId(null), 1000)
+                        }
+                      }}
+                      className='h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-100'
+                    >
+                      {doneStoneId === stone.id ? (
+                        <CheckIcon className='w-4 h-4 text-green-600' />
+                      ) : (
+                        <MinusIcon className='w-4 h-4' />
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {userRole === 'admin' && (
+                  <>
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      onClick={e => handleEditClick(stone.id, e)}
+                      className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                    >
+                      <Edit style={{ minWidth: '20px', minHeight: '20px' }} />
+                    </Button>
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      onClick={e => handleDeleteClick(stone.id, e)}
+                      className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                    >
+                      <Trash style={{ minWidth: '20px', minHeight: '20px' }} />
+                    </Button>
+                  </>
+                )}
+
+                {userRole === 'customer' && (
+                  <ChevronRight className='h-4 w-4 text-gray-400' />
+                )}
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <SuperCarousel
         type='stones'
         currentId={currentId}

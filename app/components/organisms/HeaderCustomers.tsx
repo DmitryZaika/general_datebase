@@ -26,7 +26,11 @@ function getButtonLink({
   return `/customer/${companyId}/stones${location.search}`
 }
 
-export default function HeaderCustomers() {
+export default function HeaderCustomers({
+  hideBurgerMenu = false,
+}: {
+  hideBurgerMenu?: boolean
+}) {
   const location = useLocation()
   const isLogin = location.pathname.includes('login')
   const isCustomersCompanies = location.pathname === '/customers/companies'
@@ -74,9 +78,7 @@ export default function HeaderCustomers() {
           </a>
         )}
       </div>
-      <div className='md:hidden'>
-        <BurgerMenu />
-      </div>
+      <div className='md:hidden'>{hideBurgerMenu ? null : <BurgerMenu />}</div>
     </header>
   )
 }

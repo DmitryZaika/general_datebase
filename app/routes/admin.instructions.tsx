@@ -1,7 +1,22 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import DOMPurify from 'isomorphic-dompurify'
-import { Pencil, Plus, Search, Trash2, X } from 'lucide-react'
-import type { FC } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { GripVertical, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import type { FC, HTMLAttributes, ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -10,6 +25,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useRevalidator,
   useSearchParams,
 } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
@@ -25,26 +41,15 @@ import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { cn } from '~/lib/utils'
 import '~/styles/instructions.css'
+import {
+  applySiblingReorder,
+  buildInstructionTree,
+  type InstructionNode,
+  type InstructionRow,
+} from '~/utils/instructionTree'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import { isEmptyRichText, stripHtmlTags } from '~/utils/stringHelpers'
-
-interface Instructions {
-  id: number
-  title: string
-  parent_id: number | null
-  after_id: number | null
-  rich_text: string
-}
-
-interface InstructionNode {
-  id: number
-  title: string
-  parent_id: number | null
-  after_id: number | null
-  rich_text: string
-  children: InstructionNode[]
-}
 
 interface SearchResult extends InstructionNode {
   matchType: 'title' | 'content'
@@ -54,6 +59,9 @@ interface InstructionItemProps {
   instruction: InstructionNode
   onEdit: (id: number) => void
   onDelete: (id: number) => void
+  onReorder: (parentId: number | null, orderedIds: number[]) => void
+  sortDisabled?: boolean
+  dragHandle?: ReactNode
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -69,7 +77,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     url.searchParams.get('type') === 'general' ? 'general' : 'company'
   const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
   const companyId = mode === 'general' ? 0 : user.company_id
-  const instructions = await selectMany<Instructions>(
+  const instructions = await selectMany<InstructionRow>(
     db,
     'SELECT id, title, parent_id, after_id, rich_text FROM instructions WHERE company_id = ?',
     [companyId],
@@ -77,46 +85,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { instructions, allowGeneral, mode }
 }
 
-function buildInstructionTree(instructions: Instructions[]): InstructionNode[] {
-  const nodeMap = new Map<number, InstructionNode>()
-
-  instructions.forEach(item => {
-    nodeMap.set(item.id, {
-      ...item,
-      children: [],
-    })
+async function persistInstructionOrder(
+  parentId: number | null,
+  orderedIds: number[],
+  mode: 'company' | 'general',
+) {
+  const response = await fetch('/api/instructions/reorder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parentId, orderedIds, mode }),
   })
-
-  const rootNodes: InstructionNode[] = []
-
-  const insertNodeInOrder = (nodes: InstructionNode[], node: InstructionNode) => {
-    if (node.after_id === null) {
-      nodes.unshift(node)
-    } else {
-      const index = nodes.findIndex(n => n.id === node.after_id)
-      if (index !== -1) {
-        nodes.splice(index + 1, 0, node)
-      } else {
-        nodes.push(node)
-      }
-    }
+  if (!response.ok) {
+    throw new Error('Failed to reorder instructions')
   }
-
-  instructions.forEach(item => {
-    const node = nodeMap.get(item.id)
-    if (!node) return
-
-    if (item.parent_id === null) {
-      insertNodeInOrder(rootNodes, node)
-    } else {
-      const parentNode = nodeMap.get(item.parent_id)
-      if (parentNode) {
-        insertNodeInOrder(parentNode.children, node)
-      }
-    }
-  })
-
-  return rootNodes
 }
 
 interface InstructionHeaderProps {
@@ -124,6 +105,7 @@ interface InstructionHeaderProps {
   onEdit: (e: React.MouseEvent) => void
   onDelete: (e: React.MouseEvent) => void
   textAlign?: 'left' | 'center'
+  dragHandle?: ReactNode
 }
 
 const InstructionHeader: FC<InstructionHeaderProps> = ({
@@ -131,16 +113,20 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
   onEdit,
   onDelete,
   textAlign,
+  dragHandle,
 }) => (
-  <div className='flex items-center justify-between flex-1 gap-6'>
-    <h3
-      className={cn(
-        'font-bold text-2xl text-gray-900',
-        textAlign && `text-${textAlign}`,
-      )}
-    >
-      {title}
-    </h3>
+  <div className='flex items-center justify-between flex-1 gap-3'>
+    <div className='flex min-w-0 items-center gap-2'>
+      {dragHandle}
+      <h3
+        className={cn(
+          'font-bold text-2xl text-gray-900',
+          textAlign && `text-${textAlign}`,
+        )}
+      >
+        {title}
+      </h3>
+    </div>
     <div className='flex items-center gap-2 shrink-0'>
       <button
         type='button'
@@ -164,10 +150,144 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
   </div>
 )
 
+function InstructionDragHandle(props: HTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type='button'
+      className='touch-none rounded p-1 text-gray-400 hover:text-gray-700'
+      aria-label='Drag to reorder'
+      onClick={event => event.stopPropagation()}
+      {...props}
+    >
+      <GripVertical className='h-4 w-4' />
+    </button>
+  )
+}
+
+interface InstructionSortableListProps {
+  items: InstructionNode[]
+  parentId: number | null
+  sortDisabled?: boolean
+  onReorder: (parentId: number | null, orderedIds: number[]) => void
+  onEdit: (id: number) => void
+  onDelete: (id: number) => void
+  accordion?: boolean
+}
+
+function SortableInstructionRow({
+  instruction,
+  sortDisabled,
+  children,
+}: {
+  instruction: InstructionNode
+  sortDisabled?: boolean
+  children: (dragHandle: ReactNode | undefined) => ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: instruction.id, disabled: sortDisabled })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const dragHandle = sortDisabled ? undefined : (
+    <InstructionDragHandle {...attributes} {...listeners} />
+  )
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children(dragHandle)}
+    </div>
+  )
+}
+
+function InstructionSortableList({
+  items,
+  parentId,
+  sortDisabled,
+  onReorder,
+  onEdit,
+  onDelete,
+  accordion = true,
+}: InstructionSortableListProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (sortDisabled) return
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = items.findIndex(item => item.id === Number(active.id))
+    const newIndex = items.findIndex(item => item.id === Number(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    onReorder(
+      parentId,
+      arrayMove(items, oldIndex, newIndex).map(item => item.id),
+    )
+  }
+
+  const listContent = items.map(item => (
+    <SortableInstructionRow
+      key={item.id}
+      instruction={item}
+      sortDisabled={sortDisabled}
+    >
+      {dragHandle => (
+        <InstructionItem
+          instruction={item}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onReorder={onReorder}
+          sortDisabled={sortDisabled}
+          dragHandle={dragHandle}
+        />
+      )}
+    </SortableInstructionRow>
+  ))
+
+  if (sortDisabled) {
+    if (accordion) {
+      return (
+        <Accordion type='multiple' className='w-full'>
+          {listContent}
+        </Accordion>
+      )
+    }
+    return <div className='space-y-3'>{listContent}</div>
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext
+        items={items.map(item => item.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        {accordion ? (
+          <Accordion type='multiple' className='w-full'>
+            {listContent}
+          </Accordion>
+        ) : (
+          <div className='space-y-3'>{listContent}</div>
+        )}
+      </SortableContext>
+    </DndContext>
+  )
+}
+
 const InstructionItem: FC<InstructionItemProps> = ({
   instruction,
   onEdit,
   onDelete,
+  onReorder,
+  sortDisabled,
+  dragHandle,
 }) => {
   const hasChildren = instruction.children.length > 0
   const hasContent = !isEmptyRichText(instruction.rich_text)
@@ -191,6 +311,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
             title={instruction.title}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            dragHandle={dragHandle}
           />
         </div>
       )
@@ -207,6 +328,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
             onEdit={handleEdit}
             onDelete={handleDelete}
             textAlign='left'
+            dragHandle={dragHandle}
           />
         </AccordionTrigger>
         <AccordionContent>
@@ -227,16 +349,14 @@ const InstructionItem: FC<InstructionItemProps> = ({
             )}
             {hasChildren && (
               <section className='mt-6'>
-                <Accordion type='multiple' className='space-y-3'>
-                  {instruction.children.map(child => (
-                    <InstructionItem
-                      key={child.id}
-                      instruction={child}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                    />
-                  ))}
-                </Accordion>
+                <InstructionSortableList
+                  items={instruction.children}
+                  parentId={instruction.id}
+                  sortDisabled={sortDisabled}
+                  onReorder={onReorder}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                />
               </section>
             )}
           </div>
@@ -249,13 +369,16 @@ const InstructionItem: FC<InstructionItemProps> = ({
     <div className='ml-6 border-l-1 border-blue-200 pl-4'>
       <article className='py-5 px-6 bg-gray-50 rounded-lg shadow-md'>
         <div className='flex items-start justify-between gap-6'>
-          <div
-            className='prose prose-base max-w-none instructions flex-1'
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
-            dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(instruction.rich_text),
-            }}
-          />
+          <div className='flex min-w-0 flex-1 items-start gap-2'>
+            {dragHandle}
+            <div
+              className='prose prose-base max-w-none instructions flex-1'
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(instruction.rich_text),
+              }}
+            />
+          </div>
           <div className='flex items-center gap-3 shrink-0'>
             <button
               type='button'
@@ -285,14 +408,15 @@ const InstructionItem: FC<InstructionItemProps> = ({
         </div>
         {hasChildren && (
           <section className='mt-6 space-y-3'>
-            {instruction.children.map(child => (
-              <InstructionItem
-                key={child.id}
-                instruction={child}
-                onEdit={onEdit}
-                onDelete={onDelete}
-              />
-            ))}
+            <InstructionSortableList
+              items={instruction.children}
+              parentId={instruction.id}
+              sortDisabled={sortDisabled}
+              onReorder={onReorder}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              accordion={false}
+            />
           </section>
         )}
       </article>
@@ -351,16 +475,34 @@ const searchAllInstructions = (
 export default function AdminInstructions() {
   const { instructions, allowGeneral, mode } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
+  const revalidator = useRevalidator()
   const [searchParams, setSearchParams] = useSearchParams()
   const instructionIdParam = searchParams.get('instructionId')
   const location = useLocation()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [instructionRows, setInstructionRows] = useState(instructions)
+
+  useEffect(() => {
+    setInstructionRows(instructions)
+  }, [instructions])
 
   const instructionTree = useMemo(
-    () => buildInstructionTree(instructions),
-    [instructions],
+    () => buildInstructionTree(instructionRows),
+    [instructionRows],
+  )
+
+  const handleReorder = useCallback(
+    async (parentId: number | null, orderedIds: number[]) => {
+      setInstructionRows(current => applySiblingReorder(current, parentId, orderedIds))
+      try {
+        await persistInstructionOrder(parentId, orderedIds, mode)
+      } catch {
+        revalidator.revalidate()
+      }
+    },
+    [mode, revalidator],
   )
 
   const searchResults = useMemo(
@@ -511,16 +653,14 @@ export default function AdminInstructions() {
         </section>
       ) : (
         <section>
-          <Accordion type='multiple' className='w-full'>
-            {displayTree.map(instruction => (
-              <InstructionItem
-                key={instruction.id}
-                instruction={instruction}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))}
-          </Accordion>
+          <InstructionSortableList
+            items={displayTree}
+            parentId={null}
+            sortDisabled={!!selectedId}
+            onReorder={handleReorder}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         </section>
       )}
       <Outlet />
