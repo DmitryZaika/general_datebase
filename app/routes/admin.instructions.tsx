@@ -75,7 +75,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const allowGeneral = !!user.is_superuser
   const requestedMode =
     url.searchParams.get('type') === 'general' ? 'general' : 'company'
-  const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
+  const mode: 'company' | 'general' =
+    allowGeneral && requestedMode === 'general' ? 'general' : 'company'
   const companyId = mode === 'general' ? 0 : user.company_id
   const instructions = await selectMany<InstructionRow>(
     db,

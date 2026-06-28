@@ -26,7 +26,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   const dealListId = params.dealListId
   await db.execute(`UPDATE deals_list SET deleted_at = NOW() WHERE id = ?`, [
-    dealListId,
+    dealListId || null,
   ])
 
   const session = await getSession(request.headers.get('Cookie'))

@@ -65,7 +65,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
      WHERE id = ?`,
     [
       data.customer_id,
-      data.amount,
+      data.amount || null,
       data.title ?? null,
       data.list_id,
       data.position,

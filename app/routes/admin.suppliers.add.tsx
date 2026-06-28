@@ -60,7 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
   await db.execute(
     `INSERT INTO suppliers  (website, supplier_name, manager,  phone, email, notes, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
-      data.website,
+      data.website || null,
       data.supplier_name,
       data.manager ?? null,
       data.phone ?? null,

@@ -22,32 +22,35 @@ async function convertWithHeicConvert(original: Buffer): Promise<Buffer> {
     format: 'JPEG',
     quality: 0.92,
   })
-  return Buffer.from(output)
+  if (output instanceof ArrayBuffer) {
+    return Buffer.from(output)
+  }
+  return Buffer.from(output.buffer, output.byteOffset, output.length)
 }
 
 async function convertWithHeicConvertAll(original: Buffer): Promise<Buffer> {
   const mod = await import('heic-convert')
-  const convert = mod.default ?? mod
-  const convertAll = convert.all as
-    | ((opts: {
-        buffer: Buffer | Uint8Array
-        format: 'JPEG' | 'PNG'
-        quality?: number
-      }) => Promise<Array<Uint8Array | ArrayBuffer>>)
-    | undefined
+  // Direct cast to the module type handles common interop setups cleanly
+  const convert = (mod.default ?? mod) as typeof import('heic-convert')
 
-  if (!convertAll) {
+  if (!convert.all) {
     return await convertWithHeicConvert(original)
   }
 
-  const outputs = await convertAll({
+  // TypeScript now natively knows the correct parameters and return shapes here
+  const outputs = await convert.all({
     buffer: original,
     format: 'JPEG',
     quality: 0.92,
   })
-  const first = outputs[0]
-  if (!first) throw new Error('heic-convert returned no images')
-  return Buffer.from(first)
+
+  const firstImage = outputs[0]
+  if (!firstImage) throw new Error('heic-convert returned no images')
+
+  // The official types reveal we must call .convert() on the image instance
+  const actualArrayBuffer = await firstImage.convert()
+
+  return Buffer.from(actualArrayBuffer)
 }
 
 export async function convertHeicToJpeg(original: Buffer): Promise<Buffer> {

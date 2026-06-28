@@ -93,8 +93,8 @@ export async function action({ request }: ActionFunctionArgs) {
        VALUES (?, ?, ?, ?, ?, 1, ?)`,
     [
       data.name,
-      data.phone_number,
-      data.email,
+      data.phone_number || null,
+      data.email || null,
       password,
       data.company_id,
       data.is_admin,

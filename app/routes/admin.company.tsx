@@ -133,7 +133,7 @@ export async function action({ request }: ActionFunctionArgs) {
       [
         data.name,
         data.address,
-        nextLogoUrl,
+        nextLogoUrl || null,
         resolveCompanyLogoHeight(data.logo_height),
         displayTaxRateToDb(data.state_taxes),
         user.company_id,

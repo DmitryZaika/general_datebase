@@ -50,6 +50,7 @@ async function fetchPlacePostalCode(
   placeId: string,
   signal: AbortSignal,
 ): Promise<string | null> {
+  if (!GOOGLE_KEY) return null
   const normalizedPlaceId = placeId.replace(/^places\//, '')
   const gRes = await fetch(
     `https://places.googleapis.com/v1/places/${encodeURIComponent(normalizedPlaceId)}`,
@@ -93,6 +94,7 @@ async function fetchPostalCodeFromGeocode(
 ): Promise<string | null> {
   const query = addressText.replace(/,\s*USA\s*$/i, '').trim()
   if (!query) return null
+  if (!GOOGLE_KEY) return null
 
   const url = new URL('https://maps.googleapis.com/maps/api/geocode/json')
   url.searchParams.set('address', query)

@@ -64,7 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.customer_id,
-        data.amount,
+        data.amount ?? null,
         data.title ?? null,
         initialStatus,
         data.list_id,
@@ -89,7 +89,7 @@ export async function action({ request }: ActionFunctionArgs) {
     await db.execute(
       `UPDATE deals SET amount = ?, title = ?, status = ?, list_id = ?, position = ? WHERE id = ?`,
       [
-        data.amount,
+        data.amount ?? null,
         data.title ?? null,
         initialStatus,
         data.list_id,

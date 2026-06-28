@@ -29,12 +29,12 @@ export interface DealActivity {
   deal_id: number
   company_id: number
   name: string
-  deadline: Nullable<string>
+  deadline: string | null
   priority: ActivityPriority
   is_completed: number
-  completed_at: Nullable<string>
+  completed_at: string | null
   created_at: string
-  created_by: Nullable<string>
+  created_by: string | null
 }
 
 const VALID_PRIORITIES = Object.values(ActivityPriority)
@@ -47,7 +47,7 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0')
 }
 
-function toMySQLDatetime(dateString: string): Nullable<string> {
+function toMySQLDatetime(dateString: string): string | null {
   const dateOnly = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (dateOnly) {
     const [, y, mo, d] = dateOnly
@@ -76,7 +76,7 @@ function toMySQLDatetime(dateString: string): Nullable<string> {
   return null
 }
 
-function deadlineForReminder(rawDeadline: Nullable<string>): Nullable<string> {
+function deadlineForReminder(rawDeadline: string | null): string | null {
   if (!rawDeadline) return null
   if (rawDeadline.includes('T')) return rawDeadline
   if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rawDeadline)) {
@@ -87,8 +87,8 @@ function deadlineForReminder(rawDeadline: Nullable<string>): Nullable<string> {
 
 interface ActivityInput {
   name: string
-  rawDeadline: Nullable<string>
-  deadlineValue: Nullable<string>
+  rawDeadline: string | null
+  deadlineValue: string | null
   priority: ActivityPriority
 }
 
@@ -205,7 +205,7 @@ async function handleCreate(
   formData: FormData,
   dealId: number,
   companyId: number,
-  createdBy: Nullable<string>,
+  createdBy: string | null,
   userId: number,
 ) {
   const parsed = parseActivityInput(formData)
@@ -237,7 +237,7 @@ async function handleUpdate(
   formData: FormData,
   dealId: number,
   companyId: number,
-  createdBy: Nullable<string>,
+  createdBy: string | null,
   userId: number,
 ) {
   const activityId = formData.get('activityId')
@@ -326,7 +326,7 @@ async function handleDelete(
   formData: FormData,
   dealId: number,
   companyId: number,
-  createdBy: Nullable<string>,
+  createdBy: string | null,
   userId: number,
 ) {
   const activityId = formData.get('activityId')

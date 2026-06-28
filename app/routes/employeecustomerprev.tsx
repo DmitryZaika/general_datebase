@@ -41,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   await db.execute(
     `INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
-    [data.name, data.email, data.phoneNumber, data.address],
+    [data.name, data.email || null, data.phoneNumber || null, data.address || null],
   )
   return { success: true }
 }

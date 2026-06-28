@@ -59,10 +59,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     [
       data.website,
       data.supplier_name,
-      data.manager,
+      data.manager || null,
       data.phone,
-      data.email,
-      data.notes,
+      data.email || null,
+      data.notes || null,
       supplierId,
     ],
   )

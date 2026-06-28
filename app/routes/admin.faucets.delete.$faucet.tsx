@@ -26,9 +26,11 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
   const faucetId = params.faucet
-  await db.execute(`UPDATE faucet_type SET is_deleted = 1 WHERE id = ?`, [faucetId])
+  await db.execute(`UPDATE faucet_type SET is_deleted = 1 WHERE id = ?`, [
+    faucetId || null,
+  ])
   await db.execute(`UPDATE faucets SET is_deleted = 1 WHERE faucet_type_id = ?`, [
-    faucetId,
+    faucetId || null,
   ])
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Faucet Deleted'))

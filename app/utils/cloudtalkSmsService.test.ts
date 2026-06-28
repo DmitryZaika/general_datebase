@@ -425,12 +425,14 @@ describe.skip('cloudtalkSmsService', () => {
         recipient: '3173161456',
         agent: 'agent-A',
         text: 'agent A message',
+        sender_user_id: admin.id,
       })
       await factory.smsOutbound({
         company_id: company.id,
         recipient: '5125559090',
         agent: 'agent-B',
         text: 'agent B message',
+        sender_user_id: admin.id,
       })
 
       const mine = await listThreadsForUser({
@@ -471,6 +473,7 @@ describe.skip('cloudtalkSmsService', () => {
         recipient: '5125559090',
         agent: 'agent-B',
         text: 'theirs',
+        sender_user_id: user.id,
       })
 
       const result = await listThreadsForUser({
@@ -509,6 +512,7 @@ describe.skip('cloudtalkSmsService', () => {
         recipient: '5125559090',
         agent: TEST_AGENT,
         text: 'other',
+        sender_user_id: admin.id,
       })
 
       const reversed = await listThreadsForUser({
@@ -555,12 +559,14 @@ describe.skip('cloudtalkSmsService', () => {
         recipient: '3173161456',
         agent: 'agent-A',
         text: 'from A',
+        sender_user_id: admin.id,
       })
       await factory.smsOutbound({
         company_id: company.id,
         recipient: '5125559090',
         agent: 'agent-B',
         text: 'from B',
+        sender_user_id: admin.id,
       })
 
       const all = await listThreadsForUser({

@@ -204,8 +204,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     `,
     [
       data.name,
-      data.email,
-      data.phone_number,
+      data.email || null,
+      data.phone_number || null,
       data.company_id,
       data.is_admin,
       cloudtalkAgentId,

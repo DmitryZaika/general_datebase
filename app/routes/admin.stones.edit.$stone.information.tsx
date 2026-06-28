@@ -60,7 +60,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.name,
           data.type,
           data.finishing,
-          data.file,
+          data.file || null,
           data.is_display,
           data.regular_stock,
           data.supplier_id,

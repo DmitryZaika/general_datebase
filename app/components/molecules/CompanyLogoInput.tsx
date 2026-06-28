@@ -37,7 +37,7 @@ export function CompanyLogoInput<
   const form = useFormContext<T>()
   const logoHeight = resolveCompanyLogoHeight(form.watch('logo_height' as Path<T>))
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentLogoUrl)
-  const originalFileRef = useRef<File | undefined>()
+  const originalFileRef = useRef<File | undefined>(undefined)
   const previewUrlRef = useRef<string | null>(currentLogoUrl)
 
   useEffect(() => {

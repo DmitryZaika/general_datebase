@@ -25,7 +25,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
   const supportId = params.support
-  await db.execute(`DELETE FROM supports WHERE id = ?`, [supportId])
+  await db.execute(`DELETE FROM supports WHERE id = ?`, [supportId || null])
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'support Deleted'))

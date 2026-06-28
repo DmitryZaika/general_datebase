@@ -28,7 +28,7 @@ vi.mock('~/db.server', () => {
   })
   return {
     db: {
-      execute: async (sql: string, params: unknown[]) => {
+      execute: async (sql: string, params: string | null | number | boolean[]) => {
         return await pool.execute(sql, params)
       },
       query: async (sql: string, params: unknown[]) => {

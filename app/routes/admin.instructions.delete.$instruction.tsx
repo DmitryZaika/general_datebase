@@ -37,7 +37,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
   const instructionId = params.instruction
-  await db.execute(`DELETE FROM instructions WHERE id = ?`, [instructionId])
+  await db.execute(`DELETE FROM instructions WHERE id = ?`, [instructionId || null])
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'instruction Deleted'))
   return redirect('..', {
