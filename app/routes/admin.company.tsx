@@ -95,6 +95,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         logo_height: resolveCompanyLogoHeight(company.logo_height),
         state_taxes: dbTaxRateToDisplay(company.state_taxes),
       },
+      companyId: user.company_id,
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -152,7 +153,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function AdminCompanySettings() {
-  const { company } = useLoaderData<typeof loader>()
+  const { company, companyId } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
 
@@ -203,6 +204,13 @@ export default function AdminCompanySettings() {
             />
           )}
         />
+
+        <div className='flex flex-col gap-1.5'>
+          <label className='text-sm font-medium text-slate-700'>
+            Company ID : {companyId}
+          </label>
+        </div>
+
         <LoadingButton loading={isSubmitting}>Save</LoadingButton>
       </MultiPartForm>
     </PageLayout>
