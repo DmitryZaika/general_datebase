@@ -374,7 +374,6 @@ export default function App() {
   const isLandingPage = pathname === '/'
   const isCustomersCompanies = pathname === '/customers/companies'
   const isMarketingPublicPage = isLandingPage || isLogin || isCustomersCompanies
-  const isCompactMarketingPage = isLogin || isCustomersCompanies
   const isDraw = pathname.startsWith('/employee/draw')
   const isCheckIn = pathname.includes('/check-in')
   const isExternalMarketing = pathname.includes(`/external/marketing/`)
@@ -449,12 +448,10 @@ export default function App() {
                 />
               )}
               <main
-                className={`w-full ${
-                  isCompactMarketingPage
-                    ? 'h-dvh overflow-hidden bg-white'
-                    : isMarketingPublicPage
-                      ? 'min-h-dvh overflow-y-auto scroll-smooth bg-white'
-                      : 'h-screen overflow-y-auto bg-gray-100'
+                className={`w-full [scrollbar-gutter:stable] ${
+                  isMarketingPublicPage
+                    ? 'h-dvh overflow-y-scroll scroll-smooth bg-white'
+                    : 'h-screen overflow-y-auto bg-gray-100'
                 }`}
               >
                 {isMarketingPublicPage ? null : isExternalMarketing ||

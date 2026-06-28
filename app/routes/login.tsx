@@ -18,6 +18,7 @@ import { PasswordInput } from '~/components/molecules/PasswordInput'
 import {
   GraniteManagerMarketingBackground,
   GraniteManagerMarketingHeader,
+  MarketingSlideDown,
   useGraniteManagerCalendly,
 } from '~/components/organisms/GraniteManagerMarketingShell'
 import { DialogFooter } from '~/components/ui/dialog'
@@ -132,54 +133,60 @@ export default function Login() {
     <GraniteManagerMarketingBackground fillViewport>
       <GraniteManagerMarketingHeader onDemo={openDemo} />
       <div className='flex min-h-0 flex-1 flex-col items-center justify-start gap-4 overflow-y-auto px-4 py-6'>
-        <img
-          src={loginLogo}
-          alt='Granite Manager'
-          className=' shrink-0  object-contain h-20 sm:h-30 md:h-40 '
-        />
-        <Link
-          to='/customers/companies'
-          className='shrink-0 text-md font-medium text-slate-600 underline hover:text-slate-900'
-        >
-          For Customers
-        </Link>
-        <FormProvider {...form}>
-          <Form
-            className='w-full max-w-sm rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg backdrop-blur'
-            method='post'
-            onSubmit={fullSubmit}
+        <MarketingSlideDown delay={0}>
+          <img
+            src={loginLogo}
+            alt='Granite Manager'
+            className=' shrink-0  object-contain h-20 sm:h-30 md:h-40 '
+          />
+        </MarketingSlideDown>
+        <MarketingSlideDown delay={100}>
+          <Link
+            to='/customers/companies'
+            className='shrink-0 text-md font-medium text-slate-600 underline hover:text-slate-900'
           >
-            <div className='mb-6 text-center'>
-              <h1 className='mt-2 text-2xl font-bold tracking-tight text-slate-900'>
-                Sign in to Granite Manager
-              </h1>
-            </div>
-            {(error || actionData?.error) && (
-              <div className='mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-red-600'>
-                {error || actionData?.error}
+            For Customers
+          </Link>
+        </MarketingSlideDown>
+        <MarketingSlideDown delay={200} className='w-full max-w-sm'>
+          <FormProvider {...form}>
+            <Form
+              className='rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg backdrop-blur'
+              method='post'
+              onSubmit={fullSubmit}
+            >
+              <div className='mb-6 text-center'>
+                <h1 className='mt-2 text-2xl font-bold tracking-tight text-slate-900'>
+                  Sign in to Granite Manager
+                </h1>
               </div>
-            )}
-            <FormField
-              control={form.control}
-              name='email'
-              render={({ field }) => (
-                <InputItem name='Email' placeholder='Email' field={field} />
+              {(error || actionData?.error) && (
+                <div className='mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-red-600'>
+                  {error || actionData?.error}
+                </div>
               )}
-            />
-            <FormField
-              control={form.control}
-              name='password'
-              render={({ field }) => (
-                <PasswordInput name='password' placeholder='Password' field={field} />
-              )}
-            />
-            <DialogFooter>
-              <LoadingButton loading={isSubmitting} className='w-full'>
-                Login
-              </LoadingButton>
-            </DialogFooter>
-          </Form>
-        </FormProvider>
+              <FormField
+                control={form.control}
+                name='email'
+                render={({ field }) => (
+                  <InputItem name='Email' placeholder='Email' field={field} />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='password'
+                render={({ field }) => (
+                  <PasswordInput name='password' placeholder='Password' field={field} />
+                )}
+              />
+              <DialogFooter>
+                <LoadingButton loading={isSubmitting} className='w-full'>
+                  Login
+                </LoadingButton>
+              </DialogFooter>
+            </Form>
+          </FormProvider>
+        </MarketingSlideDown>
       </div>
     </GraniteManagerMarketingBackground>
   )

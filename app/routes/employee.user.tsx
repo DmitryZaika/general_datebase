@@ -20,6 +20,7 @@ import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { LogoutButton } from '~/components/molecules/LogoutButton'
 import { Button } from '~/components/ui/button'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
@@ -408,11 +409,7 @@ export default function UserProfile() {
               <LoadingButton loading={isSubmitting} type='submit'>
                 Save Changes
               </LoadingButton>
-              <Link to='/logout'>
-                <Button variant='destructive' type='button'>
-                  Logout
-                </Button>
-              </Link>
+              <LogoutButton variant='destructive' />
             </div>
           </Form>
         </FormProvider>

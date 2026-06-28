@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router'
 import {
   GraniteManagerMarketingBackground,
   GraniteManagerMarketingHeader,
+  MarketingSlideDown,
   scrollToMarketingSection,
   useGraniteManagerCalendly,
   useGraniteManagerCalendlyConfigured,
@@ -107,7 +108,7 @@ export function GraniteManagerLanding() {
 
       <section className='relative overflow-hidden border-b border-slate-100'>
         <div className='relative mx-auto grid max-w-6xl gap-10 px-4 py-16 md:grid-cols-2 md:px-6 md:py-24'>
-          <div className='flex flex-col justify-center'>
+          <MarketingSlideDown delay={0} className='flex flex-col justify-center'>
             <p className='mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500'>
               AI CRM System
             </p>
@@ -135,8 +136,8 @@ export function GraniteManagerLanding() {
                 View Pricing
               </button>
             </div>
-          </div>
-          <div className='flex items-center justify-center'>
+          </MarketingSlideDown>
+          <MarketingSlideDown delay={120} className='flex items-center justify-center'>
             <div className='aspect-[4/3] w-full max-w-lg rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 shadow-sm'>
               <div className='flex h-full flex-col justify-between rounded-xl bg-white p-6 shadow-sm'>
                 <div>
@@ -156,7 +157,7 @@ export function GraniteManagerLanding() {
                 </p>
               </div>
             </div>
-          </div>
+          </MarketingSlideDown>
         </div>
       </section>
 
@@ -236,7 +237,11 @@ export function GraniteManagerLanding() {
 
       <section id='pricing' className='scroll-mt-24 py-16 md:py-24'>
         <div className='mx-auto max-w-6xl px-4 md:px-6'>
-          <div className='mx-auto max-w-2xl text-center'>
+          <MarketingSlideDown
+            whenVisible
+            delay={0}
+            className='mx-auto max-w-2xl text-center'
+          >
             <h2 className='text-3xl font-bold tracking-tight md:text-4xl'>
               Build your price
             </h2>
@@ -244,81 +249,87 @@ export function GraniteManagerLanding() {
               Simple team pricing. $300 per month for up to 10 users. Add more users as
               you grow.
             </p>
-          </div>
+          </MarketingSlideDown>
 
-          <div className='mx-auto mt-12 max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-lg'>
-            <div className='flex items-center justify-between gap-4'>
-              <div>
-                <p className='text-sm font-medium text-slate-500'>Team size</p>
-                <p className='mt-1 text-3xl font-bold tabular-nums'>{users} users</p>
+          <MarketingSlideDown
+            whenVisible
+            delay={120}
+            className='mx-auto mt-12 max-w-xl'
+          >
+            <div className='rounded-2xl border border-slate-200 bg-white p-8 shadow-lg'>
+              <div className='flex items-center justify-between gap-4'>
+                <div>
+                  <p className='text-sm font-medium text-slate-500'>Team size</p>
+                  <p className='mt-1 text-3xl font-bold tabular-nums'>{users} users</p>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <button
+                    type='button'
+                    aria-label='Decrease users'
+                    className='flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 hover:bg-slate-50'
+                    onClick={() => setUsers(value => Math.max(1, value - 1))}
+                  >
+                    <Minus className='h-4 w-4' />
+                  </button>
+                  <button
+                    type='button'
+                    aria-label='Increase users'
+                    className='flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 hover:bg-slate-50'
+                    onClick={() => setUsers(value => Math.min(500, value + 1))}
+                  >
+                    <Plus className='h-4 w-4' />
+                  </button>
+                </div>
               </div>
-              <div className='flex items-center gap-2'>
-                <button
-                  type='button'
-                  aria-label='Decrease users'
-                  className='flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 hover:bg-slate-50'
-                  onClick={() => setUsers(value => Math.max(1, value - 1))}
-                >
-                  <Minus className='h-4 w-4' />
-                </button>
-                <button
-                  type='button'
-                  aria-label='Increase users'
-                  className='flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 hover:bg-slate-50'
-                  onClick={() => setUsers(value => Math.min(500, value + 1))}
-                >
-                  <Plus className='h-4 w-4' />
-                </button>
+
+              <input
+                type='range'
+                min={1}
+                max={50}
+                value={users}
+                onChange={event => setUsers(Number(event.target.value))}
+                className='mt-8 w-full accent-slate-900'
+              />
+
+              <div className='mt-8 rounded-xl bg-slate-50 p-6 text-center'>
+                <p className='text-sm font-medium text-slate-500'>
+                  Estimated monthly total
+                </p>
+                <p className='mt-2 text-5xl font-bold tabular-nums tracking-tight'>
+                  ${monthly}
+                  <span className='text-lg font-medium text-slate-500'> / month</span>
+                </p>
+                <p className='mt-3 text-sm text-slate-600'>{pricingSummary(users)}</p>
               </div>
+
+              <ul className='mt-6 space-y-2 text-sm text-slate-700'>
+                <li className='flex items-start gap-2'>
+                  <Check className='mt-0.5 h-4 w-4 shrink-0 text-slate-900' />
+                  Full AI CRM platform for your team
+                </li>
+                <li className='flex items-start gap-2'>
+                  <Check className='mt-0.5 h-4 w-4 shrink-0 text-slate-900' />
+                  All core features included
+                </li>
+                <li className='flex items-start gap-2'>
+                  <Check className='mt-0.5 h-4 w-4 shrink-0 text-slate-900' />
+                  $300 flat for teams up to 10 users
+                </li>
+                <li className='flex items-start gap-2'>
+                  <Check className='mt-0.5 h-4 w-4 shrink-0 text-slate-900' />
+                  $330 at 11 users, then +$30 per additional user
+                </li>
+              </ul>
+
+              <button
+                type='button'
+                onClick={openDemo}
+                className='mt-8 w-full cursor-pointer rounded-full bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+              >
+                Schedule a Demo
+              </button>
             </div>
-
-            <input
-              type='range'
-              min={1}
-              max={50}
-              value={users}
-              onChange={event => setUsers(Number(event.target.value))}
-              className='mt-8 w-full accent-slate-900'
-            />
-
-            <div className='mt-8 rounded-xl bg-slate-50 p-6 text-center'>
-              <p className='text-sm font-medium text-slate-500'>
-                Estimated monthly total
-              </p>
-              <p className='mt-2 text-5xl font-bold tabular-nums tracking-tight'>
-                ${monthly}
-                <span className='text-lg font-medium text-slate-500'> / month</span>
-              </p>
-              <p className='mt-3 text-sm text-slate-600'>{pricingSummary(users)}</p>
-            </div>
-
-            <ul className='mt-6 space-y-2 text-sm text-slate-700'>
-              <li className='flex items-start gap-2'>
-                <Check className='mt-0.5 h-4 w-4 shrink-0 text-slate-900' />
-                Full AI CRM platform for your team
-              </li>
-              <li className='flex items-start gap-2'>
-                <Check className='mt-0.5 h-4 w-4 shrink-0 text-slate-900' />
-                All core features included
-              </li>
-              <li className='flex items-start gap-2'>
-                <Check className='mt-0.5 h-4 w-4 shrink-0 text-slate-900' />
-                $300 flat for teams up to 10 users
-              </li>
-              <li className='flex items-start gap-2'>
-                <Check className='mt-0.5 h-4 w-4 shrink-0 text-slate-900' />
-                $330 at 11 users, then +$30 per additional user
-              </li>
-            </ul>
-
-            <button
-              type='button'
-              onClick={openDemo}
-              className='mt-8 w-full cursor-pointer rounded-full bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800'
-            >
-              Schedule a Demo
-            </button>
-          </div>
+          </MarketingSlideDown>
         </div>
       </section>
 

@@ -321,12 +321,10 @@ export default function AdminStones() {
         </div>
       </div>
 
-      {isListLoading ? (
-        <InventoryCatalogContentSkeleton fieldLineCount={4} />
-      ) : (
-        <div>
+      <div className='relative'>
+        <div className={isListLoading ? 'pointer-events-none opacity-40' : undefined}>
           {viewMode === VIEW_MODE.GRID ? (
-            <ModuleList skipItemMountAnimation>
+            <ModuleList subtleSlideDown>
               {sortedStones.map(stone => {
                 const displayedAmount = stone.amount > 0 ? stone.amount : '—'
                 const displayedAvailable = stone.available
@@ -421,7 +419,13 @@ export default function AdminStones() {
             <StoneTable stones={sortedStones} />
           )}
         </div>
-      )}
+
+        {isListLoading ? (
+          <div className='absolute inset-0 z-10 bg-gray-100/80'>
+            <InventoryCatalogContentSkeleton fieldLineCount={4} />
+          </div>
+        ) : null}
+      </div>
 
       <Outlet />
     </>

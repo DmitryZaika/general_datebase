@@ -194,9 +194,9 @@ export default function Stones() {
       </div>
 
       <div className='w-full min-h-0'>
-        {!isListLoading ? (
-          <ModuleList skipItemMountAnimation>
-            <div className='w-full col-span-full'>
+        <div className='relative'>
+          <div className={isListLoading ? 'pointer-events-none opacity-40' : undefined}>
+            <div className='w-full px-2'>
               <SuperCarousel
                 type='stones'
                 currentId={currentId}
@@ -205,19 +205,25 @@ export default function Stones() {
                 userRole='customer'
               />
             </div>
-            {sortedStones.map(stone => (
-              <InteractiveCard
-                key={stone.id}
-                stone={stone}
-                setCurrentId={handleCardClick}
-                stoneType={stone.type}
-              />
-            ))}
-          </ModuleList>
-        ) : null}
-      </div>
+            <ModuleList subtleSlideDown>
+              {sortedStones.map(stone => (
+                <InteractiveCard
+                  key={stone.id}
+                  stone={stone}
+                  setCurrentId={handleCardClick}
+                  stoneType={stone.type}
+                />
+              ))}
+            </ModuleList>
+          </div>
 
-      {isListLoading ? <InventoryCatalogContentSkeleton fieldLineCount={4} /> : null}
+          {isListLoading ? (
+            <div className='absolute inset-0 z-10 bg-white/80'>
+              <InventoryCatalogContentSkeleton fieldLineCount={4} />
+            </div>
+          ) : null}
+        </div>
+      </div>
 
       <Outlet />
     </>

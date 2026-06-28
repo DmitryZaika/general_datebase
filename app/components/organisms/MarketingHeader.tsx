@@ -1,5 +1,4 @@
-import { Link } from 'react-router'
-import { Button } from '~/components/ui/button'
+import { LogoutButton } from '~/components/molecules/LogoutButton'
 import { resolveCompanyLogoHeight, resolveCompanyLogoUrl } from '~/utils/companyLogo'
 
 interface MarketingHeaderProps {
@@ -34,9 +33,7 @@ export function MarketingHeader({
         </div>
       )}
       <div className='flex items-center gap-2'>
-        <Link to='/logout' reloadDocument>
-          <Button>Logout</Button>
-        </Link>
+        <LogoutButton />
       </div>
     </header>
   )

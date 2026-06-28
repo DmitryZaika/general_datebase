@@ -1,12 +1,12 @@
 import clsx from 'clsx'
 import { Link, useLoaderData, useLocation } from 'react-router'
-import { Button } from '~/components/ui/button'
 import { getCompanyLogoUrl } from '~/constants/logos'
 import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { HeaderProps } from '~/types'
 import { resolveCompanyLogoHeight } from '~/utils/companyLogo'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
 import { LinkButton } from '../molecules/LinkButton'
+import { LogoutButton } from '../molecules/LogoutButton'
 import { Notification } from '../molecules/Notification'
 import { SuperAdminCompanySelect } from '../molecules/SuperAdminCompanySelect'
 import { TodoList } from '../organisms/TodoList'
@@ -98,11 +98,7 @@ export function HeaderDesktop({
         <TodoList />
       </div>
 
-      {user !== null && (
-        <Link to='/logout'>
-          <Button>Logout</Button>
-        </Link>
-      )}
+      {user !== null && <LogoutButton />}
       <div className='flex justify-center md:justify-end w-full md:w-auto'></div>
     </header>
   )
