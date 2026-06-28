@@ -2,6 +2,7 @@ import { Link, useLoaderData } from 'react-router'
 import {
   GraniteManagerMarketingBackground,
   GraniteManagerMarketingHeader,
+  MarketingSlideDown,
   useGraniteManagerCalendly,
 } from '~/components/organisms/GraniteManagerMarketingShell'
 import { getCompanyLogoUrl } from '~/constants/logos'
@@ -33,35 +34,41 @@ export default function CustomersCompanies() {
   return (
     <GraniteManagerMarketingBackground fillViewport>
       <GraniteManagerMarketingHeader onDemo={openDemo} />
-      <div className='flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto px-4 py-8 pt-30'>
-        <h1 className='text-center text-2xl font-bold tracking-tight text-slate-900'>
-          Choose your company
-        </h1>
-        <p className='mt-2 text-center text-sm text-slate-600'>
-          Select a location to browse stones and products
-        </p>
-        <div className='mt-10 flex flex-wrap items-start justify-center gap-8'>
-          {companies.map(company => (
-            <Link
-              key={company.id}
-              to={`/customer/${company.id}/stones`}
-              className='flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-sm transition-colors hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2'
-            >
-              <img
-                src={company.logo}
-                alt={company.name}
-                className='h-24 w-auto max-w-[200px] object-contain'
-              />
-              <span className='text-sm font-bold text-slate-800'>{company.name}</span>
-            </Link>
-          ))}
-        </div>
-        <Link
-          to='/login'
-          className='mt-10 text-sm font-medium text-slate-600 underline hover:text-slate-900'
-        >
-          For Employees
-        </Link>
+      <div className='flex min-h-0 flex-1 flex-col items-center justify-start gap-4 overflow-y-auto px-4 py-6'>
+        <MarketingSlideDown delay={0} className='text-center'>
+          <h1 className='text-2xl font-bold tracking-tight text-slate-900'>
+            Choose your company
+          </h1>
+          <p className='mt-2 text-sm text-slate-600'>
+            Select a location to browse stones and products
+          </p>
+        </MarketingSlideDown>
+        <MarketingSlideDown delay={100} className='w-full'>
+          <div className='mt-6 flex flex-wrap items-start justify-center gap-8'>
+            {companies.map(company => (
+              <Link
+                key={company.id}
+                to={`/customer/${company.id}/stones`}
+                className='flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-sm transition-colors hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2'
+              >
+                <img
+                  src={company.logo}
+                  alt={company.name}
+                  className='h-24 w-auto max-w-[200px] object-contain'
+                />
+                <span className='text-sm font-bold text-slate-800'>{company.name}</span>
+              </Link>
+            ))}
+          </div>
+        </MarketingSlideDown>
+        <MarketingSlideDown delay={200}>
+          <Link
+            to='/login'
+            className='shrink-0 text-md font-medium text-slate-600 underline hover:text-slate-900'
+          >
+            For Employees
+          </Link>
+        </MarketingSlideDown>
       </div>
     </GraniteManagerMarketingBackground>
   )
