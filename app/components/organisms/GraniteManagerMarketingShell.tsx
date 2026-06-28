@@ -17,9 +17,26 @@ import {
   openDemoSection,
 } from '~/utils/calendlyClient'
 
+export function MarketingDemoButtonLabel({ variant }: { variant: 'free' | 'short' }) {
+  if (variant === 'free') {
+    return (
+      <>
+        Get a Free Dem<span data-demo-o>o</span>
+      </>
+    )
+  }
+
+  return (
+    <>
+      Get Dem<span data-demo-o>o</span>
+    </>
+  )
+}
+
 export function MarketingDemoArrow() {
   const wrapRef = useRef<HTMLSpanElement>(null)
-  const [travelX, setTravelX] = useState(0)
+  const [travelEnd, setTravelEnd] = useState(0)
+  const [enterStart, setEnterStart] = useState(0)
 
   useLayoutEffect(() => {
     const wrap = wrapRef.current
@@ -30,10 +47,17 @@ export function MarketingDemoArrow() {
     const update = () => {
       const buttonRect = button.getBoundingClientRect()
       const wrapRect = wrap.getBoundingClientRect()
-      const paddingRight =
-        Number.parseFloat(window.getComputedStyle(button).paddingRight) || 0
-      const targetLeft = buttonRect.right - paddingRight - wrapRect.width
-      setTravelX(Math.max(0, targetLeft - wrapRect.left))
+      const nextTravelEnd = buttonRect.right - wrapRect.left
+      setTravelEnd(Math.max(0, nextTravelEnd))
+
+      const oMark = button.querySelector('[data-demo-o]')
+      if (oMark instanceof HTMLElement) {
+        const oRect = oMark.getBoundingClientRect()
+        setEnterStart(oRect.left - wrapRect.left)
+        return
+      }
+
+      setEnterStart(-nextTravelEnd)
     }
 
     update()
@@ -51,10 +75,13 @@ export function MarketingDemoArrow() {
       ref={wrapRef}
       aria-hidden
       className='relative ml-2 inline-flex h-4 w-4 shrink-0'
-      style={{ ['--demo-arrow-travel' as string]: `${travelX}px` }}
+      style={{
+        ['--demo-arrow-travel-end' as string]: `${travelEnd}px`,
+        ['--demo-arrow-enter-start' as string]: `${enterStart}px`,
+      }}
     >
-      <ArrowRight className='h-4 w-4 transition-all duration-300 ease-out group-hover:translate-x-[var(--demo-arrow-travel)] group-hover:opacity-0' />
-      <ArrowRight className='absolute inset-0 h-4 w-4 -translate-x-[var(--demo-arrow-travel)] opacity-0 transition-all duration-300 ease-out group-hover:translate-x-[var(--demo-arrow-travel)] group-hover:opacity-100' />
+      <ArrowRight className='h-4 w-4 transition-all duration-300 ease-out group-hover:translate-x-[var(--demo-arrow-travel-end)] group-hover:opacity-0' />
+      <ArrowRight className='absolute inset-0 h-4 w-4 translate-x-[var(--demo-arrow-enter-start)] opacity-0 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100 group-hover:delay-150' />
     </span>
   )
 }
@@ -248,10 +275,47 @@ export function MarketingSlideDown({
   )
 }
 
+function useHomeSection(): 'main' | 'pricing' {
+  const [section, setSection] = useState<'main' | 'pricing'>('main')
+
+  useEffect(() => {
+    const main = document.querySelector('main')
+    const scroller = main && main.scrollHeight > main.clientHeight + 1 ? main : window
+
+    const onScroll = () => {
+      const pricing = document.getElementById('pricing')
+      if (!pricing) {
+        setSection('main')
+        return
+      }
+      const scrollY =
+        scroller === window ? window.scrollY : (scroller as HTMLElement).scrollTop
+      const pricingTop =
+        scroller === window
+          ? pricing.getBoundingClientRect().top + window.scrollY - 120
+          : pricing.offsetTop - 120
+      setSection(scrollY >= pricingTop ? 'pricing' : 'main')
+    }
+
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => scroller.removeEventListener('scroll', onScroll)
+  }, [])
+
+  return section
+}
+
 export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }) {
   const location = useLocation()
   const isLoginPage = location.pathname === '/login'
   const isHomePage = location.pathname === '/'
+  const homeSection = useHomeSection()
+  const atPricing = isHomePage && homeSection === 'pricing'
+  const atMain = isHomePage && homeSection === 'main'
+
+  const navUnderline =
+    "relative pb-1 before:absolute before:inset-x-0 before:bottom-0 before:h-[3px] before:origin-right before:scale-x-0 before:bg-black before:transition-transform before:duration-300 before:ease-out before:content-[''] hover:before:origin-left hover:before:scale-x-100"
+  const navUnderlineActive = 'before:origin-left before:scale-x-100'
 
   return (
     <>
@@ -272,14 +336,21 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
               <button
                 type='button'
                 onClick={scrollToMarketingTop}
-                className='hidden cursor-pointer text-sm font-medium text-slate-900 sm:inline'
+                className={cn(
+                  'hidden cursor-pointer text-sm font-medium text-slate-900 sm:inline-block',
+                  navUnderline,
+                  atMain && navUnderlineActive,
+                )}
               >
                 Main Page
               </button>
             ) : (
               <Link
                 to='/'
-                className='hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline'
+                className={cn(
+                  'hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                  navUnderline,
+                )}
               >
                 Main Page
               </Link>
@@ -288,7 +359,10 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
               href='https://docs.granite-manager.com/'
               target='_blank'
               rel='noopener noreferrer'
-              className='hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline'
+              className={cn(
+                'hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                navUnderline,
+              )}
             >
               Documentation
             </a>
@@ -296,24 +370,42 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
               <button
                 type='button'
                 onClick={() => scrollToMarketingSection('pricing')}
-                className='hidden cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline'
+                className={cn(
+                  'hidden cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                  navUnderline,
+                  atPricing && navUnderlineActive,
+                )}
               >
                 Pricing
               </button>
             ) : (
               <Link
                 to='/#pricing'
-                className='hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline'
+                className={cn(
+                  'hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline-block',
+                  navUnderline,
+                )}
               >
                 Pricing
               </Link>
             )}
             {isLoginPage ? (
-              <span className='text-sm font-medium text-slate-900'>Login</span>
+              <span
+                className={cn(
+                  'inline-block text-sm font-medium text-slate-900',
+                  navUnderline,
+                  navUnderlineActive,
+                )}
+              >
+                Login
+              </span>
             ) : (
               <Link
                 to='/login'
-                className='text-sm font-medium text-slate-600 hover:text-slate-900'
+                className={cn(
+                  'inline-block text-sm font-medium text-slate-600 hover:text-slate-900',
+                  navUnderline,
+                )}
               >
                 Login
               </Link>
@@ -321,10 +413,9 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
             <button
               type='button'
               onClick={onDemo}
-              className='group inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800'
+              className='cursor-pointer rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800'
             >
               Get Demo
-              <MarketingDemoArrow />
             </button>
           </nav>
         </div>

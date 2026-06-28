@@ -5,6 +5,7 @@ import {
   GraniteManagerMarketingBackground,
   GraniteManagerMarketingHeader,
   MarketingDemoArrow,
+  MarketingDemoButtonLabel,
   MarketingSlideDown,
   scrollToMarketingSection,
   useGraniteManagerCalendly,
@@ -137,15 +138,15 @@ export function GraniteManagerLanding() {
               <button
                 type='button'
                 onClick={openDemo}
-                className='group inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+                className='group relative inline-flex cursor-pointer items-center overflow-hidden rounded-full bg-slate-900 py-3 pl-6 pr-10 text-sm font-semibold text-white hover:bg-slate-800'
               >
-                Get a Free Demo
+                <MarketingDemoButtonLabel variant='free' />
                 <MarketingDemoArrow />
               </button>
               <button
                 type='button'
                 onClick={() => scrollToMarketingSection('pricing')}
-                className='inline-flex cursor-pointer items-center rounded-full border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50'
+                className='inline-flex cursor-pointer items-center rounded-full border border-slate-300 bg-transparent px-6 py-3 text-sm font-semibold text-slate-800 transition-colors duration-300 ease-out hover:border-black hover:bg-black hover:text-white'
               >
                 View Pricing
               </button>
@@ -341,12 +342,9 @@ export function GraniteManagerLanding() {
               <button
                 type='button'
                 onClick={openDemo}
-                className='group mt-8 w-full cursor-pointer rounded-full bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+                className='mt-8 w-full cursor-pointer rounded-full bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800'
               >
-                <span className='inline-flex items-center justify-center gap-2'>
-                  Schedule a Demo
-                  <MarketingDemoArrow />
-                </span>
+                Schedule a Demo
               </button>
             </div>
           </MarketingSlideDown>
@@ -369,9 +367,9 @@ export function GraniteManagerLanding() {
           <button
             type='button'
             onClick={openDemo}
-            className='group mt-8 inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+            className='group relative mt-8 inline-flex cursor-pointer items-center overflow-hidden rounded-full bg-slate-900 py-3 pl-8 pr-10 text-sm font-semibold text-white hover:bg-slate-800'
           >
-            Get Demo
+            <MarketingDemoButtonLabel variant='short' />
             <MarketingDemoArrow />
           </button>
           {hasCalendly ? null : (
@@ -435,14 +433,6 @@ export function GraniteManagerLanding() {
             <Link to='/login' className='hover:text-slate-900'>
               Login
             </Link>
-            <button
-              type='button'
-              onClick={openDemo}
-              className='group inline-flex cursor-pointer items-center gap-1.5 hover:text-slate-900'
-            >
-              Get Demo
-              <MarketingDemoArrow />
-            </button>
             <a href='mailto:sales@granite-manager.com' className='hover:text-slate-900'>
               sales@granite-manager.com
             </a>
