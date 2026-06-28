@@ -28,11 +28,11 @@ import {
 } from '~/components/ui/dialog'
 import { Label } from '~/components/ui/label'
 import { useToast } from '~/hooks/use-toast'
+import type { loader as rootLoader } from '~/root'
 import { createCustomerMutation, sourceEnum } from '~/schemas/customers'
 import { getSession } from '~/sessions.server'
 import { optionalEmailSchema, zodPhone } from '~/utils/constants'
 import { getEmployeeUser, type User } from '~/utils/session.server'
-import type { loader as rootLoader } from '~/root'
 import {
   FormControl,
   FormField,
@@ -76,7 +76,6 @@ const customerCheckInSchema = z.object({
     .refine(val => val === true, 'You must acknowledge the safety instructions'),
 })
 
-type CheckInFormData = z.infer<typeof customerCheckInSchema>
 const resolver = zodResolver(customerCheckInSchema)
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
@@ -105,7 +104,7 @@ export default function CustomerCheckIn() {
   const hasCloudtalkApi = Boolean(rootData?.hasCloudtalkApi)
   const companyName = rootData?.companyName?.trim() || 'Our company'
 
-  const form = useForm<CheckInFormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       company_id: companyId,

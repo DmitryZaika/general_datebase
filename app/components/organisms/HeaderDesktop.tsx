@@ -1,9 +1,10 @@
 import clsx from 'clsx'
 import { Link, useLoaderData, useLocation } from 'react-router'
 import { Button } from '~/components/ui/button'
+import { getCompanyLogoUrl } from '~/constants/logos'
 import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { HeaderProps } from '~/types'
-import { resolveCompanyLogoHeight, resolveCompanyLogoUrl } from '~/utils/companyLogo'
+import { resolveCompanyLogoHeight } from '~/utils/companyLogo'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
 import { LinkButton } from '../molecules/LinkButton'
 import { Notification } from '../molecules/Notification'
@@ -35,8 +36,8 @@ export function HeaderDesktop({
     ? location.pathname.split('/').filter(Boolean)[1]
     : (activeCompanyId ?? data?.user?.company_id)
   const id = Number(companyId)
-  const companyLogo = resolveCompanyLogoUrl(data?.companyLogoUrl)
-  const logoHeight = resolveCompanyLogoHeight(data?.companyLogoHeight)
+  const companyLogo = data.companyLogoUrl?.trim() || getCompanyLogoUrl(id)
+  const logoHeight = resolveCompanyLogoHeight(data.companyLogoHeight)
 
   const customerSwitchUrl =
     companyId === undefined

@@ -1,11 +1,16 @@
-import { type LoaderFunction, redirect } from 'react-router'
+import { type LoaderFunctionArgs, redirect } from 'react-router'
+import { GraniteManagerLanding } from '~/components/pages/GraniteManagerLanding'
 import { getEmployeeUser } from '~/utils/session.server'
 
-export const loader: LoaderFunction = async ({ request }) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request)
+    return redirect('/employee')
   } catch {
-    return redirect(`/login`)
+    return null
   }
-  return redirect('/employee')
+}
+
+export default function Index() {
+  return <GraniteManagerLanding />
 }

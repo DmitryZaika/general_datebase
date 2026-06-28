@@ -5,8 +5,7 @@ import {
   useLocation,
   useNavigation,
 } from 'react-router'
-import { loginLogo } from '~/constants/logos'
-import { resolveCompanyLogoHeight, resolveCompanyLogoUrl } from '~/utils/companyLogo'
+import { getCompanyLogoUrl, loginLogo } from '~/constants/logos'
 import { LoadingButton } from '../molecules/LoadingButton'
 import { BurgerMenu } from './HeaderMobile'
 
@@ -37,24 +36,22 @@ export default function HeaderCustomers({
   const isCustomersCompanies = location.pathname === '/customers/companies'
   const segments = location.pathname.split('/').filter(Boolean)
   const companyId = segments[1]
-  const { companyLogoUrl, companyLogoHeight } = useLoaderData<{
+  const { companyLogoUrl } = useLoaderData<{
     companyLogoUrl?: string | null
     companyLogoHeight?: number
   }>()
   const navigation = useNavigation()
   const loading = navigation.state === 'loading'
-  const logoUrl = isLogin ? loginLogo : resolveCompanyLogoUrl(companyLogoUrl)
-  const logoHeight = resolveCompanyLogoHeight(companyLogoHeight)
+  const id = Number(companyId)
+  const logoUrl = isLogin ? loginLogo : companyLogoUrl?.trim() || getCompanyLogoUrl(id)
   const viewId = segments[0] === 'customer' && segments.length >= 3 ? segments[2] : ''
   const isStonesView = viewId === 'stones'
   const buttonLink = getButtonLink({ location, companyId })
   const isSurvey = location.pathname.includes('survey')
   const showStonesButton = !isLogin && !isSurvey && !isCustomersCompanies
-  const logoSizeClass =
-    isLogin || isCustomersCompanies
-      ? 'h-36 md:h-44 object-contain'
-      : 'max-w-full object-contain'
-  const logoStyle = isLogin || isCustomersCompanies ? undefined : { height: logoHeight }
+  const logoSizeClass = isLogin
+    ? 'h-36 md:h-44 object-contain'
+    : 'h-12 md:h-16 object-contain'
   return (
     <header className='flex justify-between items-center'>
       <div className='flex items-center gap-2'>
@@ -68,13 +65,9 @@ export default function HeaderCustomers({
         )}
       </div>
       <div className='flex-1 flex justify-center'>
-        {isCustomersCompanies ? (
-          <img src={logoUrl} alt='Logo' className={logoSizeClass} style={logoStyle} />
-        ) : (
-          <a href={isLogin ? '/' : 'stones'}>
-            <img src={logoUrl} alt='Logo' className={logoSizeClass} style={logoStyle} />
-          </a>
-        )}
+        <a href={isLogin ? '/' : 'stones'}>
+          <img src={logoUrl} alt='Logo' className={logoSizeClass} />
+        </a>
       </div>
       <div className='md:hidden'>{hideBurgerMenu ? null : <BurgerMenu />}</div>
     </header>

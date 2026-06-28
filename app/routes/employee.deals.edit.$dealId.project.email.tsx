@@ -65,7 +65,6 @@ import {
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
-import { fetchTemplateVariableData } from '~/services/templateVariables.server'
 import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
 import { compressImageFiles } from '~/utils/compressImage.client'
 import type { EmailTemplate } from '~/utils/emailTemplates'
@@ -184,10 +183,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect('/employee/deals')
   }
 
-  const [senderInfo, templateVariableData] = await Promise.all([
-    fetchSenderInfo(user),
-    fetchTemplateVariableData({ user, dealId }),
-  ])
+  const senderInfo = await fetchSenderInfo(user)
 
   return {
     email: rows[0].email || '',
@@ -195,7 +191,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     senderInfo,
     dealId,
     companyId: user.company_id ?? 0,
-    templateVariableData,
+    userId: user.id,
   }
 }
 
@@ -595,7 +591,7 @@ function sendEmail(
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, customerName, dealId, companyId, templateVariableData } =
+  const { email, customerName, dealId, companyId, userId } =
     useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [_isGenerating, setIsGenerating] = useState(false)
@@ -717,7 +713,7 @@ export default function DealEmailDialog() {
 
   const applyTemplate = useCallback(
     async (template: EmailTemplate) => {
-      const applied = await applyEmailTemplateContent(template, templateVariableData)
+      const applied = await applyEmailTemplateContent(userId, dealId, null, template)
       form.setValue('subject', applied.subject)
       form.setValue('text', applied.body)
       form.setValue('attachments', applied.attachments)
@@ -728,7 +724,7 @@ export default function DealEmailDialog() {
         return applied.previews
       })
     },
-    [form, templateVariableData],
+    [form],
   )
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,15 +1,14 @@
-import { db } from '~/db.server'
-import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'
-import { selectId } from '~/utils/queryHelpers'
+import type { TemplateVariableData } from '~/services/types'
 
 async function fetchFromLambda<T>(
   path: string,
+  method: 'GET' | 'POST',
   data: T | undefined = undefined,
 ): Promise<Response> {
   const url = `${process.env.LAMBDA_URL}/${path}`
   if (!process.env.LAMBDA_KEY) throw new Error('LAMBDA_KEY not set')
   return await fetch(url, {
-    method: 'POST',
+    method,
     headers: {
       'Content-Type': 'application/json',
 
@@ -19,28 +18,75 @@ async function fetchFromLambda<T>(
   })
 }
 
-function hasPhone(phone?: string | null, phone2?: string | null): boolean {
-  return Boolean(phone?.trim() || phone2?.trim())
-}
-
 export async function syncCustomerToCloudTalk(
   companyId: number,
   customerId: number,
-): Promise<string | null> {
-  if (!(await companyHasCloudTalk(companyId))) return null
-
-  const customer = await selectId<{ phone: string | null; phone_2: string | null }>(
-    db,
-    'SELECT phone, phone_2 FROM customers WHERE id = ? AND company_id = ? AND deleted_at IS NULL',
-    [customerId, companyId],
+): Promise<string> {
+  const response = await fetchFromLambda(
+    `cloudtalk/sync/${companyId}/${customerId}`,
+    'POST',
   )
-  if (!customer || !hasPhone(customer.phone, customer.phone_2)) return null
-
-  const response = await fetchFromLambda(`cloudtalk/sync/${companyId}/${customerId}`)
   if (!response.ok) {
     throw new Error(
       `Failed to sync customer ${customerId} to CloudTalk: ${response.statusText}`,
     )
   }
+  return await response.text()
+}
+
+export async function fetchTemplateVariableData(
+  userId: number,
+  dealId: number | null,
+  customerId: number | null,
+): Promise<TemplateVariableData> {
+  // 1. Build the optional query parameters
+  const params = new URLSearchParams()
+  if (dealId !== null) params.append('dealId', dealId.toString())
+  if (customerId !== null) params.append('customerId', customerId.toString())
+
+  // 2. Append the query string to the path if parameters exist
+  const queryString = params.toString()
+  const path = queryString
+    ? `template/variables/${userId}?${queryString}`
+    : `template/variables/${userId}`
+
+  // 3. Make the request
+  const response = await fetchFromLambda(path, 'GET')
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch template variables for user ${userId}: ${response.statusText}`,
+    )
+  }
+
+  return await response.json()
+}
+
+export async function replaceTemplateVariables(
+  userId: number,
+  dealId: number | null,
+  customerId: number | null,
+  template: string,
+): Promise<string> {
+  // 1. Build the optional query parameters
+  const params = new URLSearchParams()
+  if (dealId !== null) params.append('dealId', dealId.toString())
+  if (customerId !== null) params.append('customerId', customerId.toString())
+
+  // 2. Append the query string to the path if parameters exist
+  const queryString = params.toString()
+  const path = queryString
+    ? `template/complete/${userId}?${queryString}`
+    : `template/complete/${userId}`
+
+  // 3. Make the request
+  const response = await fetchFromLambda(path, 'POST', { template })
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to replace template variables for user ${userId}: ${response.statusText}`,
+    )
+  }
+
   return await response.text()
 }

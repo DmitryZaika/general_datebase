@@ -14,6 +14,10 @@
   outline-style: none;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 @layer components {
   @keyframes highlight-animation {
     from {
@@ -33,8 +37,8 @@
   --border-radius-sm: "calc(var(--radius) - 4px)";
   --border-color: white;
   --font-sans:
-    "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
-    "Segoe UI Symbol", "Noto Color Emoji", Arial;
+    "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", Arial;
 
   @keyframes accordion-down {
     from {

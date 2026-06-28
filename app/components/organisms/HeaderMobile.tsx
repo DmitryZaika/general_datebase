@@ -1,17 +1,17 @@
-import { useLoaderData } from 'react-router'
+import clsx from 'clsx'
+import { Menu } from 'lucide-react'
+import { useLoaderData, useLocation } from 'react-router'
+import { Button } from '~/components/ui/button'
+import { useSidebar } from '~/components/ui/sidebar'
+import { getCompanyLogoUrl } from '~/constants/logos'
 import type { HeaderProps } from '~/types'
+import { resolveCompanyLogoHeight } from '~/utils/companyLogo'
 import { Notification } from '../molecules/Notification'
 import { TodoList } from '../organisms/TodoList'
 
 interface HeaderMobileProps extends HeaderProps {
   className: string
 }
-
-import clsx from 'clsx'
-import { Menu } from 'lucide-react'
-import { Button } from '~/components/ui/button'
-import { useSidebar } from '~/components/ui/sidebar'
-import { resolveCompanyLogoHeight, resolveCompanyLogoUrl } from '~/utils/companyLogo'
 
 export function BurgerMenu() {
   const { toggleSidebar } = useSidebar()
@@ -29,14 +29,20 @@ export function BurgerMenu() {
 }
 
 export function HeaderMobile({ className }: HeaderMobileProps) {
+  const location = useLocation()
+  const isCustomerPage = location.pathname.startsWith('/customer')
   const data = useLoaderData<{
     user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
     activeCompanyId?: number
     companyLogoUrl?: string | null
     companyLogoHeight?: number
   }>()
-  const companyLogo = resolveCompanyLogoUrl(data?.companyLogoUrl)
-  const logoHeight = resolveCompanyLogoHeight(data?.companyLogoHeight)
+  const companyId = isCustomerPage
+    ? location.pathname.split('/').filter(Boolean)[1]
+    : (data?.activeCompanyId ?? data?.user?.company_id)
+  const id = Number(companyId)
+  const companyLogo = data.companyLogoUrl?.trim() || getCompanyLogoUrl(id)
+  const logoHeight = resolveCompanyLogoHeight(data.companyLogoHeight)
 
   return (
     <header className={clsx('flex justify-between', className)}>

@@ -98,7 +98,6 @@ import {
 import {
   getUnfilledCustomVariables,
   hasAnyVariables,
-  type TemplateVariableData,
 } from '~/utils/emailTemplateVariables'
 import {
   filterVisibleEmailAttachments,
@@ -144,6 +143,7 @@ interface EmailChatBaseProps {
   scrollToMessageId?: number | null
   dealNav?: EmailChatDealNav
   embedded?: boolean
+  userId: number
   readOnly?: boolean
 }
 
@@ -612,6 +612,7 @@ export function EmailChat(props: EmailChatProps) {
     onClose,
     scrollToMessageId,
     dealNav,
+    userId,
     embedded = false,
     readOnly = false,
   } = props
@@ -688,21 +689,6 @@ export function EmailChat(props: EmailChatProps) {
     queryKey: templateQueryKey(employeeProps?.companyId ?? 0),
     queryFn: () => fetchAllTemplates(employeeProps?.companyId ?? 0),
     enabled: showMobileTemplatePicker && !!employeeProps?.companyId,
-    staleTime: TEMPLATE_STALE_TIME,
-  })
-
-  const { data: templateVariableData } = useQuery({
-    queryKey: ['templateVariables', employeeProps?.dealId],
-    queryFn: async () => {
-      const params = new URLSearchParams()
-      if (employeeProps?.dealId) {
-        params.set('dealId', String(employeeProps.dealId))
-      }
-      const res = await fetch(`/api/template-variables?${params}`)
-      if (!res.ok) return {}
-      return res.json() as Promise<TemplateVariableData>
-    },
-    enabled: !!employeeProps,
     staleTime: TEMPLATE_STALE_TIME,
   })
 
@@ -914,9 +900,12 @@ export function EmailChat(props: EmailChatProps) {
 
   const applyEmailTemplate = async (template: EmailTemplate) => {
     if (!employeeProps) return
-
-    const variableData: TemplateVariableData = templateVariableData ?? {}
-    const applied = await applyEmailTemplateContent(template, variableData)
+    const applied = await applyEmailTemplateContent(
+      userId,
+      employeeProps.dealId,
+      null,
+      template,
+    )
     const plainText = htmlToPlainText(applied.body)
     setMessageText(plainText)
     setActiveTemplateId(template.id)

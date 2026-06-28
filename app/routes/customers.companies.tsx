@@ -1,50 +1,68 @@
-import type { LoaderFunctionArgs } from 'react-router'
 import { Link, useLoaderData } from 'react-router'
-import { gbColumbus, gbIndianapolis } from '~/constants/logos'
+import {
+  GraniteManagerMarketingBackground,
+  GraniteManagerMarketingHeader,
+  useGraniteManagerCalendly,
+} from '~/components/organisms/GraniteManagerMarketingShell'
+import { getCompanyLogoUrl } from '~/constants/logos'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 
-const companies = [
-  { id: 1, logo: gbIndianapolis },
-  { id: 3, logo: gbColumbus },
-] as const
+const CUSTOMER_COMPANY_IDS = [1, 3, 7]
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const rows = await selectMany<{ id: number; name: string }>(
+export const loader = async () => {
+  const placeholders = CUSTOMER_COMPANY_IDS.map(() => '?').join(',')
+  const rows = await selectMany<{ id: number; name: string; logo_url: string | null }>(
     db,
-    'SELECT id, name FROM company WHERE id IN (1, 3) ORDER BY id',
-    [],
+    `SELECT id, name, logo_url FROM company WHERE id IN (${placeholders}) ORDER BY id`,
+    CUSTOMER_COMPANY_IDS,
   )
-  const namesById: Record<number, string> = {}
-  for (const row of rows) {
-    namesById[row.id] = row.name
+  return {
+    companies: rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      logo: row.logo_url?.trim() || getCompanyLogoUrl(row.id),
+    })),
   }
-  return { namesById }
 }
 
 export default function CustomersCompanies() {
-  const { namesById } = useLoaderData<typeof loader>()
+  const { companies } = useLoaderData<typeof loader>()
+  const openDemo = useGraniteManagerCalendly()
+
   return (
-    <div className='flex flex-col items-center justify-start min-h-[60vh] gap-8 p-6'>
-      <h1 className='text-xl font-medium text-center'>Choose your company</h1>
-      <div className='flex flex-wrap justify-center items-start gap-10'>
-        {companies.map(({ id, logo }) => (
-          <Link
-            key={id}
-            to={`/customer/${id}/stones`}
-            className='flex flex-col items-center gap-3 p-6 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400'
-          >
-            <img
-              src={logo}
-              alt={namesById[id] ?? `Company ${id}`}
-              className='h-24 w-auto object-contain max-w-[200px]'
-            />
-            <span className='text-sm text-gray-700 font-bold'>
-              {namesById[id] ?? id}
-            </span>
-          </Link>
-        ))}
+    <GraniteManagerMarketingBackground fillViewport>
+      <GraniteManagerMarketingHeader onDemo={openDemo} />
+      <div className='flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto px-4 py-8 pt-30'>
+        <h1 className='text-center text-2xl font-bold tracking-tight text-slate-900'>
+          Choose your company
+        </h1>
+        <p className='mt-2 text-center text-sm text-slate-600'>
+          Select a location to browse stones and products
+        </p>
+        <div className='mt-10 flex flex-wrap items-start justify-center gap-8'>
+          {companies.map(company => (
+            <Link
+              key={company.id}
+              to={`/customer/${company.id}/stones`}
+              className='flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-sm transition-colors hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2'
+            >
+              <img
+                src={company.logo}
+                alt={company.name}
+                className='h-24 w-auto max-w-[200px] object-contain'
+              />
+              <span className='text-sm font-bold text-slate-800'>{company.name}</span>
+            </Link>
+          ))}
+        </div>
+        <Link
+          to='/login'
+          className='mt-10 text-sm font-medium text-slate-600 underline hover:text-slate-900'
+        >
+          For Employees
+        </Link>
       </div>
-    </div>
+    </GraniteManagerMarketingBackground>
   )
 }
