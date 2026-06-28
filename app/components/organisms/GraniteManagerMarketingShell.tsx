@@ -241,6 +241,14 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
                 Main Page
               </Link>
             )}
+            <a
+              href='https://docs.granite-manager.com/'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline'
+            >
+              Documentation
+            </a>
             {isHomePage ? (
               <button
                 type='button'
