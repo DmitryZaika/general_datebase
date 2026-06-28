@@ -333,7 +333,7 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
               Granite Manager
             </span>
           </Link>
-          <nav className='flex items-center gap-2 md:gap-4'>
+          <nav className='flex items-center gap-5 md:gap-4'>
             {isHomePage ? (
               <button
                 type='button'
