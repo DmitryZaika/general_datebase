@@ -171,6 +171,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     threadId,
     currentUserSignature,
     companyId: user.company_id ?? 0,
+    userId: user.id,
   }
 }
 
@@ -185,7 +186,9 @@ export default function EmployeeCustomerEmailChatRoute() {
   return (
     <EmailChat
       variant='employee'
+      userId={data.userId}
       customerName={data.customerName}
+      customerId={data.customerId}
       messages={data.messages}
       onClose={() =>
         navigate(`/employee/customers/info/${data.customerId}/info${location.search}`)

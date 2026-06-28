@@ -1,7 +1,7 @@
-import type { Location, Navigation } from 'react-router'
+import type { Location } from 'react-router'
 
 export function isEmployeeListFilterLoading(
-  navigation: Navigation,
+  navigation: { state: 'idle' | 'loading' | 'submitting'; location?: Location },
   location: Location,
   ignoredParams: string[] = ['viewMode'],
 ) {

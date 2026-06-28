@@ -18,7 +18,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const cleanDealId = dealId && !Number.isNaN(dealId) ? dealId : null
   try {
-    const data = await fetchTemplateVariableData(user.id, cleanDealId, null)
+    const data = await fetchTemplateVariableData(
+      user.id,
+      cleanDealId,
+      user.company_id,
+      null,
+    )
 
     return Response.json(data)
   } catch (error) {

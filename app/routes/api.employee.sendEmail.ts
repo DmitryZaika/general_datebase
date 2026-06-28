@@ -209,6 +209,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const personalizedBody = await replaceTemplateVariables(
         user.id,
         cleaned.dealId ?? null,
+        user.company_id,
         customerId,
         cleaned.body,
       )

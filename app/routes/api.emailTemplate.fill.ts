@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from 'react-router'
 import { data } from 'react-router'
 import { z } from 'zod'
 import { replaceTemplateVariables } from '~/services/lambda.server'
+import { getEmployeeUser } from '~/utils/session.server'
 
 // 1. Define a bulletproof Zod schema
 const replaceTemplateSchema = z.object({
@@ -19,6 +20,7 @@ const replaceTemplateSchema = z.object({
 
 export async function action({ request }: ActionFunctionArgs) {
   // Only allow POST requests
+  const user = await getEmployeeUser(request)
   if (request.method !== 'POST') {
     return data({ success: false, error: 'Method Not Allowed' }, { status: 405 })
   }
@@ -42,6 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const completedTemplate = await replaceTemplateVariables(
       userId,
       dealId,
+      user.company_id,
       customerId,
       template,
     )

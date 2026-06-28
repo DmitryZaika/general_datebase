@@ -75,6 +75,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   let customerName = 'Customer'
   let customerEmail = ''
+  let customerId: number | null = null
 
   if (dealId) {
     const [customerRows] = await db.execute<RowDataPacket[]>(
@@ -86,6 +87,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     )
     customerName = customerRows?.[0]?.name || 'Customer'
     customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
+    customerId = customerRows?.[0]?.customer_id || null
   } else {
     // Try to find customer from email thread participants
     const [threadEmails] = await db.execute<RowDataPacket[]>(
@@ -193,6 +195,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return {
     customerName,
     customerEmail,
+    customerId,
     messages,
     dealId,
     subject: emailRows?.[0]?.subject || null,
@@ -213,6 +216,7 @@ export default function AdminEmailsChatRoute() {
     <EmailChat
       variant='admin'
       customerName={data.customerName}
+      customerId={data.customerId}
       messages={data.messages}
       onClose={() => {
         dismissEmailAction()
