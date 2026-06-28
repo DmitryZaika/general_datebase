@@ -14,6 +14,26 @@ type CalendlyEventTypesResponse = {
   }>
 }
 
+export function getConfiguredCalendlyDemoUrl(): string {
+  return (
+    parseCalendlySchedulingUrl(process.env.CALENDLY_DEMO_URL) ||
+    parseCalendlySchedulingUrl(process.env.VITE_CALENDLY_DEMO_URL) ||
+    ''
+  )
+}
+
+let cachedResolvedUrl: string | null | undefined
+
+export async function resolveCalendlyDemoSchedulingUrl(): Promise<string | null> {
+  const configured = getConfiguredCalendlyDemoUrl()
+  if (configured) return configured
+
+  if (cachedResolvedUrl !== undefined) return cachedResolvedUrl
+
+  cachedResolvedUrl = await fetchCalendlyDemoSchedulingUrl()
+  return cachedResolvedUrl
+}
+
 export async function fetchCalendlyDemoSchedulingUrl(): Promise<string | null> {
   const token = process.env.CALENDLY_API_TOKEN?.trim()
   if (!token) return null

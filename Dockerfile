@@ -22,7 +22,9 @@ COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 
 ARG VITE_POSTHOG_KEY
+ARG VITE_CALENDLY_DEMO_URL
 ENV VITE_POSTHOG_KEY=${VITE_POSTHOG_KEY}
+ENV VITE_CALENDLY_DEMO_URL=${VITE_CALENDLY_DEMO_URL}
 ENV NODE_ENV=production
 RUN bun run build
 
