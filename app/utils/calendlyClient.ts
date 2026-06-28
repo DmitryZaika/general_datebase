@@ -1,7 +1,13 @@
-import { parseCalendlySchedulingUrl } from '~/utils/calendlyUrls'
+import {
+  DEFAULT_CALENDLY_DEMO_URL,
+  parseCalendlySchedulingUrl,
+} from '~/utils/calendlyUrls'
 
 export function getCalendlySchedulingUrl(): string {
-  return parseCalendlySchedulingUrl(import.meta.env.VITE_CALENDLY_DEMO_URL)
+  return (
+    parseCalendlySchedulingUrl(import.meta.env.VITE_CALENDLY_DEMO_URL) ||
+    (import.meta.env.PROD ? DEFAULT_CALENDLY_DEMO_URL : '')
+  )
 }
 
 let calendlyWidgetReady: Promise<void> | null = null
@@ -78,11 +84,15 @@ export async function ensureCalendlyWidgetReady() {
 export async function openCalendlyScheduling(url: string) {
   try {
     await ensureCalendlyWidgetReady()
-    window.Calendly?.initPopupWidget({ url })
-    return
+    if (window.Calendly?.initPopupWidget) {
+      window.Calendly.initPopupWidget({ url })
+      return
+    }
   } catch {
-    window.location.assign(url)
+    // Fall back to opening the scheduling page directly.
   }
+
+  window.location.assign(url)
 }
 
 export function openDemoSection(pathname: string) {
