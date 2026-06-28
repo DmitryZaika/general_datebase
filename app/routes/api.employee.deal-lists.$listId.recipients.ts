@@ -9,14 +9,33 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const listId = parseInt(params.listId ?? '0', 10)
     if (!listId) return data({ emails: [] })
 
+    const url = new URL(request.url)
+    const includeWon = url.searchParams.get('won') === '1'
+    const includeLost = url.searchParams.get('lost') === '1'
+
+    const conditions: string[] = ['d.deleted_at IS NULL', 'd.list_id = ?']
+    const params_arr: (number | string)[] = [listId]
+
+    if (includeWon && includeLost) {
+      conditions.push('(d.is_won IS NULL OR d.is_won = 1 OR d.is_won = 0)')
+    } else if (includeWon) {
+      conditions.push('(d.is_won IS NULL OR d.is_won = 1)')
+    } else if (includeLost) {
+      conditions.push('(d.is_won IS NULL OR d.is_won = 0)')
+    } else {
+      conditions.push('d.is_won IS NULL')
+    }
+
+    params_arr.push(user.id)
+
     const rows = await selectMany<{ email: string; name: string | null }>(
       db,
       `SELECT DISTINCT c.email, c.name
        FROM customers c
-       INNER JOIN deals d ON d.customer_id = c.id AND d.deleted_at IS NULL AND d.list_id = ?
+       INNER JOIN deals d ON d.customer_id = c.id AND ${conditions.join(' AND ')}
        WHERE c.sales_rep = ? AND c.deleted_at IS NULL AND c.email IS NOT NULL AND TRIM(c.email) != ''
        ORDER BY c.email`,
-      [listId, user.id],
+      params_arr,
     )
     const recipients = rows
       .map(r => ({

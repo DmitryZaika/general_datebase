@@ -344,6 +344,8 @@ function FromListToField({
   const [lists, setLists] = useState<DealList[]>([])
   const [listsLoading, setListsLoading] = useState(false)
   const [recipientsLoading, setRecipientsLoading] = useState(false)
+  const [includeWon, setIncludeWon] = useState(false)
+  const [includeLost, setIncludeLost] = useState(false)
 
   const fetchLists = useCallback(async () => {
     setListsLoading(true)
@@ -369,7 +371,11 @@ function FromListToField({
     async (listId: number) => {
       setRecipientsLoading(true)
       try {
-        const res = await fetch(`/api/employee/deal-lists/${listId}/recipients`)
+        const params = new URLSearchParams()
+        if (includeWon) params.set('won', '1')
+        if (includeLost) params.set('lost', '1')
+        const query = params.toString() ? `?${params.toString()}` : ''
+        const res = await fetch(`/api/employee/deal-lists/${listId}/recipients${query}`)
         if (!res.ok) return
         const data = await res.json()
         const recipients: { email: string; name: string | null }[] =
@@ -390,7 +396,15 @@ function FromListToField({
         setRecipientsLoading(false)
       }
     },
-    [value, onChange, labels, onLabelsChange, normalizedExisting],
+    [
+      value,
+      onChange,
+      labels,
+      onLabelsChange,
+      normalizedExisting,
+      includeWon,
+      includeLost,
+    ],
   )
 
   return (
@@ -418,7 +432,30 @@ function FromListToField({
             From list
           </Button>
         </PopoverTrigger>
-        <PopoverContent className='w-56 p-0' align='end'>
+        <PopoverContent className='w-64 p-0' align='end'>
+          <div className='border-b px-3 py-2'>
+            <p className='text-xs font-medium text-zinc-500 mb-2'>Deal status filter</p>
+            <div className='flex items-center gap-4'>
+              <label className='flex items-center gap-1.5 text-sm text-zinc-700 cursor-pointer'>
+                <input
+                  type='checkbox'
+                  checked={includeWon}
+                  onChange={e => setIncludeWon(e.target.checked)}
+                  className='h-3.5 w-3.5 rounded accent-slate-900'
+                />
+                Won
+              </label>
+              <label className='flex items-center gap-1.5 text-sm text-zinc-700 cursor-pointer'>
+                <input
+                  type='checkbox'
+                  checked={includeLost}
+                  onChange={e => setIncludeLost(e.target.checked)}
+                  className='h-3.5 w-3.5 rounded accent-slate-900'
+                />
+                Lost
+              </label>
+            </div>
+          </div>
           {listsLoading ? (
             <div className='p-3 text-sm text-zinc-500'>Loading lists...</div>
           ) : lists.length === 0 ? (
