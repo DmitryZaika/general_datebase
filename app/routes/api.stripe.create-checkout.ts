@@ -1,7 +1,6 @@
 import { type ActionFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
-import { getStripe } from '~/utils/getStripe'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -43,13 +42,14 @@ export async function action({ request }: ActionFunctionArgs) {
       [Number(saleId)],
     )
 
-    if (!sale || !sale[0]) {
+    if (!sale?.[0]) {
       throw new Error('Sale not found')
     }
 
     const { customer_name, customer_email, price } = sale[0]
 
     // Create Stripe checkout session
+    /*
     const session = await getStripe().checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -76,12 +76,13 @@ export async function action({ request }: ActionFunctionArgs) {
         },
       },
     })
-
     if (!session.url) {
       throw new Error('Failed to create checkout session')
     }
 
     return redirect(session.url)
+  */
+    return redirect(`/customers/${viewId}`)
   } catch (error) {
     posthogClient.captureException(error)
     const session = await getSession(request.headers.get('Cookie'))
