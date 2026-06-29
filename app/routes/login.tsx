@@ -3,7 +3,6 @@ import { FormProvider, useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
   Form,
-  Link,
   type LoaderFunctionArgs,
   redirect,
   useActionData,
@@ -140,14 +139,14 @@ export default function Login() {
             className=' shrink-0  object-contain h-30 sm:h-35 md:h-40 '
           />
         </MarketingSlideDown>
-        <MarketingSlideDown delay={100}>
-          <Link
+        {/* <MarketingSlideDown delay={100}>
+           <Link
             to='/customers/companies'
             className='shrink-0 text-md font-medium text-slate-600 underline hover:text-slate-900'
           >
             For Customers
-          </Link>
-        </MarketingSlideDown>
+          </Link> }
+        </MarketingSlideDown> */}
         <MarketingSlideDown delay={200} className='w-full max-w-sm'>
           <FormProvider {...form}>
             <Form
