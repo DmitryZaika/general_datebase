@@ -1,4 +1,4 @@
-import { ArrowRight, Menu, X } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import {
   type ReactNode,
   useCallback,
@@ -315,12 +315,6 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
   const atPricing = isHomePage && homeSection === 'pricing'
   const atMain = isHomePage && homeSection === 'main'
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  useEffect(() => {
-    setMobileMenuOpen(false)
-  }, [location.pathname])
-
   const navUnderline =
     "relative pb-1 before:absolute before:inset-x-0 before:bottom-0 before:h-[3px] before:origin-right before:scale-x-0 before:bg-black before:transition-transform before:duration-300 before:ease-out before:content-[''] hover:before:origin-left hover:before:scale-x-100"
   const navUnderlineActive = 'before:origin-left before:scale-x-100'
@@ -328,9 +322,9 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
   return (
     <>
       <header className='fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur'>
-        {/* Mobile: burger menu on right, Get Demo centered */}
-        <div className='mx-auto grid max-w-6xl grid-cols-3 items-center px-2 py-3 md:hidden'>
-          <Link to='/' className='flex shrink-0 items-center gap-3 justify-self-start'>
+        {/* Mobile / Tablet: flex-row layout */}
+        <div className='mx-auto flex max-w-6xl items-center gap-4 px-2 py-3 lg:hidden'>
+          <Link to='/' className='flex shrink-0 items-center gap-3'>
             <img
               src={loginLogo}
               alt='Granite Manager'
@@ -338,115 +332,89 @@ export function GraniteManagerMarketingHeader({ onDemo }: { onDemo: () => void }
             />
           </Link>
 
+          <nav className='flex flex-1 items-center justify-center gap-4'>
+            {isHomePage ? (
+              <button
+                type='button'
+                onClick={scrollToMarketingTop}
+                className={cn(
+                  'cursor-pointer text-sm font-medium',
+                  navUnderline,
+                  atMain && navUnderlineActive,
+                )}
+              >
+                Main
+              </button>
+            ) : (
+              <Link
+                to='/'
+                className={cn(
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
+                  navUnderline,
+                )}
+              >
+                Main
+              </Link>
+            )}
+
+            {isHomePage ? (
+              <button
+                type='button'
+                onClick={() => scrollToMarketingSection('pricing')}
+                className={cn(
+                  'cursor-pointer text-sm font-medium',
+                  navUnderline,
+                  atPricing && navUnderlineActive,
+                )}
+              >
+                Pricing
+              </button>
+            ) : (
+              <Link
+                to='/#pricing'
+                className={cn(
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
+                  navUnderline,
+                )}
+              >
+                Pricing
+              </Link>
+            )}
+
+            {isLoginPage ? (
+              <span
+                className={cn(
+                  'text-sm font-medium text-slate-900',
+                  navUnderline,
+                  navUnderlineActive,
+                )}
+              >
+                Login
+              </span>
+            ) : (
+              <Link
+                to='/login'
+                className={cn(
+                  'text-sm font-medium text-slate-600 hover:text-slate-900',
+                  navUnderline,
+                )}
+              >
+                Login
+              </Link>
+            )}
+          </nav>
+
           <button
             type='button'
             onClick={onDemo}
-            className='cursor-pointer justify-self-center rounded-full bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800'
+            className='cursor-pointer shrink-0 rounded-full bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800'
           >
             Get Demo
           </button>
-
-          <div className='relative justify-self-end'>
-            <button
-              type='button'
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-              onClick={() => setMobileMenuOpen(prev => !prev)}
-              className='flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-            >
-              {mobileMenuOpen ? (
-                <X className='h-5 w-5' />
-              ) : (
-                <Menu className='h-5 w-5' />
-              )}
-            </button>
-
-            <div
-              className={cn(
-                'absolute right-0 top-12 z-50 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-lg transition-all duration-300 ease-out',
-                mobileMenuOpen
-                  ? 'translate-x-0 opacity-100'
-                  : 'pointer-events-none translate-x-4 opacity-0',
-              )}
-            >
-              <nav className='flex flex-col gap-0.5'>
-                {isHomePage ? (
-                  <button
-                    type='button'
-                    onClick={() => {
-                      scrollToMarketingTop()
-                      setMobileMenuOpen(false)
-                    }}
-                    className={cn(
-                      'cursor-pointer rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-slate-50',
-                      atMain && 'text-slate-900',
-                    )}
-                  >
-                    Main Page
-                  </button>
-                ) : (
-                  <Link
-                    to='/'
-                    onClick={() => setMobileMenuOpen(false)}
-                    className='rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  >
-                    Main Page
-                  </Link>
-                )}
-
-                {isHomePage ? (
-                  <button
-                    type='button'
-                    onClick={() => {
-                      scrollToMarketingSection('pricing')
-                      setMobileMenuOpen(false)
-                    }}
-                    className={cn(
-                      'cursor-pointer rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-slate-50',
-                      atPricing && 'text-slate-900',
-                    )}
-                  >
-                    Pricing
-                  </button>
-                ) : (
-                  <Link
-                    to='/#pricing'
-                    onClick={() => setMobileMenuOpen(false)}
-                    className='rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  >
-                    Pricing
-                  </Link>
-                )}
-
-                {isLoginPage ? (
-                  <span className='rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-900'>
-                    Login
-                  </span>
-                ) : (
-                  <Link
-                    to='/login'
-                    onClick={() => setMobileMenuOpen(false)}
-                    className='rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  >
-                    Login
-                  </Link>
-                )}
-
-                <a
-                  href='https://docs.granite-manager.com/'
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  onClick={() => setMobileMenuOpen(false)}
-                  className='rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                >
-                  Documentation
-                </a>
-              </nav>
-            </div>
-          </div>
         </div>
 
         {/* Desktop: nav on the right */}
-        <div className='mx-auto hidden max-w-6xl items-center justify-between gap-4 px-2 py-3 md:flex md:px-6'>
+        <div className='mx-auto hidden max-w-6xl items-center justify-between gap-4 px-2 py-3 lg:flex lg:px-6'>
           <Link to='/' className='flex shrink-0 items-center gap-3'>
             <img
               src={loginLogo}
