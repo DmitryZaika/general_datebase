@@ -21,17 +21,21 @@ async function fetchFromLambda<T>(
 export async function syncCustomerToCloudTalk(
   companyId: number,
   customerId: number,
-): Promise<string> {
-  const response = await fetchFromLambda(
-    `cloudtalk/sync/${companyId}/${customerId}`,
-    'POST',
-  )
-  if (!response.ok) {
-    throw new Error(
-      `Failed to sync customer ${customerId} to CloudTalk: ${response.statusText}`,
+): Promise<void> {
+  try {
+    const response = await fetchFromLambda(
+      `cloudtalk/sync/${companyId}/${customerId}`,
+      'POST',
     )
+    if (!response.ok) {
+      throw new Error(
+        `Failed to sync customer ${customerId} to CloudTalk: ${response.statusText}`,
+      )
+    }
+    await response.text()
+  } catch {
+    // CloudTalk not configured for this company — silently skip
   }
-  return await response.text()
 }
 
 export async function fetchTemplateVariableData(

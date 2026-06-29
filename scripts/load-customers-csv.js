@@ -1,10 +1,11 @@
 // load-customers-csv.js
 
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import mysql from 'mysql2/promise'
+import fs from 'node:fs'
+import path from 'node:path'
+import readline from 'node:readline'
+import { fileURLToPath } from 'node:url'
 
 dotenv.config()
 
@@ -14,10 +15,12 @@ const access = {
   password: process.env.DB_PASSWORD,
   host: process.env.DB_HOST,
 }
-export const db = mysql.createPool(access)
+const db = mysql.createPool(access)
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, '')
-const CSV_PATH = path.join(__dirname, 'data.csv') // при желании укажи абсолютный путь
+const CSV_PATH = path.join(__dirname, 'data.csv')
+
+const BATCH_SIZE = 500
 
 // --- helpers ----------------------------------------------------
 function detectDelimiter(headerLine) {
@@ -82,13 +85,26 @@ function toInt(v) {
   return Number.isFinite(n) ? n : null
 }
 
-// --- CSV: читаем как есть, только детект разделителя, без алиасов -----------------
+// --- interactive prompt -----------------------------------------
+function ask(question) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+  return new Promise(resolve => {
+    rl.question(question, answer => {
+      rl.close()
+      resolve(answer.trim())
+    })
+  })
+}
+
+// --- CSV --------------------------------------------------------
 function getCsvData() {
   if (!fs.existsSync(CSV_PATH)) {
     throw new Error(`File not found: ${CSV_PATH}`)
   }
 
-  // читаем как utf8, если упадёт — latin1
   let raw
   try {
     raw = fs.readFileSync(CSV_PATH, 'utf8')
@@ -103,12 +119,10 @@ function getCsvData() {
   const first = lines[0]
   const delim = detectDelimiter(first)
 
-  // ВАЖНО: ожидаем именно английские заголовки в нижнем регистре:
   // created_date,name,phone,email,address,sales_rep
   const headers = first.split(delim).map(h => h.trim())
   const needed = ['created_date', 'name', 'phone', 'email', 'address', 'sales_rep']
 
-  // Проверяем строгое соответствие (без алиасов)
   const idx = Object.fromEntries(needed.map(h => [h, headers.indexOf(h)]))
   for (const h of needed) {
     if (idx[h] === -1) {
@@ -139,15 +153,14 @@ function convertData(data) {
     email: normalizeEmail(item.email ?? null),
     address: item.address ?? null,
     sales_rep: toInt(item.sales_rep),
-    source: item.source ?? 'leads',
+    source: 'leads',
   }))
 }
 
-// ---- загрузка существующих телефонов/email из БД и нормализация ------------------
-async function loadExistingIdentifiers({ companyId = 1 } = {}) {
+// --- existing identifiers ---------------------------------------
+async function loadExistingIdentifiers(companyId) {
   const conn = await db.getConnection()
   try {
-    // Если нужно ограничивать по компании — оставляем WHERE company_id = ?
     const [rows] = await conn.query(
       `SELECT phone, email FROM customers WHERE company_id = ?`,
       [companyId],
@@ -157,7 +170,6 @@ async function loadExistingIdentifiers({ companyId = 1 } = {}) {
     const existingEmails = new Set()
 
     for (const r of rows) {
-      // нормализуем то, что лежит в базе (на всякий случай поддержим любые форматы)
       const p = normalizePhone(r.phone)
       if (p) existingPhones.add(p)
       const e = normalizeEmail(r.email)
@@ -179,13 +191,11 @@ function filterDuplicates(data, existingPhones, existingEmails) {
   let skippedDuplicates = 0
 
   for (const r of data) {
-    // пропускаем запись, если нет и телефона, и email
     if (!r.phone && !r.email) {
       skippedNoContact++
       continue
     }
 
-    // проверяем дубли по телефону/email
     const phoneDup = r.phone && batchPhones.has(r.phone)
     const emailDup = r.email && batchEmails.has(r.email)
 
@@ -194,8 +204,6 @@ function filterDuplicates(data, existingPhones, existingEmails) {
       continue
     }
 
-    // новая уникальная запись — добавляем и учитываем в сетах,
-    // чтобы внутри текущей загрузки тоже не было дублей
     if (r.phone) batchPhones.add(r.phone)
     if (r.email) batchEmails.add(r.email)
     result.push(r)
@@ -204,61 +212,110 @@ function filterDuplicates(data, existingPhones, existingEmails) {
   return { filtered: result, skippedDuplicates, skippedNoContact }
 }
 
-async function saveData(data) {
-  const sql = `
-    INSERT INTO customers
-      (created_date, name, phone, email, address, sales_rep, company_id, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `
+// --- batch insert -----------------------------------------------
+async function saveData(data, companyId) {
+  if (data.length === 0) return 0
+
+  const columns = ['created_date', 'name', 'phone', 'email', 'address', 'sales_rep', 'company_id', 'source']
+  const placeholders = columns.map(() => '?').join(', ')
 
   const conn = await db.getConnection()
-
-  let _inserted = 0
+  let inserted = 0
 
   try {
-    await conn.beginTransaction()
+    for (let i = 0; i < data.length; i += BATCH_SIZE) {
+      const chunk = data.slice(i, i + BATCH_SIZE)
+      const valueTuples = chunk
+        .map(() => `(${placeholders})`)
+        .join(', ')
 
-    for (const r of data) {
-      await conn.execute(sql, [
-        r.created_date,
-        r.name,
-        r.phone,
-        r.email,
-        r.address,
-        r.sales_rep,
-        1,
-        'leads',
-      ])
+      const sql = `INSERT INTO customers (${columns.join(', ')}) VALUES ${valueTuples}`
 
-      _inserted++
+      const params = []
+      for (const r of chunk) {
+        params.push(
+          r.created_date,
+          r.name,
+          r.phone,
+          r.email,
+          r.address,
+          r.sales_rep,
+          companyId,
+          r.source,
+        )
+      }
+
+      await conn.execute(sql, params)
+      inserted += chunk.length
     }
-
-    await conn.commit()
-  } catch (e) {
-    await conn.rollback()
-
-    throw e
   } finally {
     conn.release()
-
     await db.end()
   }
 
-  return _inserted
+  return inserted
 }
 
 // --- run --------------------------------------------------------
 // biome-ignore lint/suspicious/noConsole: for tests
-console.log('customers import started')
+console.log('=== Customers CSV Import ===\n')
+
+const companyIdInput = await ask('Enter company ID: ')
+const companyId = Number(companyIdInput)
+if (!Number.isFinite(companyId) || companyId <= 0) {
+  console.error('Invalid company ID')
+  process.exit(1)
+}
+
+let dbCompanyName
+{
+  const conn = await db.getConnection()
+  try {
+    const [companyRows] = await conn.query(
+      'SELECT name FROM company WHERE id = ?',
+      [companyId],
+    )
+    if (!companyRows.length) {
+      console.error(`No company found with ID ${companyId}`)
+      await db.end()
+      process.exit(1)
+    }
+    dbCompanyName = companyRows[0].name
+  } finally {
+    conn.release()
+  }
+}
+
+const enteredName = await ask(
+  `Please enter the name of the company you add leads: '${dbCompanyName}' -> `,
+)
+if (enteredName !== dbCompanyName) {
+  console.error(
+    `Company name mismatch: you entered "${enteredName}", but the company with ID ${companyId} is "${dbCompanyName}"`,
+  )
+  await db.end()
+  process.exit(1)
+}
+
+// biome-ignore lint/suspicious/noConsole: for tests
+console.log(`\nImporting to: ${dbCompanyName} (ID: ${companyId})\n`)
+
+const dbName = process.env.DB_DATABASE ?? 'unknown'
+const confirmDb = await ask(
+  `You are adding leads to the main database '${dbName}' — is this correct? (yes/no) -> `,
+)
+if (confirmDb.toLowerCase() !== 'yes' && confirmDb.toLowerCase() !== 'y') {
+  console.error('Import aborted by user')
+  await db.end()
+  process.exit(1)
+}
 
 const rawData = getCsvData()
 const cleanData = convertData(rawData)
 // biome-ignore lint/suspicious/noConsole: for tests
-console.log('customers cleanData count', cleanData.length)
+console.log(`CSV rows parsed: ${cleanData.length}`)
 
-const { existingPhones, existingEmails } = await loadExistingIdentifiers({
-  companyId: 1,
-})
+const { existingPhones, existingEmails } = await loadExistingIdentifiers(companyId)
 const { filtered, skippedDuplicates, skippedNoContact } = filterDuplicates(
   cleanData,
   existingPhones,
@@ -267,9 +324,9 @@ const { filtered, skippedDuplicates, skippedNoContact } = filterDuplicates(
 
 // biome-ignore lint/suspicious/noConsole: for tests
 console.log(
-  `filtered to insert: ${filtered.length} (skipped duplicates: ${skippedDuplicates}, skipped no phone+email: ${skippedNoContact})`,
+  `Filtered to insert: ${filtered.length} (skipped duplicates: ${skippedDuplicates}, skipped no phone+email: ${skippedNoContact})`,
 )
 
-const inserted = await saveData(filtered)
+const inserted = await saveData(filtered, companyId)
 // biome-ignore lint/suspicious/noConsole: for tests
-console.log(`customers import finished, inserted: ${inserted}`)
+console.log(`Import finished, inserted: ${inserted} customers into ${dbCompanyName}`)
