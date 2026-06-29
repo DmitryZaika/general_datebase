@@ -1,6 +1,5 @@
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
-import { normalizeToE164 } from '~/utils/phone'
 import { selectId } from '~/utils/queryHelpers'
 
 export const BASE_URL = 'https://my.cloudtalk.io/api'
@@ -252,18 +251,6 @@ export async function fetchValue<T>(
   return { items: json.responseData?.data ?? [] }
 }
 
-export interface ContactPayload {
-  name: string
-  ContactNumber: { public_number: string }[]
-  ContactEmail: { email: string }[]
-  ExternalUrl?: { name: string; url: string }[]
-  address?: string
-  city?: string
-  state?: string
-  zip?: string
-  country_id?: number
-}
-
 export class CloudTalkApiError extends Error {
   status: number
   apiMessage: Nullable<string>
@@ -279,8 +266,6 @@ export class CloudTalkApiError extends Error {
 const MAX_5XX_RETRIES = 3
 const MAX_429_RETRIES = 5
 const SERVER_BACKOFF_MS = [2000, 4000, 8000]
-const POST_CREATE_LOOKUP_RETRIES = 3
-const POST_CREATE_LOOKUP_DELAY_MS = 500
 
 type CtMethod = 'PUT' | 'POST' | 'DELETE' | 'GET'
 
@@ -424,68 +409,6 @@ export function coerceId(value: unknown): Nullable<number> {
   return null
 }
 
-function findContactId(json: unknown): Nullable<number> {
-  if (!json || typeof json !== 'object') return null
-  const obj = json as Record<string, unknown>
-  const responseData = obj.responseData as Record<string, unknown> | undefined
-  const data = (responseData?.data ?? obj.data) as Record<string, unknown> | undefined
-  const candidates: unknown[] = [
-    (data?.Contact as Record<string, unknown> | undefined)?.id,
-    data?.id,
-    (obj.Contact as Record<string, unknown> | undefined)?.id,
-    obj.id,
-  ]
-  for (const c of candidates) {
-    const id = coerceId(c)
-    if (id !== null) return id
-  }
-  return null
-}
-
-export async function createCloudTalkContact(
-  companyId: number,
-  payload: ContactPayload,
-): Promise<number> {
-  const response = await cloudtalkRequest('contacts/add.json', companyId, {
-    method: 'PUT',
-    body: payload,
-  })
-  const json = (await response.json().catch(() => null)) as unknown
-
-  const idFromResponse = findContactId(json)
-  if (idFromResponse !== null) return idFromResponse
-
-  // Some CloudTalk responses omit the id even on success — fall back to a
-  // phone-keyed lookup against the contact we just created.
-  const phone = payload.ContactNumber[0]?.public_number
-  if (phone) {
-    for (let attempt = 0; attempt < POST_CREATE_LOOKUP_RETRIES; attempt++) {
-      await sleep(POST_CREATE_LOOKUP_DELAY_MS)
-      const found = await findContactByOnePhone(companyId, phone)
-      if (found !== null) return found
-    }
-  }
-
-  // biome-ignore lint/suspicious/noConsole: server-only PII-safe ops log
-  console.error('[cloudtalk-unparseable-response]', {
-    endpoint: 'PUT contacts/add.json',
-    companyId,
-    preview: JSON.stringify(json).slice(0, 500),
-  })
-  throw new Error('CloudTalk add.json: unable to resolve contact id')
-}
-
-export async function updateCloudTalkContact(
-  companyId: number,
-  cloudtalkId: number,
-  payload: ContactPayload,
-): Promise<void> {
-  await cloudtalkRequest(`contacts/edit/${cloudtalkId}.json`, companyId, {
-    method: 'POST',
-    body: payload,
-  })
-}
-
 export async function deleteCloudTalkContact(
   companyId: number,
   cloudtalkId: number,
@@ -493,67 +416,6 @@ export async function deleteCloudTalkContact(
   await cloudtalkRequest(`contacts/delete/${cloudtalkId}.json`, companyId, {
     method: 'DELETE',
   })
-}
-
-interface ContactSearchHit {
-  Contact?: {
-    id?: number | string
-    contact_numbers?: string[]
-    ContactNumber?: { public_number?: string }[]
-  }
-  id?: number | string
-  contact_numbers?: string[]
-  ContactNumber?: { public_number?: string }[]
-}
-
-interface ContactSearchEnvelope {
-  responseData?: { data?: ContactSearchHit[] }
-}
-
-function extractPhones(hit: ContactSearchHit): Nullable<string>[] {
-  const node = hit.Contact ?? hit
-  const phones: Nullable<string>[] = []
-  for (const p of node.contact_numbers ?? []) {
-    if (typeof p === 'string') phones.push(normalizeToE164(p))
-  }
-  for (const p of node.ContactNumber ?? []) {
-    if (p?.public_number) phones.push(normalizeToE164(p.public_number))
-  }
-  return phones
-}
-
-function extractId(hit: ContactSearchHit): Nullable<number> {
-  return coerceId(hit.Contact?.id ?? hit.id)
-}
-
-async function findContactByOnePhone(
-  companyId: number,
-  e164Phone: string,
-): Promise<Nullable<number>> {
-  const response = await cloudtalkRequest(
-    `contacts/index.json?keyword=${encodeURIComponent(e164Phone)}&limit=10`,
-    companyId,
-    { method: 'GET' },
-  )
-  const json = (await response.json()) as ContactSearchEnvelope
-  for (const hit of json.responseData?.data ?? []) {
-    if (extractPhones(hit).includes(e164Phone)) {
-      const id = extractId(hit)
-      if (id !== null) return id
-    }
-  }
-  return null
-}
-
-export async function findCloudTalkContactByPhone(
-  companyId: number,
-  e164Phones: string[],
-): Promise<Nullable<number>> {
-  for (const phone of e164Phones) {
-    const id = await findContactByOnePhone(companyId, phone)
-    if (id) return id
-  }
-  return null
 }
 
 export async function fetchCallsForPhones(

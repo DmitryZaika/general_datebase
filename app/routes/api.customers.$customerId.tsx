@@ -108,7 +108,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
   }
 
-  await syncCustomerToCloudTalk(validatedData.company_id, customerId)
+  // Best-effort: never block customer update on a CloudTalk/Lambda failure.
+  void syncCustomerToCloudTalk(validatedData.company_id, customerId).catch(
+    syncError => {
+      posthogClient.captureException(
+        syncError,
+        'cloudtalk_update_customer_sync_failed',
+        {
+          customerId,
+        },
+      )
+    },
+  )
 
   return data({
     success: true,

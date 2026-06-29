@@ -5,14 +5,15 @@ async function fetchFromLambda<T>(
   method: 'GET' | 'POST',
   data: T | undefined = undefined,
 ): Promise<Response> {
-  const url = `${process.env.LAMBDA_URL}/${path}`
-  if (!process.env.LAMBDA_KEY) throw new Error('LAMBDA_KEY not set')
+  const baseUrl = (process.env.LAMBDA_URL ?? '').replace(/\/$/, '')
+  const url = `${baseUrl}/${path}`
+  if (!process.env.REMIX_KEY) throw new Error('REMIX_KEY not set')
   return await fetch(url, {
     method,
     headers: {
       'Content-Type': 'application/json',
 
-      Authorization: process.env.LAMBDA_KEY,
+      Authorization: process.env.REMIX_KEY,
     },
     body: JSON.stringify(data),
   })
