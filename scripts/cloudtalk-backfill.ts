@@ -88,8 +88,9 @@ async function syncCustomerWithRetry(
   companyId: number,
   customerId: number,
 ): Promise<void> {
-  const url = `${process.env.LAMBDA_URL}/cloudtalk/sync/${companyId}/${customerId}`
-  if (!process.env.LAMBDA_KEY) throw new Error('LAMBDA_KEY not set')
+  const baseUrl = (process.env.LAMBDA_URL ?? '').replace(/\/$/, '')
+  const url = `${baseUrl}/cloudtalk/sync/${companyId}/${customerId}`
+  if (!process.env.REMIX_KEY) throw new Error('REMIX_KEY not set')
 
   for (let attempt = 0; attempt <= MAX_SYNC_RETRIES; attempt += 1) {
     if (stopRequested) throw new Error('stopped')
@@ -98,7 +99,7 @@ async function syncCustomerWithRetry(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: process.env.LAMBDA_KEY,
+        Authorization: process.env.REMIX_KEY,
       },
       body: JSON.stringify(undefined),
     })

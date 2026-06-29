@@ -8,6 +8,7 @@ import {
   fetchUserDisplayNameById,
   recordCustomerReassignment,
 } from '~/utils/customerAudit.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -60,7 +61,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const customerId = result.insertId
 
-  await syncCustomerToCloudTalk(validatedData.company_id, customerId)
+  // Best-effort: never block customer creation on a CloudTalk/Lambda failure.
+  void syncCustomerToCloudTalk(validatedData.company_id, customerId).catch(
+    syncError => {
+      posthogClient.captureException(
+        syncError,
+        'cloudtalk_create_customer_sync_failed',
+        {
+          customerId,
+        },
+      )
+    },
+  )
 
   if (salesRep !== null && createdBy) {
     const toName = await fetchUserDisplayNameById(db, salesRep)

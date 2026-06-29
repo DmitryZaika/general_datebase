@@ -6,18 +6,6 @@ vi.mock('~/utils/queryHelpers', () => ({
   selectId: (...args: unknown[]) => selectId(...args),
 }))
 
-const okJsonResponse = (body: unknown): Response =>
-  new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  })
-
-const payload = {
-  name: 'Acme',
-  ContactNumber: [{ public_number: '+13173161456' }],
-  ContactEmail: [],
-}
-
 beforeEach(async () => {
   selectId.mockReset()
   selectId.mockResolvedValue({
@@ -79,103 +67,6 @@ describe('coerceId', () => {
     expect(coerceId({})).toBeNull()
     expect(coerceId([])).toBeNull()
     expect(coerceId(true)).toBeNull()
-  })
-})
-
-describe('createCloudTalkContact', () => {
-  it('returns the id when CloudTalk responds with a string id', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        okJsonResponse({ responseData: { status: 201, data: { id: '1779762076' } } }),
-      )
-
-    const { createCloudTalkContact } = await import('./cloudtalk.server')
-
-    expect(await createCloudTalkContact(7, payload)).toBe(1779762076)
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-  })
-
-  it('returns the id when CloudTalk responds with a numeric id', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(okJsonResponse({ responseData: { data: { id: 42 } } }))
-
-    const { createCloudTalkContact } = await import('./cloudtalk.server')
-
-    expect(await createCloudTalkContact(7, payload)).toBe(42)
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-  })
-
-  it('returns the id from data.Contact.id when present', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      okJsonResponse({ responseData: { data: { Contact: { id: '99' } } } }),
-    )
-
-    const { createCloudTalkContact } = await import('./cloudtalk.server')
-
-    expect(await createCloudTalkContact(7, payload)).toBe(99)
-  })
-
-  it('falls back to phone search only when the response truly lacks an id', async () => {
-    let call = 0
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      call += 1
-      if (call === 1) return okJsonResponse({ responseData: { data: {} } })
-      return okJsonResponse({
-        responseData: {
-          data: [
-            {
-              Contact: {
-                id: '555',
-                ContactNumber: [{ public_number: '+13173161456' }],
-              },
-            },
-          ],
-        },
-      })
-    })
-
-    const { createCloudTalkContact } = await import('./cloudtalk.server')
-
-    expect(await createCloudTalkContact(7, payload)).toBe(555)
-    expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(2)
-  })
-
-  it('does not leak the CloudTalk response body into the thrown error message', async () => {
-    const pii = 'Jane Doe 555-867-5309 jane@example.com'
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(`{"error":"validation","echo":"${pii}"}`, {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-
-    const { createCloudTalkContact } = await import('./cloudtalk.server')
-
-    const err = (await createCloudTalkContact(7, payload).catch(e => e)) as Error
-    expect(err).toBeInstanceOf(Error)
-    expect(err.message).not.toContain(pii)
-    expect(err.message).toContain('400')
-  })
-
-  it('does not leak the unparseable response preview into the thrown error message', async () => {
-    const pii = 'Jane Doe 555-867-5309'
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: unknown) => {
-      const url = typeof input === 'string' ? input : (input as Request).url
-      if (url.includes('contacts/add.json')) {
-        return okJsonResponse({ responseData: { weird_shape: pii } })
-      }
-      return okJsonResponse({ responseData: { data: [] } })
-    })
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-
-    const { createCloudTalkContact } = await import('./cloudtalk.server')
-
-    const err = (await createCloudTalkContact(7, payload).catch(e => e)) as Error
-    expect(err.message).toContain('unable to resolve contact id')
-    expect(err.message).not.toContain(pii)
   })
 })
 

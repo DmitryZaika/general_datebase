@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from 'react-router'
 import { data } from 'react-router'
 import { db } from '~/db.server'
+import { syncCustomerToCloudTalk } from '~/services/lambda.server'
 import type { Nullable } from '~/types/utils'
 import {
   badRequest,
@@ -8,7 +9,6 @@ import {
   notFound,
   requireEmployeeWithCsrf,
 } from '~/utils/apiResponse.server'
-import { syncCustomerToCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import { formatPhoneForStorage, PHONE_DIGITS_REGEX } from '~/utils/phone'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -49,7 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
     // Eagerly upsert into cloudtalk_contacts so subsequent fetchCustomerByPhone
     // joins succeed immediately. Failures here are best-effort — the periodic
     // sync job will retry. Fire-and-forget so the UI gets a fast response.
-    void syncCustomerToCloudTalk(customer.id).catch(syncError => {
+    void syncCustomerToCloudTalk(user.company_id, customer.id).catch(syncError => {
       posthogClient.captureException(syncError, 'cloudtalk_link_phone_sync_failed', {
         customerId: customer.id,
       })
