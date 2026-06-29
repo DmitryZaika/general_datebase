@@ -106,6 +106,39 @@ export async function action({ request, params }: ActionFunctionArgs) {
       'UPDATE deals SET user_id = ? WHERE customer_id = ? AND deleted_at IS NULL',
       [salesRep, customerId],
     )
+
+    const [existingDealRows] = await db.execute<RowDataPacket[]>(
+      'SELECT id FROM deals WHERE customer_id = ? AND deleted_at IS NULL LIMIT 1',
+      [customerId],
+    )
+
+    if (existingDealRows.length === 0) {
+      const [defaultListRows] = await db.execute<RowDataPacket[]>(
+        `SELECT dl.id, dl.name
+         FROM groups_list g
+         JOIN deals_list dl ON dl.group_id = g.id AND dl.deleted_at IS NULL
+         WHERE g.deleted_at IS NULL AND g.is_default = 1
+           AND (g.company_id = ? OR g.id = 1)
+         ORDER BY dl.position ASC
+         LIMIT 1`,
+        [validatedData.company_id],
+      )
+      const listId = defaultListRows[0]?.id ?? 1
+      const status = defaultListRows[0]?.name ?? 'New Customer'
+      const [posRows] = await db.query<RowDataPacket[]>(
+        'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = ? AND deleted_at IS NULL',
+        [listId],
+      )
+      const nextPos = posRows[0]?.next ?? 1
+      const [dealResult] = await db.execute<ResultSetHeader>(
+        'INSERT INTO deals (customer_id, status, list_id, position, user_id, created_by) VALUES (?,?,?,?,?,?)',
+        [customerId, status, listId, nextPos, salesRep, assignedBy],
+      )
+      await db.execute(
+        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+        [dealResult.insertId, listId],
+      )
+    }
   }
 
   await syncCustomerToCloudTalk(validatedData.company_id, customerId)
