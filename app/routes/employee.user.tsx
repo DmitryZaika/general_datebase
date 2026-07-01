@@ -10,6 +10,7 @@ import {
   Form,
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useLocation,
@@ -99,6 +100,10 @@ interface UserData extends RowDataPacket {
   cloudtalk_agent_id: string | null
   cloudtalk_phone_number: string | null
   telegram_id: boolean
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'My Account' }]
 }
 
 export async function action({ request }: ActionFunctionArgs) {

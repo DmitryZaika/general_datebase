@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -23,6 +24,10 @@ import { getAdminUser, type User } from '~/utils/session.server'
 interface Document {
   id: number
   name: string
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Documents' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

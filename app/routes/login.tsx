@@ -4,6 +4,7 @@ import {
   type ActionFunctionArgs,
   Form,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useActionData,
   useLoaderData,
@@ -43,6 +44,10 @@ const userSchema = z.object({
 })
 
 const userResolver = zodResolver(userSchema)
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Login' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {

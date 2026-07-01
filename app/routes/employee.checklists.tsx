@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
@@ -25,6 +30,10 @@ interface ChecklistItem {
   comments: string | null
   created_at: string
   installer_name: string | null
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Checklists' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

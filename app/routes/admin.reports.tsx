@@ -1,6 +1,11 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import { useState } from 'react'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
 import {
@@ -42,6 +47,10 @@ function formatDate(dateString: string | null) {
   } catch {
     return '-'
   }
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Reports' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

@@ -19,7 +19,12 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
@@ -840,6 +845,10 @@ function ActivityTimeline({ items }: { items: GroupedUserActivity[] }) {
       </div>
     </div>
   )
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Users Activity' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

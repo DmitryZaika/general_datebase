@@ -5,7 +5,7 @@ import { getEmployeeUser } from '~/utils/session.server'
 export const meta: MetaFunction = () => {
   return [
     {
-      title: 'Granite Manager | All-in-One CRM & Inventory for Stone Fabricators',
+      title: 'All-in-One CRM & Inventory for Stone Fabricators',
     },
     {
       name: 'description',

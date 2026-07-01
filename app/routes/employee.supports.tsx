@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useLocation,
@@ -24,6 +25,10 @@ interface Support {
   id: number
   name: string
   url: string | null
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Supports' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

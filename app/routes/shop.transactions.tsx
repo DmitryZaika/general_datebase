@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -62,6 +63,10 @@ function formatDate(dateString: string) {
     month: '2-digit',
     day: '2-digit',
   }).format(date)
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Shop – Transactions' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

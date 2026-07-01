@@ -4,6 +4,7 @@ import {
   type ActionFunctionArgs,
   Form,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -29,6 +30,10 @@ interface PayrollItem {
   sale_status: string
   paid_date: string | null
   sales_payroll: number | null
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Payroll' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

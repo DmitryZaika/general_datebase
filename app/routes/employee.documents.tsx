@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { motion } from 'framer-motion'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useLocation,
@@ -19,6 +20,10 @@ interface ItemDocument {
   id: number
   name: string
   url: string | null
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Documents' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -44,6 +49,7 @@ const columns: ColumnDef<ItemDocument>[] = [
         href={row.original.url || ''}
         target='_blank'
         className='text-blue-600 underline hover:text-blue-800'
+        rel='noopener'
       >
         {row.original.name}
       </a>

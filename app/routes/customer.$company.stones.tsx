@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   useLoaderData,
   useLocation,
@@ -60,6 +61,10 @@ function sortStonesLikeAdminEmployee(stones: Stone[]): Stone[] {
     ...outOfStock.sort(byName),
     ...notDisplayed.sort(byName),
   ]
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Stones' }]
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {

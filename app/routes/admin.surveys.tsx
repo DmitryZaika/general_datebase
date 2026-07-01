@@ -1,4 +1,9 @@
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -15,6 +20,10 @@ type SurveyItem = {
   installation_rating: number
   installation_comments: string | null
   created_at: string
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Surveys' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

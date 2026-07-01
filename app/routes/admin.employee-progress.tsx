@@ -1,7 +1,13 @@
 // app/routes/admin.employee-progress.tsx
 import type { RowDataPacket } from 'mysql2'
 import React from 'react'
-import { Link, type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  Link,
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -104,6 +110,10 @@ async function fetchAnswerAttempts(companyId: number): Promise<AnswerAttempt[]> 
 // ═════════════════════════════════════════════════════════════════════════════
 // SERVER: Loader
 // ═════════════════════════════════════════════════════════════════════════════
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Employee Progress' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let admin: User

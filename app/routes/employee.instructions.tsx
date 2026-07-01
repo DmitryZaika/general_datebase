@@ -2,6 +2,7 @@ import DOMPurify from 'isomorphic-dompurify'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useSearchParams,
@@ -215,6 +216,10 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
   return mapInstructionTree(buildInstructionTree(instructions))
 }
 
+export const meta: MetaFunction = () => {
+  return [{ title: 'Instructions' }]
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request)
@@ -308,9 +313,11 @@ export default function Instructions() {
       )
       if (closedIdsForSelect.length > 0) {
         const idsToRemove = new Set<number>(closedIdsForSelect)
-        closedIdsForSelect.forEach(id =>
-          getDescendants(finalInstructions, id).forEach(d => idsToRemove.add(d)),
-        )
+        for (const id of closedIdsForSelect) {
+          for (const d of getDescendants(finalInstructions, id)) {
+            idsToRemove.add(d)
+          }
+        }
         if (selectedId && idsToRemove.has(selectedId)) {
           setSelectedId(null)
         }
@@ -327,7 +334,9 @@ export default function Instructions() {
         closedIds.forEach(id => {
           idsToRemove.add(id)
           const descendants = getDescendants(finalInstructions, id)
-          descendants.forEach(d => idsToRemove.add(d))
+          for (const d of descendants) {
+            idsToRemove.add(d)
+          }
         })
 
         const prevFiltered = prev.filter(
@@ -374,7 +383,9 @@ export default function Instructions() {
       // Обновляем expandedIds: добавляем весь путь к уже существующим
       setExpandedIds(prev => {
         const next = new Set(prev)
-        path.forEach(pId => next.add(pId))
+        for (const pId of path) {
+          next.add(pId)
+        }
         return Array.from(next)
       })
 

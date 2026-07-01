@@ -1,8 +1,12 @@
-import type { LoaderFunctionArgs } from 'react-router'
+import type { LoaderFunctionArgs, MetaFunction } from 'react-router'
 import { redirect } from 'react-router'
 import { companyHasCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import { listCloudtalkSalesReps } from '~/utils/cloudtalkSmsService.server'
 import { getAdminUser } from '~/utils/session.server'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – CloudTalk SMS' }]
+}
 
 export { default } from './employee.cloudtalk'
 

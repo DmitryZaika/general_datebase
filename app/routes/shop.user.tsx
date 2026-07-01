@@ -9,6 +9,7 @@ import {
   Form,
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useActionData,
   useLoaderData,
@@ -82,6 +83,10 @@ function profileFieldFromKey(key: string): ProfileField | undefined {
   if (key === 'email_name') return 'email_name'
   if (key === 'cloudtalk_agent_id') return 'cloudtalk_agent_id'
   return undefined
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Shop – My Account' }]
 }
 
 export async function action({ request }: ActionFunctionArgs) {

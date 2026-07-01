@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -28,6 +29,10 @@ interface Supplier {
   phone: string
   email: string
   notes: string
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Suppliers' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

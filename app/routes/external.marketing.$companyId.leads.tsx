@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   data,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -43,6 +44,10 @@ interface Lead {
   lost_reason?: string
   invalid_lead: string | null
   className?: string
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'External Marketing' }]
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {

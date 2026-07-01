@@ -7,6 +7,7 @@ import {
   data,
   Form,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useRouteLoaderData,
@@ -77,6 +78,10 @@ const customerCheckInSchema = z.object({
 })
 
 const resolver = zodResolver(customerCheckInSchema)
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Check In' }]
+}
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const session = await getSession(request.headers.get('Cookie'))

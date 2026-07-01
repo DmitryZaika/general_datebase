@@ -1,7 +1,13 @@
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { CheckIcon, MinusIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  Outlet,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
@@ -19,6 +25,10 @@ import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries'
 import { getEmployeeUser, getShopWorkerUser, type User } from '~/utils/session.server'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Shop – Samples' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let user: User

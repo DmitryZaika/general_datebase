@@ -2,6 +2,7 @@ import type { ChangeEvent } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useNavigation,
@@ -75,6 +76,10 @@ async function requireCompanyManager(request: Request): Promise<SessionUser> {
     throw new TypeError('Invalid user permissions')
   }
   return user
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Company' }]
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {

@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -62,6 +63,10 @@ interface InstructionItemProps {
   onReorder: (parentId: number | null, orderedIds: number[]) => void
   sortDisabled?: boolean
   dragHandle?: ReactNode
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Instructions' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

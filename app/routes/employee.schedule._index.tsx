@@ -1,4 +1,8 @@
-import { redirect } from 'react-router'
+import { type MetaFunction, redirect } from 'react-router'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Schedule' }]
+}
 
 export async function loader() {
   // Redirect to the default schedule view (month)

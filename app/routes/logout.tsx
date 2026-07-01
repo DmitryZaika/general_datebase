@@ -1,7 +1,11 @@
-import type { LoaderFunctionArgs } from 'react-router'
+import type { LoaderFunctionArgs, MetaFunction } from 'react-router'
 import { redirect } from 'react-router'
 import { db } from '~/db.server'
 import { destroySession, getSession } from '~/sessions.server'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Logout' }]
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const cookie = request.headers.get('Cookie')

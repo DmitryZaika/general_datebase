@@ -1,6 +1,10 @@
-import type { LoaderFunctionArgs } from 'react-router'
+import type { LoaderFunctionArgs, MetaFunction } from 'react-router'
 import { Outlet, redirect } from 'react-router'
 import { getShopWorkerUser } from '~/utils/session.server'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Shop' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {

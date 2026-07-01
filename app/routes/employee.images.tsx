@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { useEffect } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useLocation,
@@ -21,6 +22,10 @@ import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
 import { loadImagesLibrary } from '~/utils/imagesLibrary.server'
 import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { getEmployeeUser, type User } from '~/utils/session.server'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Images' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let user: User

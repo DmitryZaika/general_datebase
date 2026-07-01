@@ -6,10 +6,7 @@ import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export const meta: MetaFunction = () => {
-  return [
-    { title: 'Granite Depot Database' },
-    { name: 'description', content: 'Welcome to Remix!' },
-  ]
+  return [{ title: 'Employee' }]
 }
 
 export const loader: LoaderFunction = async ({ request }) => {

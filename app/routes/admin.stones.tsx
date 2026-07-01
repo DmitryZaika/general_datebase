@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   type ShouldRevalidateFunctionArgs,
   useLoaderData,
@@ -37,6 +38,10 @@ const VIEW_MODE = {
   GRID: 'grid',
   TABLE: 'table',
 } as const
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Stones' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request)

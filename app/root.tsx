@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import type { RowDataPacket } from 'mysql2'
 import { posthog } from 'posthog-js'
 import { useEffect } from 'react'
-import type { LinksFunction, LoaderFunctionArgs } from 'react-router'
+import type { LinksFunction, LoaderFunctionArgs, MetaFunction } from 'react-router'
 import {
   data,
   Links,
@@ -76,6 +76,22 @@ export const links: LinksFunction = () => [
     href: 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/Granite-manager-icon.png',
   },
 ]
+
+export const meta: MetaFunction = ({ matches }) => {
+  const leafMeta = matches[matches.length - 1]?.meta
+  let leafTitle = ''
+  if (Array.isArray(leafMeta)) {
+    for (const m of leafMeta) {
+      if ('title' in m && typeof m.title === 'string' && m.title.length > 0) {
+        leafTitle = m.title
+        break
+      }
+    }
+  }
+  return leafTitle
+    ? [{ title: `${leafTitle} | Granite Manager` }]
+    : [{ title: 'Granite Manager' }]
+}
 
 export function Posthog() {
   useEffect(() => {

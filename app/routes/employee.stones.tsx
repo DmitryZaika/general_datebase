@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   type ShouldRevalidateFunctionArgs,
@@ -35,6 +36,10 @@ import { capitalizeFirstLetter } from '~/utils/words'
 type ViewMode = 'grid' | 'table'
 
 const EMPLOYEE_STONES_LIST_PATH = '/employee/stones'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Stones' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {

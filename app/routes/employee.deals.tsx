@@ -5,6 +5,7 @@ import { useEffect, useMemo } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   type ShouldRevalidateFunctionArgs,
   useLoaderData,
@@ -44,6 +45,10 @@ type FullDeal = DealsDialogSchema & {
   due_date: string | null
   customer_id: number
   lost_reason: string | null
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Deals' }]
 }
 
 export async function action({ request }: ActionFunctionArgs) {

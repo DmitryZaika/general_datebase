@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -32,6 +33,10 @@ function formatDate(dateString: string) {
     month: '2-digit',
     day: '2-digit',
   }).format(date)
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Invoices' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

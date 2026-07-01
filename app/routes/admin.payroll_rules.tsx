@@ -4,6 +4,7 @@ import {
   type ActionFunctionArgs,
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -23,6 +24,10 @@ interface PayrollRule {
   name: string
   amount: number
   type: string
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Payroll Rules' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

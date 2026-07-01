@@ -1,7 +1,12 @@
 import { useMutation } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { CustomerSearch } from '~/components/molecules/CustomerSearch'
 import { EmailInput } from '~/components/molecules/EmailInput'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -40,6 +45,10 @@ const checklistItems: Array<[keyof ChecklistFormData, string]> = [
   ['holes_drilled', 'Holes for fixtures are drilled'],
   ['cleanup_completed', 'Clean up completed'],
 ]
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Installer Checklist' }]
+}
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {

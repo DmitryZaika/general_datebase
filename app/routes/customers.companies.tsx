@@ -1,4 +1,4 @@
-import { Link, useLoaderData } from 'react-router'
+import { Link, type MetaFunction, useLoaderData } from 'react-router'
 import {
   GraniteManagerMarketingBackground,
   GraniteManagerMarketingHeader,
@@ -10,6 +10,10 @@ import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 
 const CUSTOMER_COMPANY_IDS = [1, 3, 7]
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Customer Portal' }]
+}
 
 export const loader = async () => {
   const placeholders = CUSTOMER_COMPANY_IDS.map(() => '?').join(',')

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -25,6 +26,10 @@ const formatPrice = (price: number | null | undefined): string => {
   if (price == null) return '-'
 
   return String(price).replace(/\.0+$/, '')
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Faucets' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

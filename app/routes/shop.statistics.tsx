@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   data,
   type LoaderFunctionArgs,
+  type MetaFunction,
   useLoaderData,
   useNavigate,
   useSearchParams,
@@ -30,6 +31,10 @@ type DayStat = {
 type MaterialTotal = {
   stone_type: string
   sqft: number
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Shop – Statistics' }]
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {

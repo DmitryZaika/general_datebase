@@ -89,41 +89,48 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
     customerId = customerRows?.[0]?.customer_id || null
   } else {
-    // Try to find customer from email thread participants
     const [threadEmails] = await db.execute<RowDataPacket[]>(
-      `SELECT sender_email, receiver_email FROM emails WHERE thread_id = ? LIMIT 1`,
+      `SELECT sender_email, receiver_email, sender_user_id FROM emails WHERE thread_id = ? LIMIT 1`,
       [threadId],
     )
 
     if (threadEmails && threadEmails.length > 0) {
-      const { sender_email, receiver_email } = threadEmails[0]
+      const { sender_email, receiver_email, sender_user_id } = threadEmails[0]
       const sEmail = normalizeEmail(sender_email)
       const rEmail = normalizeEmail(receiver_email)
+      const normalizedUserEmail = normalizeEmail(user.email)
 
-      // Try to find customer by sender email
-      const [custSender] = await db.execute<RowDataPacket[]>(
+      const senderIsEmployee = sender_user_id !== null || sEmail === normalizedUserEmail
+
+      const primaryEmail = senderIsEmployee ? rEmail : sEmail
+      const secondaryEmail = senderIsEmployee ? sEmail : rEmail
+
+      const [custPrimary] = await db.execute<RowDataPacket[]>(
         `SELECT id, name, email FROM customers WHERE email = ?`,
-        [sEmail],
+        [primaryEmail],
       )
 
-      if (custSender && custSender.length > 0) {
-        customerName = custSender[0].name
-        customerEmail = normalizeEmail(custSender[0].email)
+      if (custPrimary && custPrimary.length > 0) {
+        customerName = custPrimary[0].name
+        customerEmail = normalizeEmail(custPrimary[0].email)
+        customerId = custPrimary[0].id
       } else {
-        // Try to find customer by receiver email
-        const [custReceiver] = await db.execute<RowDataPacket[]>(
+        const [custSecondary] = await db.execute<RowDataPacket[]>(
           `SELECT id, name, email FROM customers WHERE email = ?`,
-          [rEmail],
+          [secondaryEmail],
         )
 
-        if (custReceiver && custReceiver.length > 0) {
-          customerName = custReceiver[0].name
-          customerEmail = normalizeEmail(custReceiver[0].email)
+        if (custSecondary && custSecondary.length > 0) {
+          customerName = custSecondary[0].name
+          customerEmail = normalizeEmail(custSecondary[0].email)
+          customerId = custSecondary[0].id
         } else {
-          // Fallback: assume the one that is NOT the current user's email is the customer
-          if (sEmail === normalizeEmail(user.email)) {
+          if (senderIsEmployee) {
             customerName = rEmail
             customerEmail = rEmail
+          } else if (rEmail === normalizedUserEmail) {
+            customerName = sEmail
+            customerEmail = sEmail
           } else {
             customerName = sEmail
             customerEmail = sEmail

@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useLocation,
@@ -115,6 +116,10 @@ type SalesRepRating = {
   rep_name: string
   avg_rating: number
   responses: number
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Statistics' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -232,7 +237,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        JOIN customers c ON d.customer_id = c.id
        WHERE c.company_id = ? AND c.deleted_at IS NULL AND d.deleted_at IS NULL AND l.deleted_at IS NULL${
          dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
-       }${hasRepFilter ? ' AND u.name = ?' : ''}
+}${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
        ORDER BY deals_count DESC`,
       hasRepFilter
@@ -251,7 +256,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = ?
        WHERE c.company_id = ? AND c.deleted_at IS NULL AND d.deleted_at IS NULL AND l.deleted_at IS NULL AND d.is_won IS NULL${
          dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
-       }${hasRepFilter ? ' AND u.name = ?' : ''}
+}${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY l.id, l.name
        ORDER BY l.position ASC`,
       hasRepFilter
@@ -479,7 +484,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          AND d.lost_reason IS NOT NULL
          AND d.lost_reason <> ''${
            dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
-         }${hasRepFilter ? ' AND u.name = ?' : ''}
+}${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.name, d.lost_reason
        ORDER BY u.name, count DESC`,
       hasRepFilter
@@ -735,7 +740,9 @@ export default function AdminStatistics() {
 
   const stageRows = useMemo(() => {
     const map = new Map<string, DealsByStage>()
-    dealsByStage.forEach(s => map.set(s.list_name, s))
+    for (const s of dealsByStage) {
+      map.set(s.list_name, s)
+    }
     return lists.map(l => {
       const hit = map.get(l.name)
       return {

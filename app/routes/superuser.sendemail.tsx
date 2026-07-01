@@ -4,6 +4,7 @@ import {
   type ActionFunctionArgs,
   Form,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useActionData,
 } from 'react-router'
@@ -36,6 +37,10 @@ const emailSchema = z.object({
 
 type FormData = z.infer<typeof emailSchema>
 const resolver = zodResolver(emailSchema)
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Send Email' }]
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

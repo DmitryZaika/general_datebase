@@ -1,10 +1,19 @@
 import { motion } from 'framer-motion'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { AdminEmailsShell } from '~/components/views/AdminEmailsShell'
 import DealsEmailsView, { type Email } from '~/components/views/DealsEmailsView'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Emails' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {

@@ -5,6 +5,7 @@ import {
   Form,
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   type SubmitFunction,
   useActionData,
@@ -553,6 +554,10 @@ async function getAnswerChoices(companyId: number) {
 
 // LOADER AND ACTION
 
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Teach Mode' }]
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let user: User
 
@@ -614,7 +619,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 // CRUD FUNCTIONS
 
 async function toggleVisibility(formData: FormData, companyId: number) {
-  const questionId = parseInt(formData.get('questionId') as string)
+  const questionId = parseInt(formData.get('questionId') as string, 10)
   const visible = formData.get('visible') === 'true'
 
   if (Number.isNaN(questionId)) return { error: 'Invalid question ID' }
@@ -634,7 +639,7 @@ async function toggleVisibility(formData: FormData, companyId: number) {
 async function createQuestion(formData: FormData, companyId: number) {
   const questionText = formData.get('questionText') as string
   const options = JSON.parse(formData.get('options') as string)
-  const correctAnswerId = parseInt(formData.get('correctAnswerId') as string)
+  const correctAnswerId = parseInt(formData.get('correctAnswerId') as string, 10)
 
   if (
     !questionText ||
@@ -677,10 +682,10 @@ async function createQuestion(formData: FormData, companyId: number) {
 }
 
 async function editQuestion(formData: FormData, companyId: number) {
-  const questionId = parseInt(formData.get('questionId') as string)
+  const questionId = parseInt(formData.get('questionId') as string, 10)
   const questionText = formData.get('questionText') as string
   const options = JSON.parse(formData.get('options') as string)
-  const correctAnswerId = parseInt(formData.get('correctAnswerId') as string)
+  const correctAnswerId = parseInt(formData.get('correctAnswerId') as string, 10)
 
   if (
     !questionText ||
@@ -751,7 +756,7 @@ async function editQuestion(formData: FormData, companyId: number) {
 }
 
 async function deleteQuestion(formData: FormData, companyId: number) {
-  const questionId = parseInt(formData.get('questionId') as string)
+  const questionId = parseInt(formData.get('questionId') as string, 10)
   if (Number.isNaN(questionId)) return { error: 'Invalid question ID' }
 
   try {
@@ -784,7 +789,7 @@ async function saveGeneratedQuestion(formData: FormData, companyId: number) {
   const optionsString = formData.get('options') as string
   const options = optionsString.split(',').map(s => s.trim())
   const correctAnswer = formData.get('correctAnswer') as string
-  const instructionId = parseInt(formData.get('instructionId') as string)
+  const instructionId = parseInt(formData.get('instructionId') as string, 10)
 
   if (
     !questionText ||

@@ -5,6 +5,7 @@ import * as React from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   type SubmitFunction,
   useActionData,
@@ -158,6 +159,10 @@ async function saveAnswerAttempts(
 }
 
 // LOADER AND ACTION
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Teach Mode' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let user: User

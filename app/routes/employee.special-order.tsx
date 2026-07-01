@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useState } from 'react'
-import type { LoaderFunctionArgs } from 'react-router'
+import type { LoaderFunctionArgs, MetaFunction } from 'react-router'
 import { useLoaderData, useLocation } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
 import { db } from '~/db.server'
@@ -11,6 +11,10 @@ import {
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { calculateSpecialOrder } from '~/utils/specialOrderCalculator'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Special Order' }]
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request)

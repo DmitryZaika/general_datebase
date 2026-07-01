@@ -6,6 +6,7 @@ import {
   type ActionFunctionArgs,
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useFetcher,
@@ -32,6 +33,10 @@ import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 
 const IMAGE_DRAG_TYPE = 'application/x-admin-image-id'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Images' }]
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {

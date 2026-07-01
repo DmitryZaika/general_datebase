@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { useEffect, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useSearchParams,
@@ -44,6 +45,10 @@ interface Sale {
   company_id: number
   all_cut?: number | null
   any_cut?: number | null
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Customer View' }]
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

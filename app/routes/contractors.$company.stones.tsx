@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { type LoaderFunctionArgs, Outlet, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  type MetaFunction,
+  Outlet,
+  useLoaderData,
+} from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { ImageCard } from '~/components/organisms/ImageCard'
@@ -42,6 +47,10 @@ function sortStones(a: Stone, b: Stone) {
   if (aAmount === 0 && bAmount !== 0) return 1
   if (aAmount !== 0 && bAmount === 0) return -1
   return a.name.localeCompare(b.name)
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Stones' }]
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {

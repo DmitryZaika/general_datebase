@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -20,6 +21,10 @@ import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
 import { isEmployeeListFilterLoading } from '~/utils/isEmployeeListFilterLoading'
 import { type Sink, sinkQueryBuilder } from '~/utils/queries.server'
 import { getEmployeeUser } from '~/utils/session.server'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Sinks' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {

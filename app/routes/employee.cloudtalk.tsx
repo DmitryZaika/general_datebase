@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -29,6 +30,10 @@ import type { SmsSalesRep } from '~/utils/cloudtalkSmsService.server'
 import { EMPLOYEE_VIEW_ENTER } from '~/utils/employeeViewEnterMotion'
 import { getEmployeeUser } from '~/utils/session.server'
 import { cloudtalkBasePath } from '~/utils/urlHelpers'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'CloudTalk SMS' }]
+}
 
 const PAGE_SIZE = 20
 

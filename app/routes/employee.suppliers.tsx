@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import {
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
   useLocation,
@@ -32,6 +33,10 @@ interface SupplierFile {
   supplier_id: number
   name: string
   url: string
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Suppliers' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

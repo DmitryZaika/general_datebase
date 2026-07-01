@@ -6,6 +6,7 @@ import {
   type ActionFunctionArgs,
   Form,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -83,6 +84,10 @@ function formatDate(dateString: string) {
     month: '2-digit',
     day: '2-digit',
   }).format(date)
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Transactions' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

@@ -52,10 +52,7 @@ function adminShellMotionKey(pathname: string, search: string): string {
 }
 
 export const meta: MetaFunction = () => {
-  return [
-    { title: 'Granite Depot Database' },
-    { name: 'description', content: 'Welcome to Remix!' },
-  ]
+  return [{ title: 'Admin' }]
 }
 
 export const loader: LoaderFunction = async ({ request }) => {

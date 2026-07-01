@@ -2,6 +2,7 @@ import { Mail, Menu, SettingsIcon } from 'lucide-react'
 import { useEffect } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   type ShouldRevalidateFunctionArgs,
   useLoaderData,
@@ -44,6 +45,10 @@ type AdminDeal = {
   sales_rep: string | null
   user_id: number | null
   is_won: number | null
+}
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Deals' }]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

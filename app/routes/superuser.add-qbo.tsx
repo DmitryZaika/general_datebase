@@ -4,6 +4,7 @@ import {
   type ActionFunctionArgs,
   Form,
   type LoaderFunctionArgs,
+  type MetaFunction,
   redirect,
   useLoaderData,
 } from 'react-router'
@@ -35,6 +36,10 @@ const userschema = z.object({
 })
 
 const resolver = zodResolver(userschema)
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Add QBO' }]
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

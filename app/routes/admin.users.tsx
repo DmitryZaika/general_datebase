@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import {
   Link,
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -40,6 +41,10 @@ interface Company {
   name: string
 }
 
+export const meta: MetaFunction = () => {
+  return [{ title: 'Admin – Users' }]
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let user: SessionUser
   try {
@@ -50,7 +55,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const canEditUsers = await canEditAdminUsers(user)
   const url = new URL(request.url)
   const companyIdParam = url.searchParams.get('companyId')
-  const companyId = companyIdParam ? parseInt(companyIdParam) : undefined
+  const companyId = companyIdParam ? parseInt(companyIdParam, 10) : undefined
 
   const effectiveCompanyId = user.is_superuser ? companyId : user.company_id
 

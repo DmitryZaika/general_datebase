@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  type MetaFunction,
   Outlet,
   redirect,
   useLoaderData,
@@ -16,6 +17,10 @@ import DealsEmailsView, { type Email } from '~/components/views/DealsEmailsView'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
+
+export const meta: MetaFunction = () => {
+  return [{ title: 'Emails' }]
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {

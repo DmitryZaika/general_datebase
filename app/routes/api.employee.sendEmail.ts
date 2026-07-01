@@ -205,29 +205,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const threadId =
         cleaned.to.length === 1 && cleaned.threadId ? cleaned.threadId : uuidv4()
 
-      const customerId = await fetchCustomerDataByEmail(recipient, user.company_id)
-      const personalizedBody = await replaceTemplateVariables(
-        user.id,
-        cleaned.dealId ?? null,
-        user.company_id,
-        customerId,
-        cleaned.body,
-      )
-
-      const emailInformation = await emailToSend(
-        user,
-        {
-          subject: cleaned.subject,
-          body: personalizedBody,
-          dealId: cleaned.dealId,
-          threadId: cleaned.threadId,
-          attachments: cleaned.attachments,
-        },
-        recipient,
-      )
-
       let info: MailReturn
+      let personalizedBody = cleaned.body
+      let emailInformation: Awaited<ReturnType<typeof emailToSend>>
       try {
+        const customerId = await fetchCustomerDataByEmail(recipient, user.company_id)
+        personalizedBody = await replaceTemplateVariables(
+          user.id,
+          cleaned.dealId ?? null,
+          user.company_id,
+          customerId,
+          cleaned.body,
+        )
+
+        emailInformation = await emailToSend(
+          user,
+          {
+            subject: cleaned.subject,
+            body: personalizedBody,
+            dealId: cleaned.dealId,
+            threadId: cleaned.threadId,
+            attachments: cleaned.attachments,
+          },
+          recipient,
+        )
+
         info = await sendEmail(emailInformation)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
