@@ -27,7 +27,7 @@ import { faucetSchema } from '~/schemas/faucets'
 import { commitSession, getSession } from '~/sessions.server'
 import { DIALOG_CONTENT_ADD_EDIT_CLASS, FAUCET_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
-import { parseMutliForm } from '~/utils/parseMultiForm'
+import { parseOptionalMultiForm } from '~/utils/parseMultiForm'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
@@ -70,11 +70,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, 'No faucet id provided')
   }
   const faucetId = parseInt(params.faucet, 10)
-  const { errors, data } = await parseMutliForm(request, faucetSchema, 'faucets')
+  const { errors, data } = await parseOptionalMultiForm(
+    request,
+    faucetSchema,
+    'faucets',
+  )
   if (errors || !data) {
     return { errors }
   }
-  const newFile = data.file && data.file !== 'undefined'
+  const file = data.file
+  const newFile = typeof file === 'string'
 
   let oldUrl = null
   if (newFile) {
@@ -93,7 +98,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       [
         data.name,
         data.type,
-        data.file,
+        file,
         data.is_display,
         data.regular_stock,
         !data.supplier_id || data.supplier_id === 0 ? null : data.supplier_id,

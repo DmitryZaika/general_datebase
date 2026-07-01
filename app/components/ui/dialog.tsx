@@ -63,10 +63,46 @@ const DialogContent = React.forwardRef<
       position,
       hideClose = false,
       disablePortal = false,
+      onPointerDownOutside,
+      onInteractOutside,
       ...props
     },
     ref,
   ) => {
+    const RADIX_PORTAL_SELECTOR = [
+      '[data-radix-popper-content-wrapper]',
+      '[role="menu"]',
+      '[role="listbox"]',
+      '[role="dialog"]',
+      '[role="alertdialog"]',
+    ].join(', ')
+
+    const isInsideRadixPortal = (event: CustomEvent): boolean => {
+      const originalEvent = (
+        event.detail as { originalEvent?: { target?: EventTarget } } | undefined
+      )?.originalEvent
+      const target = originalEvent?.target ?? null
+      return (
+        target instanceof HTMLElement && target.closest(RADIX_PORTAL_SELECTOR) !== null
+      )
+    }
+
+    const handlePointerDownOutside = (event: CustomEvent) => {
+      if (isInsideRadixPortal(event)) {
+        event.preventDefault()
+        return
+      }
+      onPointerDownOutside?.(event)
+    }
+
+    const handleInteractOutside = (event: CustomEvent) => {
+      if (isInsideRadixPortal(event)) {
+        event.preventDefault()
+        return
+      }
+      onInteractOutside?.(event)
+    }
+
     const content = (
       <>
         <DialogOverlay />
@@ -74,6 +110,8 @@ const DialogContent = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           className={cn(dialogVariants({ position }), className)}
+          onPointerDownOutside={handlePointerDownOutside}
+          onInteractOutside={handleInteractOutside}
           {...props}
         >
           {!hideClose && (

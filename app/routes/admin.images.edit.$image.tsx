@@ -21,7 +21,7 @@ import {
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
-import { parseMutliForm } from '~/utils/parseMultiForm'
+import { parseOptionalMultiForm } from '~/utils/parseMultiForm'
 import { selectId } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
@@ -48,12 +48,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!params.image) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
-  const imageId = parseInt(params.image)
-  const { errors, data } = await parseMutliForm(request, imageSchema, 'images')
+  const imageId = parseInt(params.image, 10)
+  const { errors, data } = await parseOptionalMultiForm(request, imageSchema, 'images')
   if (errors || !data) {
     return { errors }
   }
-  const newFile = data.file && data.file !== 'undefined'
+  const file = data.file
+  const newFile = typeof file === 'string'
 
   // NOTE: THIS IS DANGEROUS
   const image = await selectId<{ url: string }>(
@@ -65,7 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (newFile) {
     await db.execute(`UPDATE images SET name = ?, url = ? WHERE id = ?`, [
       data.name,
-      data.file,
+      file,
       imageId,
     ])
   } else {
@@ -90,7 +91,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   if (!params.image) {
     return forceRedirectError(request.headers, 'No image id provided')
   }
-  const imageId = parseInt(params.image)
+  const imageId = parseInt(params.image, 10)
 
   const image = await selectId<{ name: string; url: string }>(
     db,

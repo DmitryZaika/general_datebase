@@ -580,7 +580,7 @@ function isOnSiteEstimateActivity(name: string): boolean {
   ) {
     return true
   }
-  if (/\b(?:on[- ]?site|be on-site)\b/.test(lower) && /\bestimate\b/.test(lower)) {
+  if (/\b(?:on[- ]?site|be on[- ]?site)\b/.test(lower)) {
     return true
   }
   return (
@@ -634,65 +634,11 @@ function parseScheduledWeekdayOffset(text: string, committedAt: Date): number | 
   return null
 }
 
-function inferAppointmentWallTime(
-  text: string,
-): { hour: number; minute: number } | null {
-  const patterns = [
-    /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i,
-    /\b(\d{1,2})\s*o['']?clock\b/i,
-    /\baround\s+(\d{1,2})(?::(\d{2}))?\b/i,
-    /\b(\d{1,2})\s+is\s+good\b/i,
-  ]
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern)
-    if (!match) continue
-    const hourRaw = Number(match[1])
-    const minute = match[2] ? Number(match[2]) : 0
-    if (!Number.isFinite(hourRaw) || !Number.isFinite(minute)) continue
-    return {
-      hour: to24Hour(hourRaw, match[3], match[0]),
-      minute,
-    }
-  }
-
-  return null
-}
-
 function parseScheduledAppointmentTime(
   transcript: string,
   committedAt: Date,
 ): ScheduledAppointment | null {
   const dayOffset = parseScheduledWeekdayOffset(transcript, committedAt)
-  const wallTime = inferAppointmentWallTime(transcript)
-
-  if (dayOffset !== null) {
-    const { year, month, day } = addStoreCalendarDays(committedAt, dayOffset)
-    if (wallTime) {
-      return {
-        iso: zonedWallTimeToUtcIso(
-          year,
-          month,
-          day,
-          wallTime.hour,
-          wallTime.minute,
-          STORE_BUSINESS_TIMEZONE,
-        ),
-        hasExplicitTime: true,
-      }
-    }
-    return {
-      iso: zonedWallTimeToUtcIso(
-        year,
-        month,
-        day,
-        ONSITE_ESTIMATE_MIN_REMINDER_HOUR,
-        0,
-        STORE_BUSINESS_TIMEZONE,
-      ),
-      hasExplicitTime: false,
-    }
-  }
 
   const chunks = transcript
     .split(/(?<=[.?!])\s+/)
@@ -726,6 +672,21 @@ function parseScheduledAppointmentTime(
     const parsed = parseExplicitDeadlineFromText(transcript.toLowerCase(), committedAt)
     if (parsed && isTimedDeadline(parsed)) {
       return { iso: parsed, hasExplicitTime: true }
+    }
+  }
+
+  if (dayOffset !== null) {
+    const { year, month, day } = addStoreCalendarDays(committedAt, dayOffset)
+    return {
+      iso: zonedWallTimeToUtcIso(
+        year,
+        month,
+        day,
+        ONSITE_ESTIMATE_MIN_REMINDER_HOUR,
+        0,
+        STORE_BUSINESS_TIMEZONE,
+      ),
+      hasExplicitTime: false,
     }
   }
 

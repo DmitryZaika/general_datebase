@@ -1,6 +1,7 @@
-import type { ChangeEvent } from 'react'
+import { type ChangeEvent, Suspense } from 'react'
 import {
   type ActionFunctionArgs,
+  Await,
   type LoaderFunctionArgs,
   type MetaFunction,
   redirect,
@@ -14,6 +15,7 @@ import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { MultiPartForm } from '~/components/molecules/MultiPartForm'
 import { AddressInput } from '~/components/organisms/AddressInput'
 import { PageLayout } from '~/components/PageLayout'
+import { Skeleton } from '~/components/ui/skeleton'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { canManageCompanySettings } from '~/utils/adminUsersAccess.server'
@@ -85,22 +87,27 @@ export const meta: MetaFunction = () => {
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const user = await requireCompanyManager(request)
-    const company = await selectId<CompanySettings>(
-      db,
-      `SELECT name, address, logo_url, logo_height, state_taxes
-       FROM company WHERE id = ?`,
-      user.company_id,
-    )
-    if (!company) {
-      throw new Error('Company not found')
-    }
-    return {
-      company: {
-        ...company,
-        logo_height: resolveCompanyLogoHeight(company.logo_height),
-        state_taxes: dbTaxRateToDisplay(company.state_taxes),
-      },
-      companyId: user.company_id,
+
+    return { data: loadPageData(user.company_id) }
+    async function loadPageData(companyId: number) {
+      const company = await selectId<CompanySettings>(
+        db,
+        `SELECT name, address, logo_url, logo_height, state_taxes
+         FROM company WHERE id = ?`,
+        companyId,
+      )
+      if (!company) {
+        throw new Error('Company not found')
+      }
+
+      return {
+        company: {
+          ...company,
+          logo_height: resolveCompanyLogoHeight(company.logo_height),
+          state_taxes: dbTaxRateToDisplay(company.state_taxes),
+        },
+        companyId,
+      }
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -158,7 +165,29 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function AdminCompanySettings() {
-  const { company, companyId } = useLoaderData<typeof loader>()
+  const { data } = useLoaderData<typeof loader>()
+
+  return (
+    <Suspense fallback={<HydrateFallback />}>
+      <Await resolve={data}>
+        {resolved => (
+          <CompanySettingsContent
+            company={resolved.company}
+            companyId={resolved.companyId}
+          />
+        )}
+      </Await>
+    </Suspense>
+  )
+}
+
+function CompanySettingsContent({
+  company,
+  companyId,
+}: {
+  company: CompanySettings & { logo_height: number | null; state_taxes: number | null }
+  companyId: number
+}) {
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
 
@@ -218,6 +247,24 @@ export default function AdminCompanySettings() {
 
         <LoadingButton loading={isSubmitting}>Save</LoadingButton>
       </MultiPartForm>
+    </PageLayout>
+  )
+}
+
+export function HydrateFallback() {
+  return (
+    <PageLayout title='Company'>
+      <div className='max-w-lg space-y-4 rounded-lg bg-white p-5 shadow-[0px_0px_5px_rgba(0,0,0,0.15)]'>
+        <Skeleton className='h-10 w-full' />
+        <Skeleton className='h-10 w-full' />
+        <Skeleton className='h-24 w-full' />
+        <Skeleton className='h-10 w-full' />
+        <div className='space-y-2'>
+          <Skeleton className='h-4 w-20' />
+          <Skeleton className='h-4 w-32' />
+        </div>
+        <Skeleton className='h-10 w-20' />
+      </div>
     </PageLayout>
   )
 }

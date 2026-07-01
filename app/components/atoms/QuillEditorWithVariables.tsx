@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuill } from 'react-quilljs'
 import {
   EMAIL_TEMPLATE_VARIABLES,
-  VARIABLE_KEYS,
   formatVariableForTemplate,
+  VARIABLE_KEYS,
   validateTemplateBody,
 } from '~/utils/emailTemplateVariables'
 import { setupQuillImageHandlers } from '~/utils/quillImageUpload'
@@ -45,15 +45,17 @@ const QUILL_MODULES = {
 function findVariableRanges(text: string): VariableRange[] {
   const regex = /\{\{([^}]+)\}\}/g
   const ranges: VariableRange[] = []
-  let match
+  let match: RegExpExecArray | null
 
-  while ((match = regex.exec(text)) !== null) {
+  match = regex.exec(text)
+  while (match !== null) {
     ranges.push({
       start: match.index,
       end: match.index + match[0].length,
       key: match[1],
       isPredefined: VARIABLE_KEYS.includes(match[1]),
     })
+    match = regex.exec(text)
   }
 
   return ranges
@@ -126,7 +128,8 @@ export function QuillEditorWithVariables({
       if (!range) return
 
       const isInside = cursorPos > range.start && cursorPos < range.end
-      const isEditKey = e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete'
+      const isEditKey =
+        e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete'
 
       if (isInside && isEditKey) {
         e.preventDefault()
@@ -173,10 +176,19 @@ export function QuillEditorWithVariables({
       if (!quill) return
 
       const range = quill.getSelection(true)
+      if (!range) {
+        quill.focus()
+        const length = quill.getLength()
+        quill.setSelection(length - 1, 0)
+      }
+
+      const selection = range ?? quill.getSelection(true)
+      if (!selection) return
+
       const variableText = formatVariableForTemplate(key)
 
-      quill.insertText(range.index, variableText)
-      quill.setSelection(range.index + variableText.length, 0)
+      quill.insertText(selection.index, variableText)
+      quill.setSelection(selection.index + variableText.length, 0)
       setIsDropdownOpen(false)
     },
     [quill],
@@ -193,7 +205,7 @@ export function QuillEditorWithVariables({
         {EMAIL_TEMPLATE_VARIABLES.map(variable => (
           <DropdownMenuItem
             key={variable.key}
-            onClick={() => handleInsertVariable(variable.key)}
+            onSelect={() => handleInsertVariable(variable.key)}
           >
             {variable.label}
           </DropdownMenuItem>

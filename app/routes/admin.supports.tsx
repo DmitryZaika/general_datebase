@@ -8,6 +8,7 @@ import {
   type MetaFunction,
   Outlet,
   redirect,
+  type ShouldRevalidateFunctionArgs,
   useLoaderData,
   useLocation,
   useNavigation,
@@ -30,6 +31,18 @@ interface Support {
 
 export const meta: MetaFunction = () => {
   return [{ title: 'Admin – Supports' }]
+}
+
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (!formMethod && currentUrl.search === nextUrl.search) {
+    return false
+  }
+  return defaultShouldRevalidate
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -79,9 +92,8 @@ export default function AdminSupports() {
           Add Support
         </LoadingButton>
       </Link>
-      {isListLoading ? (
-        <MediaGridContentSkeleton cardCount={14} />
-      ) : (
+      {isListLoading && <MediaGridContentSkeleton cardCount={14} />}
+      <div className={isListLoading ? 'hidden' : 'animate-slide-up'}>
         <div>
           <div className='grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3'>
             {supports
@@ -126,7 +138,7 @@ export default function AdminSupports() {
 
           <Outlet />
         </div>
-      )}
+      </div>
     </>
   )
 }

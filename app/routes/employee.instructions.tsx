@@ -1,6 +1,7 @@
 import DOMPurify from 'isomorphic-dompurify'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Await,
   type LoaderFunctionArgs,
   type MetaFunction,
   redirect,
@@ -15,6 +16,7 @@ import {
   AccordionTrigger,
 } from '~/components/ui/accordion'
 import { Input } from '~/components/ui/input'
+import { Skeleton } from '~/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import '~/styles/instructions.css'
@@ -220,16 +222,7 @@ export const meta: MetaFunction = () => {
   return [{ title: 'Instructions' }]
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    await getEmployeeUser(request)
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
-  }
-  const user = await getEmployeeUser(request)
-  const url = new URL(request.url)
-  const mode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
-  const companyId = mode === 'general' ? 0 : user.company_id
+async function loadPageData(companyId: number, mode: string) {
   const instructions = await selectMany<Instruction>(
     db,
     'SELECT id, title, parent_id, after_id, rich_text FROM instructions WHERE company_id = ?',
@@ -238,8 +231,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { instructions, mode }
 }
 
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    const user = await getEmployeeUser(request)
+    const url = new URL(request.url)
+    const mode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+    const companyId = mode === 'general' ? 0 : user.company_id
+    return { data: loadPageData(companyId, mode) }
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+}
+
 export default function Instructions() {
-  const { instructions, mode } = useLoaderData<typeof loader>()
+  const { data } = useLoaderData<typeof loader>()
+
+  return (
+    <Suspense fallback={<HydrateFallback />}>
+      <Await resolve={data}>
+        {({ instructions, mode }: { instructions: Instruction[]; mode: string }) => (
+          <InstructionsContent instructions={instructions} mode={mode} />
+        )}
+      </Await>
+    </Suspense>
+  )
+}
+
+function InstructionsContent({
+  instructions,
+  mode,
+}: {
+  instructions: Instruction[]
+  mode: string
+}) {
   const [searchParams, setSearchParams] = useSearchParams()
   const instructionIdParam = searchParams.get('instructionId')
   const finalInstructions = cleanData(instructions)
@@ -288,7 +312,7 @@ export default function Instructions() {
               })
             }
             collect(node)
-            return true // found
+            return true
           }
           if (node.children.length > 0) {
             if (traverse(node.children)) return true
@@ -307,7 +331,6 @@ export default function Instructions() {
       const currentOpenIds = currentOpenValues.map(Number)
       const siblingsSet = new Set(allSiblingIds)
 
-      // Сбрасываем selectedId, если закрывается выбранный элемент или его родитель
       const closedIdsForSelect = allSiblingIds.filter(
         id => expandedIds.includes(id) && !currentOpenIds.includes(id),
       )
@@ -324,12 +347,10 @@ export default function Instructions() {
       }
 
       setExpandedIds(prev => {
-        // Identify which IDs were closed
         const closedIds = allSiblingIds.filter(
           id => prev.includes(id) && !currentOpenIds.includes(id),
         )
 
-        // Remove closed IDs AND their descendants
         const idsToRemove = new Set<number>()
         closedIds.forEach(id => {
           idsToRemove.add(id)
@@ -350,7 +371,6 @@ export default function Instructions() {
 
   const navigateToInstruction = useCallback(
     async (id: number) => {
-      // Если клик по уже выбранному или раскрытому элементу -> сворачиваем
       if (selectedId === id || expandedIds.includes(id)) {
         setSelectedId(null)
         const triggerBtn = document.querySelector(
@@ -360,7 +380,6 @@ export default function Instructions() {
           triggerBtn.click()
         }
 
-        // Удаляем текущий ID и всех его потомков из expandedIds
         const descendants = getDescendants(finalInstructions, id)
         const idsToRemove = new Set([id, ...descendants])
         setExpandedIds(prev => prev.filter(expId => !idsToRemove.has(expId)))
@@ -369,18 +388,10 @@ export default function Instructions() {
       }
 
       setSelectedId(id)
-      // Временно сбрасываем через 2 сек (как было), или оставляем перманентно?
-      // В оригинале было setTimeout(() => setSelectedId(null), 2000)
-      // Если нужно "подсвечивать синим все открытые вкладки", то, вероятно,
-      // логика сброса через 2с конфликтует с постоянной подсветкой.
-      // Оставим подсветку "текущего выбранного" (selectedId) постоянной,
-      // пока пользователь не кликнет снова или не выберет другой.
-      // setTimeout убрал, чтобы выделение сохранялось.
 
       const path = findPathToNode(finalInstructions, id)
       if (!path) return
 
-      // Обновляем expandedIds: добавляем весь путь к уже существующим
       setExpandedIds(prev => {
         const next = new Set(prev)
         for (const pId of path) {
@@ -389,11 +400,9 @@ export default function Instructions() {
         return Array.from(next)
       })
 
-      // Sequentially open accordions from top to bottom
       for (let i = 0; i < path.length; i++) {
         const nodeId = path[i]
 
-        // Wait a bit for potential previous expansion animations
         if (i > 0) await new Promise(resolve => setTimeout(resolve, 100))
 
         const itemElement = document.getElementById(`instruction-${nodeId}`)
@@ -423,7 +432,6 @@ export default function Instructions() {
         }
       }
 
-      // Finally scroll to the target
       setTimeout(() => {
         const targetElement = document.getElementById(`instruction-${id}`)
         if (targetElement) {
@@ -454,7 +462,7 @@ export default function Instructions() {
     const traverse = (nodes: InstructionNode[]) => {
       for (const node of nodes) {
         const title = node.title || ''
-        const text = node.text.replace(/<[^>]*>/g, '') // strip HTML
+        const text = node.text.replace(/<[^>]*>/g, '')
 
         const titleMatch = title.toLowerCase().includes(term)
         const textMatch = text.toLowerCase().includes(term)
@@ -577,6 +585,39 @@ export default function Instructions() {
                 />
               ))
             )}
+          </div>
+        </div>
+      </div>
+    </PageLayout>
+  )
+}
+
+export function HydrateFallback() {
+  return (
+    <PageLayout title='Instructions'>
+      <div className='mb-4 flex gap-2'>
+        <Skeleton className='h-9 w-44' />
+        <Skeleton className='h-9 w-40' />
+      </div>
+      <div className='flex w-full mt-0'>
+        <div className='flex-grow space-y-2'>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className='border-b border-slate-100 pb-3'>
+              <Skeleton className='h-5 w-3/4 mb-2' />
+              <Skeleton className='h-4 w-full' />
+              <Skeleton className='h-4 w-5/6 mt-1' />
+            </div>
+          ))}
+        </div>
+        <div className='w-64 shrink-0 bg-white border rounded-lg shadow-sm ml-4 p-3 hidden sm:block'>
+          <Skeleton className='h-6 w-20 mb-2' />
+          <Skeleton className='h-8 w-full mb-3' />
+          <div className='space-y-1'>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ paddingLeft: `${i * 8 + 8}px` }}>
+                <Skeleton className='h-4 w-full' />
+              </div>
+            ))}
           </div>
         </div>
       </div>

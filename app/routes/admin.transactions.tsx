@@ -1,12 +1,14 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import {
+  Await,
   Link,
   type LoaderFunctionArgs,
   type MetaFunction,
   Outlet,
   redirect,
+  type ShouldRevalidateFunctionArgs,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -17,6 +19,7 @@ import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { Input } from '~/components/ui/input'
+import { Skeleton } from '~/components/ui/skeleton'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -41,6 +44,11 @@ interface Transaction {
   status?: string
 }
 
+interface SinkInfo {
+  sale_id: number
+  sink_types: string
+}
+
 function formatDate(dateString: string) {
   if (!dateString) return ''
   const date = new Date(dateString)
@@ -55,6 +63,18 @@ export const meta: MetaFunction = () => {
   return [{ title: 'Admin – Transactions' }]
 }
 
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (!formMethod && currentUrl.search === nextUrl.search) {
+    return false
+  }
+  return defaultShouldRevalidate
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request)
@@ -64,14 +84,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const companyId = user.company_id
 
-    interface SinkInfo {
-      sale_id: number
-      sink_types: string
+    return {
+      data: loadPageData(companyId),
     }
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+}
 
-    const sinkDetails = await selectMany<SinkInfo>(
-      db,
-      `SELECT 
+async function loadPageData(companyId: number) {
+  const sinkDetails = await selectMany<SinkInfo>(
+    db,
+    `SELECT 
          s.id as sale_id,
          GROUP_CONCAT(st.name) as sink_types
        FROM 
@@ -88,12 +112,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          s.id
        ORDER BY 
          s.id`,
-      [companyId],
-    )
+    [companyId],
+  )
 
-    const transactions = await selectMany<Transaction>(
-      db,
-      `SELECT
+  const transactions = await selectMany<Transaction>(
+    db,
+    `SELECT
         s.id,
         s.sale_date,
         c.name as customer_name,
@@ -125,36 +149,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.id, s.sale_date, c.name, u.name
       ORDER BY
         s.sale_date DESC`,
-      [companyId],
-    )
+    [companyId],
+  )
 
-    const updatedTransactions = transactions.map(t => {
-      const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id)
-      let status = 'Sold' // Default status is Sold if there's a sale_date
+  const updatedTransactions = transactions.map(t => {
+    const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id)
+    let status = 'Sold'
 
-      if (t.cancelled_date) {
-        status = 'Cancelled'
-      } else if (t.installed_date) {
-        status = 'Installed'
-      } else if (t.all_cut === 1) {
-        status = 'Cut'
-      } else if (t.any_cut === 1) {
-        status = 'Partially Cut'
-      }
-
-      return {
-        ...t,
-        sink_type: sinkInfo ? sinkInfo.sink_types : undefined,
-        status: status,
-      }
-    })
+    if (t.cancelled_date) {
+      status = 'Cancelled'
+    } else if (t.installed_date) {
+      status = 'Installed'
+    } else if (t.all_cut === 1) {
+      status = 'Cut'
+    } else if (t.any_cut === 1) {
+      status = 'Partially Cut'
+    }
 
     return {
-      transactions: updatedTransactions,
+      ...t,
+      sink_type: sinkInfo ? sinkInfo.sink_types : undefined,
+      status: status,
     }
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
-  }
+  })
+
+  return updatedTransactions
 }
 
 const transactionColumns: ColumnDef<Transaction>[] = [
@@ -306,8 +325,7 @@ const transactionColumns: ColumnDef<Transaction>[] = [
   },
 ]
 
-export default function AdminTransactions() {
-  const { transactions } = useLoaderData<typeof loader>()
+function TransactionContent({ transactions }: { transactions: Transaction[] }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isInputFocused, setIsInputFocused] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -409,5 +427,44 @@ export default function AdminTransactions() {
       </PageLayout>
       <Outlet />
     </>
+  )
+}
+
+export default function AdminTransactions() {
+  const { data } = useLoaderData<typeof loader>()
+
+  return (
+    <Suspense fallback={<HydrateFallback />}>
+      <Await resolve={data}>
+        {transactions => <TransactionContent transactions={transactions} />}
+      </Await>
+    </Suspense>
+  )
+}
+
+export function HydrateFallback() {
+  return (
+    <PageLayout title='Sales Transactions'>
+      <div className='mb-4 flex justify-between items-center'>
+        <Skeleton className='h-10 w-24' />
+        <Skeleton className='h-10 w-80 rounded-full' />
+      </div>
+      <div className='space-y-2'>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div
+            key={i}
+            className='flex items-center gap-3 py-3 border-b border-slate-100'
+          >
+            <Skeleton className='h-4 w-24' />
+            <Skeleton className='h-4 w-32' />
+            <Skeleton className='h-4 w-28' />
+            <Skeleton className='h-4 w-20' />
+            <Skeleton className='h-4 w-36' />
+            <Skeleton className='h-4 w-24' />
+            <Skeleton className='h-4 w-16' />
+          </div>
+        ))}
+      </div>
+    </PageLayout>
   )
 }

@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router'
-import { useLoaderData, useLocation } from 'react-router'
+import { Await, useLoaderData, useLocation } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
+import { Skeleton } from '~/components/ui/skeleton'
 import { db } from '~/db.server'
 import {
   EMPLOYEE_VIEW_ENTER,
@@ -18,25 +19,40 @@ export const meta: MetaFunction = () => {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request)
+  return { data: getTaxRate(user.company_id) }
+}
+
+async function getTaxRate(companyId: number) {
   const rows = await selectMany<{ state_taxes: number | string | null }>(
     db,
     'SELECT state_taxes FROM company WHERE id = ?',
-    [user.company_id],
+    [companyId],
   )
   const raw = rows[0]?.state_taxes
   const parsed = typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw)
   const taxRate = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
-  return { taxRate }
+  return taxRate
 }
 
 export default function SpecialOrder() {
+  const { data } = useLoaderData<typeof loader>()
+
+  return (
+    <Suspense fallback={<HydrateFallback />}>
+      <Await resolve={data}>
+        {taxRate => <SpecialOrderContent taxRate={taxRate} />}
+      </Await>
+    </Suspense>
+  )
+}
+
+function SpecialOrderContent({ taxRate }: { taxRate: number }) {
   const location = useLocation()
   const [price, setPrice] = useState<number | undefined>()
   const [width, setWidth] = useState<number | undefined>()
   const [length, setLength] = useState<number | undefined>()
   const [slabs, setSlabs] = useState(1)
   const [deliveryCost, setDeliveryCost] = useState<number | undefined>()
-  const { taxRate } = useLoaderData<typeof loader>()
 
   const minusSlab = () => {
     if (slabs > 1) {
@@ -173,5 +189,39 @@ export default function SpecialOrder() {
         </div>
       </PageLayout>
     </motion.div>
+  )
+}
+
+export function HydrateFallback() {
+  return (
+    <div className='w-full min-h-0'>
+      <PageLayout
+        className='bg-white p-5 rounded-lg shadow-[0px_-0px_5px_rgba(0,0,0,0.15)] max-w-lg mx-auto my-5'
+        title='Special Order Calculator'
+      >
+        <Skeleton className='h-4 w-32 mb-2' />
+        <Skeleton className='h-10 w-full mb-4' />
+
+        <Skeleton className='h-4 w-24 mb-2' />
+        <div className='flex gap-2 mb-4'>
+          <Skeleton className='h-10 w-1/2' />
+          <Skeleton className='h-10 w-1/2' />
+        </div>
+
+        <Skeleton className='h-4 w-36 mb-2' />
+        <Skeleton className='h-10 w-full mb-4' />
+
+        <div className='flex items-center gap-3 mb-4'>
+          <Skeleton className='h-4 w-12' />
+          <Skeleton className='h-10 w-10' />
+          <Skeleton className='h-6 w-6' />
+          <Skeleton className='h-10 w-10' />
+        </div>
+
+        <Skeleton className='h-6 w-48 mb-2' />
+        <Skeleton className='h-6 w-56 mb-2' />
+        <Skeleton className='h-7 w-40' />
+      </PageLayout>
+    </div>
   )
 }

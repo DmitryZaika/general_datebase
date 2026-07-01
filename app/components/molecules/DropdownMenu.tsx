@@ -47,6 +47,7 @@ export interface CustomDropdownMenuProps {
   side?: 'top' | 'right' | 'bottom' | 'left'
   contentClassName?: string
   selectedList?: string
+  modal?: boolean
 }
 
 export const CustomDropdownMenu = ({
@@ -58,6 +59,7 @@ export const CustomDropdownMenu = ({
   side,
   contentClassName,
   selectedList,
+  modal = false,
 }: CustomDropdownMenuProps) => {
   const allSections: DropdownSection[] = [...sections]
   if (options.length > 0) {
@@ -65,7 +67,7 @@ export const CustomDropdownMenu = ({
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={modal}>
       <DropdownMenuTrigger asChild>
         {trigger ? trigger : <Button variant='outline'>{triggerLabel}</Button>}
       </DropdownMenuTrigger>

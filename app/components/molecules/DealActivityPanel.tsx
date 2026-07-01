@@ -957,11 +957,13 @@ function ActivityForm({
   }, [openTimeOnMount])
 
   const handleCancel = () => {
+    setDeadlineOpen(false)
     dispatch({ type: 'RESET' })
     onCancelEdit()
   }
 
   const handleSubmit = () => {
+    setDeadlineOpen(false)
     const activityName = form.name.trim()
     submit()
     if (isEditing) {
@@ -1047,6 +1049,10 @@ function ActivityForm({
           }}
           onPointerDownOutside={event => {
             if (isNestedSelectTarget(event.target)) event.preventDefault()
+            const target = event.target
+            if (target instanceof Element && target.closest('[data-activity-submit]')) {
+              event.preventDefault()
+            }
           }}
           onFocusOutside={event => {
             if (isNestedSelectTarget(event.target)) event.preventDefault()
@@ -1088,6 +1094,7 @@ function ActivityForm({
       </Popover>
 
       <Button
+        data-activity-submit
         onClick={handleSubmit}
         disabled={!isValid || isSubmitting}
         size='sm'

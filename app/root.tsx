@@ -55,6 +55,22 @@ import { Toaster } from './components/ui/toaster'
 import { commitSession, getSession } from './sessions.server'
 import './tailwind.css'
 
+const CUSTOM_SKELETON_ROUTES = [
+  '/admin/users-activity',
+  '/admin/transactions',
+  '/admin/surveys',
+  '/admin/company',
+  '/admin/users',
+  '/admin/suppliers',
+  '/employee/checklists',
+  '/employee/special-order',
+  '/employee/instructions',
+]
+
+function hasCustomSkeleton(path: string) {
+  return CUSTOM_SKELETON_ROUTES.some(route => path.startsWith(route))
+}
+
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
   {
@@ -390,7 +406,8 @@ export default function App() {
     navigation.state === 'loading' &&
     (navPath.startsWith('/employee') || navPath.startsWith('/admin')) &&
     navPath !== pathname &&
-    isSidebarSectionChange(pathname, navPath)
+    isSidebarSectionChange(pathname, navPath) &&
+    !hasCustomSkeleton(navPath)
   useScrollMainToTopWhenLoading(showSidebarPageSkeleton)
   useScrollMainToTopOnSectionIdle(pathname, navigation.state)
   const sidebarNavigationSkeleton = renderAppNavigationSkeleton(

@@ -20,9 +20,9 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
-import { DIALOG_CONTENT_ADD_EDIT_CLASS } from '~/utils/constants'
+
 import { csrf } from '~/utils/csrf.server'
-import { parseMutliForm } from '~/utils/parseMultiForm'
+import { parseOptionalMultiForm } from '~/utils/parseMultiForm'
 import { selectId } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
@@ -49,12 +49,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
   const documentId = parseInt(params.document, 10)
-  const { errors, data } = await parseMutliForm(request, documentSchema, 'documents')
+  const { errors, data } = await parseOptionalMultiForm(
+    request,
+    documentSchema,
+    'documents',
+  )
 
   if (errors || !data) {
     return { errors }
   }
-  const newFile = data.file && data.file !== 'undefined'
+  const file = data.file
+  const newFile = typeof file === 'string'
   // NOTE: THIS IS DANGEROUS
   const document = await selectId<{ url: string }>(
     db,
@@ -65,7 +70,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (newFile) {
     await db.execute(`UPDATE documents SET name = ?, url = ? WHERE id = ?`, [
       data.name,
-      data.file,
+      file,
       documentId,
     ])
   } else {
@@ -124,7 +129,7 @@ export default function DocumentsEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
+      <DialogContent className='sm:max-w-[480px]'>
         <DialogHeader>
           <DialogTitle>Save Changes</DialogTitle>
         </DialogHeader>

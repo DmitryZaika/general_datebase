@@ -1,13 +1,16 @@
+import { Suspense } from 'react'
 import {
+  Await,
   type LoaderFunctionArgs,
   type MetaFunction,
   redirect,
   useLoaderData,
 } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import { Skeleton } from '~/components/ui/skeleton'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser, type User } from '~/utils/session.server'
+import { getAdminUser } from '~/utils/session.server'
 
 type SurveyItem = {
   id: number
@@ -26,14 +29,7 @@ export const meta: MetaFunction = () => {
   return [{ title: 'Admin – Surveys' }]
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user: User
-  try {
-    user = await getAdminUser(request)
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
-  }
-
+async function loadPageData(companyId: number) {
   const items = await selectMany<SurveyItem>(
     db,
     `SELECT 
@@ -52,15 +48,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     LEFT JOIN users i ON cs.installer_id = i.id
     WHERE cs.company_id = ?
     ORDER BY cs.created_at DESC`,
-    [user.company_id],
+    [companyId],
   )
 
   return { items }
 }
 
-export default function AdminSurveys() {
-  const { items } = useLoaderData<typeof loader>()
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    const user = await getAdminUser(request)
+    const companyId = user.company_id
+    return { data: loadPageData(companyId) }
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+}
 
+function SurveyContent({ items }: { items: SurveyItem[] }) {
   return (
     <div className='p-4 mx-auto max-w-4xl'>
       <h1 className='text-2xl font-semibold mb-4'>Customer Surveys</h1>
@@ -115,6 +119,56 @@ export default function AdminSurveys() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+export default function AdminSurveys() {
+  const { data } = useLoaderData<typeof loader>()
+
+  return (
+    <Suspense fallback={<HydrateFallback />}>
+      <Await resolve={data}>{({ items }) => <SurveyContent items={items} />}</Await>
+    </Suspense>
+  )
+}
+
+export function HydrateFallback() {
+  return (
+    <div className='p-4 mx-auto max-w-4xl'>
+      <Skeleton className='h-8 w-48 mb-4' />
+      <div className='grid gap-4 sm:grid-cols-2'>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <div className='flex justify-between items-start'>
+                <div className='space-y-2'>
+                  <Skeleton className='h-4 w-40' />
+                  <Skeleton className='h-4 w-32' />
+                </div>
+                <Skeleton className='h-3 w-20' />
+              </div>
+            </CardHeader>
+            <CardContent className='space-y-3'>
+              <div className='flex justify-between'>
+                <Skeleton className='h-4 w-20' />
+                <Skeleton className='h-4 w-8' />
+              </div>
+              <Skeleton className='h-3 w-full' />
+              <div className='flex justify-between'>
+                <Skeleton className='h-4 w-24' />
+                <Skeleton className='h-4 w-8' />
+              </div>
+              <Skeleton className='h-3 w-3/4' />
+              <div className='flex justify-between'>
+                <Skeleton className='h-4 w-32' />
+                <Skeleton className='h-4 w-8' />
+              </div>
+              <Skeleton className='h-3 w-1/2' />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }

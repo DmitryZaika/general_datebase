@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import {
+  Await,
   type LoaderFunctionArgs,
   type MetaFunction,
   redirect,
   useLoaderData,
 } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import { Skeleton } from '~/components/ui/skeleton'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { cn } from '~/lib/utils'
@@ -44,33 +46,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
-  const query = `
-    SELECT 
-      c.id,
-      c.customer_name,
-      c.installation_address,
-      c.material_correct,
-      c.seams_satisfaction,
-      c.appliances_fit,
-      c.backsplashes_correct,
-      c.edges_correct,
-      c.holes_drilled,
-      c.cleanup_completed,
-      c.comments,
-      c.created_at,
-      u.name as installer_name
-    FROM checklists c
-    LEFT JOIN users u ON c.installer_id = u.id
-    WHERE c.company_id = ?
-    ORDER BY c.created_at DESC
-  `
+  async function loadPageData(companyId: number) {
+    const query = `
+      SELECT 
+        c.id,
+        c.customer_name,
+        c.installation_address,
+        c.material_correct,
+        c.seams_satisfaction,
+        c.appliances_fit,
+        c.backsplashes_correct,
+        c.edges_correct,
+        c.holes_drilled,
+        c.cleanup_completed,
+        c.comments,
+        c.created_at,
+        u.name as installer_name
+      FROM checklists c
+      LEFT JOIN users u ON c.installer_id = u.id
+      WHERE c.company_id = ?
+      ORDER BY c.created_at DESC
+    `
 
-  const items = await selectMany<ChecklistItem>(db, query, [user.company_id])
-  return { items }
+    return selectMany<ChecklistItem>(db, query, [companyId])
+  }
+
+  return { data: loadPageData(user.company_id) }
 }
 
 export default function EmployeeChecklists() {
-  const { items } = useLoaderData<typeof loader>()
+  const { data } = useLoaderData<typeof loader>()
+
+  return (
+    <Suspense fallback={<HydrateFallback />}>
+      <Await resolve={data}>{items => <ChecklistContent items={items} />}</Await>
+    </Suspense>
+  )
+}
+
+function ChecklistContent({ items }: { items: ChecklistItem[] }) {
   const isMobile = useIsMobile()
 
   const [pendingSubmission, setPendingSubmission] =
@@ -246,6 +260,36 @@ export default function EmployeeChecklists() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+export function HydrateFallback() {
+  return (
+    <div className='p-4 mx-auto max-w-4xl'>
+      <Skeleton className='h-8 w-64 mb-4' />
+      <div className='grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3'>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className='h-4 w-32 mb-1' />
+              <Skeleton className='h-3 w-24' />
+              <Skeleton className='h-3 w-20 mt-1' />
+            </CardHeader>
+            <CardContent className='space-y-2'>
+              <Skeleton className='h-4 w-3/4' />
+              <div className='space-y-1'>
+                <Skeleton className='h-3 w-36' />
+                <Skeleton className='h-3 w-40' />
+                <Skeleton className='h-3 w-32' />
+                <Skeleton className='h-3 w-28' />
+              </div>
+              <Skeleton className='h-3 w-full mt-2' />
+              <Skeleton className='h-4 w-20' />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }

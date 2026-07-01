@@ -7,6 +7,7 @@ import {
   type MetaFunction,
   Outlet,
   redirect,
+  type ShouldRevalidateFunctionArgs,
   useLoaderData,
   useLocation,
   useNavigation,
@@ -33,6 +34,18 @@ interface Supplier {
 
 export const meta: MetaFunction = () => {
   return [{ title: 'Admin – Suppliers' }]
+}
+
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (!formMethod && currentUrl.search === nextUrl.search) {
+    return false
+  }
+  return defaultShouldRevalidate
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -117,11 +130,10 @@ export default function Suppliers() {
           Add Supplier
         </LoadingButton>
       </Link>
-      {isListLoading ? (
-        <SuppliersPageSkeleton />
-      ) : (
+      {isListLoading && <SuppliersPageSkeleton />}
+      <div className={isListLoading ? 'hidden' : 'animate-slide-up'}>
         <DataTable columns={columns} data={suppliers} />
-      )}
+      </div>
       <Outlet />
     </div>
   )

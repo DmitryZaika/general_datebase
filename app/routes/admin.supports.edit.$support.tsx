@@ -20,9 +20,9 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
-import { DIALOG_CONTENT_ADD_EDIT_CLASS } from '~/utils/constants'
+
 import { csrf } from '~/utils/csrf.server'
-import { parseMutliForm } from '~/utils/parseMultiForm'
+import { parseOptionalMultiForm } from '~/utils/parseMultiForm'
 import { selectId } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
@@ -48,12 +48,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!params.support) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
-  const supportId = parseInt(params.support)
-  const { errors, data } = await parseMutliForm(request, supportSchema, 'supports')
+  const supportId = parseInt(params.support, 10)
+  const { errors, data } = await parseOptionalMultiForm(
+    request,
+    supportSchema,
+    'supports',
+  )
   if (errors || !data) {
     return { errors }
   }
-  const newFile = data.file && data.file !== 'undefined'
+  const file = data.file
+  const newFile = typeof file === 'string'
 
   // NOTE: THIS IS DANGEROUS
   const support = await selectId<{ url: string }>(
@@ -65,7 +70,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (newFile) {
     await db.execute(`UPDATE supports SET name = ?, url = ? WHERE id = ?`, [
       data.name,
-      data.file,
+      file,
       supportId,
     ])
   } else {
@@ -93,8 +98,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   if (!params.support) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
-  const supportId = parseInt(params.support)
-
+  const supportId = parseInt(params.support, 10)
   const support = await selectId<{ name: string; url: string }>(
     db,
     'select name, url from supports WHERE id = ?',
@@ -120,7 +124,7 @@ export default function SupportsEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
+      <DialogContent className='sm:max-w-[480px]'>
         <DialogHeader>
           <DialogTitle>Edit Support</DialogTitle>
         </DialogHeader>

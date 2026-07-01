@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
+import sharp from 'sharp'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
 import { db } from '~/db.server'
@@ -127,6 +128,49 @@ const emailToSend = async (
   }
 }
 
+const COMPRESSION_THRESHOLD_BYTES = 25 * 1024 * 1024
+const IMAGE_MAX_DIMENSION = 1920
+const JPEG_QUALITY = 80
+
+const COMPRESSIBLE_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/tiff',
+  'image/avif',
+]
+
+async function compressAttachment(file: File): Promise<File> {
+  if (!COMPRESSIBLE_IMAGE_TYPES.includes(file.type)) {
+    return file
+  }
+
+  try {
+    const ab = await file.arrayBuffer()
+    const originalBuffer = Buffer.from(ab)
+
+    const compressedBuffer = await sharp(originalBuffer)
+      .resize(IMAGE_MAX_DIMENSION, IMAGE_MAX_DIMENSION, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: JPEG_QUALITY })
+      .toBuffer()
+
+    if (compressedBuffer.length >= originalBuffer.length) {
+      return file
+    }
+
+    return new File([Uint8Array.from(compressedBuffer)], file.name, {
+      type: 'image/jpeg',
+    })
+  } catch {
+    return file
+  }
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const user: User | null = await getEmployeeUser(request).catch(() => null)
@@ -164,6 +208,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
     }
 
+    const totalRawBytes = cleaned.attachments.reduce((sum, f) => sum + f.size, 0)
+    let finalAttachments: File[] = cleaned.attachments
+
+    if (totalRawBytes > COMPRESSION_THRESHOLD_BYTES) {
+      const compressed = await Promise.all(
+        cleaned.attachments.map(f => compressAttachment(f)),
+      )
+      finalAttachments = compressed
+    }
+
+    const attachmentBuffers: { buffer: Buffer; name: string; type: string }[] = []
+    for (const file of finalAttachments) {
+      const ab = await file.arrayBuffer()
+      attachmentBuffers.push({
+        buffer: Buffer.from(ab),
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+      })
+    }
+
     const uploadedAttachments: {
       contentType: string
       contentSubtype: string
@@ -171,27 +235,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       url: string
     }[] = []
 
-    for (const file of cleaned.attachments) {
-      const ab = await file.arrayBuffer()
-      const buffer = Buffer.from(ab)
-      const filename = `${uuidv4()}-${file.name}`
+    for (const att of attachmentBuffers) {
+      const filename = `${uuidv4()}-${att.name}`
       const url = await uploadStreamToS3(
         (async function* () {
-          yield new Uint8Array(buffer)
+          yield new Uint8Array(att.buffer)
         })(),
         filename,
         'emails',
       )
 
-      const [type, subtype] = (file.type || 'application/octet-stream').split('/')
+      const [type, subtype] = att.type.split('/')
 
       uploadedAttachments.push({
         contentType: type ?? 'application',
         contentSubtype: subtype ?? '',
-        filename: file.name ?? '',
+        filename: att.name ?? '',
         url: url ?? '',
       })
     }
+
+    const emailAttachments: File[] = attachmentBuffers.map(
+      att => new File([Uint8Array.from(att.buffer)], att.name, { type: att.type }),
+    )
 
     const sendResults: {
       messageId: string
@@ -225,7 +291,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             body: personalizedBody,
             dealId: cleaned.dealId,
             threadId: cleaned.threadId,
-            attachments: cleaned.attachments,
+            attachments: emailAttachments,
           },
           recipient,
         )

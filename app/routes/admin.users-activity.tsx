@@ -17,12 +17,14 @@ import {
   User,
   UserPlus,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import {
+  Await,
   type LoaderFunctionArgs,
   type MetaFunction,
   redirect,
+  useFetcher,
   useLoaderData,
 } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
@@ -37,8 +39,8 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
+import { Skeleton } from '~/components/ui/skeleton'
 import { db } from '~/db.server'
-import { type Calls200Response, fetchValue } from '~/utils/cloudtalk.server'
 import { phoneDigitsOnly } from '~/utils/phone'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -862,6 +864,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
+  const companyId = user.company_id
+
+  return { data: loadPageData(companyId) }
+}
+
+async function loadPageData(companyId: number) {
   const salesReps = await selectMany<SalesRep>(
     db,
     `SELECT u.id, u.name, u.email, u.cloudtalk_agent_id
@@ -872,10 +880,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         AND LOWER(p.name) = 'sales_rep'
         AND u.company_id = ?
       ORDER BY u.name ASC`,
-    [user.company_id],
+    [companyId],
   )
 
-  const companyId = user.company_id
+  const ninetyDaysAgo = new Date()
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+  const cutoffDate = ninetyDaysAgo.toISOString().split('T')[0]
 
   const [
     dealActivityCreated,
@@ -912,8 +922,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           AND da.created_by IS NOT NULL AND da.created_by != ''
           AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(da.created_by))
         LEFT JOIN users u_deal ON u_deal.id = d.user_id AND u_deal.company_id = da.company_id AND u_deal.is_deleted = 0
-        WHERE da.company_id = ? AND da.deleted_at IS NULL`,
-      [companyId],
+        WHERE da.company_id = ? AND da.deleted_at IS NULL AND da.created_at >= ?`,
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -931,8 +941,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         LEFT JOIN users u_deal ON u_deal.id = d.user_id
           AND u_deal.company_id = da.company_id
           AND u_deal.is_deleted = 0
-        WHERE da.company_id = ? AND da.deleted_at IS NOT NULL`,
-      [companyId],
+        WHERE da.company_id = ? AND da.deleted_at IS NOT NULL AND da.deleted_at >= ?`,
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -951,12 +961,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         LEFT JOIN users u_creator ON u_creator.company_id = c.company_id AND u_creator.is_deleted = 0
           AND c.created_by IS NOT NULL AND TRIM(c.created_by) != ''
           AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(c.created_by))
-        WHERE c.company_id = ? AND c.deleted_at IS NULL
+        WHERE c.company_id = ? AND c.deleted_at IS NULL AND c.created_date >= ?
           AND NOT (
             (c.created_by IS NULL OR TRIM(c.created_by) = '')
             AND LOWER(TRIM(IFNULL(c.source, ''))) = 'leads'
           )`,
-      [companyId],
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -978,8 +988,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         WHERE da.company_id = ?
           AND da.deleted_at IS NULL
           AND da.is_completed = 1
-          AND da.completed_at IS NOT NULL`,
-      [companyId],
+          AND da.completed_at IS NOT NULL AND da.completed_at >= ?`,
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -995,8 +1005,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         LEFT JOIN deals d ON d.id = dn.deal_id AND d.deleted_at IS NULL
         LEFT JOIN customers cust ON cust.id = d.customer_id AND cust.deleted_at IS NULL
         LEFT JOIN users u_deal ON u_deal.id = d.user_id AND u_deal.company_id = dn.company_id AND u_deal.is_deleted = 0
-        WHERE dn.company_id = ? AND dn.deleted_at IS NULL`,
-      [companyId],
+        WHERE dn.company_id = ? AND dn.deleted_at IS NULL AND dn.created_at >= ?`,
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -1012,8 +1022,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         LEFT JOIN deals d ON d.id = dn.deal_id AND d.deleted_at IS NULL
         LEFT JOIN customers cust ON cust.id = d.customer_id AND cust.deleted_at IS NULL
         LEFT JOIN users u_deal ON u_deal.id = d.user_id AND u_deal.company_id = dn.company_id AND u_deal.is_deleted = 0
-        WHERE dn.company_id = ? AND dn.deleted_at IS NOT NULL`,
-      [companyId],
+        WHERE dn.company_id = ? AND dn.deleted_at IS NOT NULL AND dn.deleted_at >= ?`,
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -1045,8 +1055,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           SELECT 1
           FROM customers c_scope
           WHERE c_scope.id = d.customer_id AND c_scope.company_id = ?
-        )`,
-      [companyId, companyId, companyId],
+        ) AND di.created_at >= ?`,
+      [companyId, companyId, companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -1078,8 +1088,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           SELECT 1
           FROM customers c_scope
           WHERE c_scope.id = d.customer_id AND c_scope.company_id = ?
-        )`,
-      [companyId, companyId, companyId],
+        ) AND dd.created_at >= ?`,
+      [companyId, companyId, companyId, cutoffDate],
     ),
     selectMany<SmsActivityRow>(
       db,
@@ -1094,9 +1104,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           CAST(IFNULL(cs.recipient, '') AS CHAR) AS recipient
         FROM cloudtalk_sms cs
         JOIN users u ON u.cloudtalk_agent_id = cs.agent
-        WHERE u.company_id = ? AND u.is_deleted = 0
+        WHERE u.company_id = ? AND u.is_deleted = 0 AND cs.created_date >= ?
         ORDER BY cs.created_date DESC, cs.id DESC`,
-      [companyId],
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -1126,9 +1136,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         JOIN users u ON u.id = e.sender_user_id
         LEFT JOIN deals d ON d.id = e.deal_id AND d.deleted_at IS NULL
         LEFT JOIN customers c_deal ON c_deal.id = d.customer_id AND c_deal.deleted_at IS NULL
-        WHERE u.company_id = ? AND u.is_deleted = 0 AND e.deleted_at IS NULL
+        WHERE u.company_id = ? AND u.is_deleted = 0 AND e.deleted_at IS NULL AND e.sent_at >= ?
         ORDER BY e.sent_at DESC, e.id DESC`,
-      [companyId],
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -1144,9 +1154,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         LEFT JOIN users u_creator ON u_creator.company_id = u_new.company_id AND u_creator.is_deleted = 0
           AND u_new.created_by IS NOT NULL AND TRIM(u_new.created_by) != ''
           AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(u_new.created_by))
-        WHERE u_new.company_id = ? AND u_new.is_deleted = 0
+        WHERE u_new.company_id = ? AND u_new.is_deleted = 0 AND u_new.created_date >= ?
           AND u_new.created_by IS NOT NULL AND TRIM(u_new.created_by) != ''`,
-      [companyId],
+      [companyId, cutoffDate],
     ),
     selectMany<UserActivity>(
       db,
@@ -1166,8 +1176,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         LEFT JOIN users u_creator ON u_creator.company_id = cust.company_id AND u_creator.is_deleted = 0
           AND d.created_by IS NOT NULL AND TRIM(d.created_by) != ''
           AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(d.created_by))
-        WHERE cust.company_id = ? AND d.deleted_at IS NULL`,
-      [companyId],
+        WHERE cust.company_id = ? AND d.deleted_at IS NULL AND d.created_at >= ?`,
+      [companyId, cutoffDate],
     ),
     selectMany<CustomerPhoneRow>(
       db,
@@ -1212,55 +1222,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ...emailActivities,
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-  let callActivities: UserActivity[] = []
-  try {
-    const callItems: Calls200Response[] = []
-    for (let page = 1; page <= 50; page += 1) {
-      const callData = await fetchValue<Calls200Response>(
-        'calls/index.json',
-        user.company_id,
-        {
-          limit: 200,
-          pageNumber: page,
-          date_from: '2020-01-01',
-        },
-      )
-      callItems.push(...callData.items)
-      if (callData.items.length < 200) break
-    }
-
-    const userByCloudTalkAgentId: Record<string, SalesRep> = {}
-    for (const rep of salesReps) {
-      if (rep.cloudtalk_agent_id) {
-        userByCloudTalkAgentId[rep.cloudtalk_agent_id] = rep
-      }
-    }
-
-    const nextCallActivities: UserActivity[] = []
-    for (const item of callItems) {
-      const mappedUser = userByCloudTalkAgentId[item.Cdr.user_id]
-      if (!mappedUser || !item.Cdr.started_at) continue
-      const contactName = item.Contact?.name?.trim()
-      nextCallActivities.push({
-        id: Number(item.Cdr.id),
-        source: 'cloudtalk_call',
-        user_id: mappedUser.id,
-        user_name: mappedUser.name,
-        action: 'Made a call',
-        created_at: item.Cdr.started_at,
-        customer_name: contactName && contactName.length > 0 ? contactName : null,
-      })
-    }
-    callActivities = nextCallActivities
-  } catch {
-    callActivities = []
-  }
-
   return {
     salesReps,
-    activities: [...activities, ...callActivities].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    ),
+    activities,
+    companyId,
   }
 }
 
@@ -1285,7 +1250,32 @@ const userActivityColumns: ColumnDef<GroupedUserActivity>[] = [
 ]
 
 export default function AdminUsersActivity() {
-  const { salesReps, activities } = useLoaderData<typeof loader>()
+  const { data } = useLoaderData<typeof loader>()
+
+  return (
+    <Suspense fallback={<HydrateFallback />}>
+      <Await resolve={data}>
+        {({ salesReps, activities, companyId }) => (
+          <ActivityContent
+            salesReps={salesReps}
+            activities={activities}
+            companyId={companyId}
+          />
+        )}
+      </Await>
+    </Suspense>
+  )
+}
+
+function ActivityContent({
+  salesReps,
+  activities,
+  companyId,
+}: {
+  salesReps: SalesRep[]
+  activities: UserActivity[]
+  companyId: number
+}) {
   const [selectedUser, setSelectedUser] = useState<SalesRep | null>(null)
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfToday())
   const [dateTo, setDateTo] = useState<Date | undefined>(todayDate())
@@ -1297,6 +1287,21 @@ export default function AdminUsersActivity() {
       order: 'desc',
     },
   )
+
+  const callFetcher = useFetcher<{ activities: UserActivity[] }>({
+    key: 'user-call-activities',
+  })
+
+  const callActivities = callFetcher.data?.activities ?? []
+
+  useEffect(() => {
+    if (selectedUser) {
+      const params = new URLSearchParams()
+      params.set('companyId', String(companyId))
+      params.set('userId', String(selectedUser.id))
+      callFetcher.load(`/api/users/activity/calls?${params.toString()}`)
+    }
+  }, [selectedUser, companyId, callFetcher])
 
   const toggleGenSort = useCallback((sortKey: string) => {
     setGenSort(prev =>
@@ -1418,7 +1423,7 @@ export default function AdminUsersActivity() {
     if (!selectedUser) return []
     const sid = selectedUser.id
     const sname = selectedUser.name.trim().toLowerCase()
-    return activities
+    const filtered = activities
       .filter(item => {
         if (item.user_id === sid) return true
         const un = item.user_name?.trim().toLowerCase()
@@ -1430,7 +1435,18 @@ export default function AdminUsersActivity() {
         if (dateTo && activityDate > dateTo) return false
         return true
       })
-  }, [activities, selectedUser, dateFrom, dateTo])
+
+    const dateFilteredCalls = callActivities.filter(item => {
+      const activityDate = new Date(item.created_at)
+      if (dateFrom && activityDate < dateFrom) return false
+      if (dateTo && activityDate > dateTo) return false
+      return true
+    })
+
+    return [...filtered, ...dateFilteredCalls].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
+  }, [activities, selectedUser, dateFrom, dateTo, callActivities])
 
   const groupedSelectedUserActivities = useMemo(
     () => groupActivitiesByTimestamp(selectedUserActivities),
@@ -1439,99 +1455,147 @@ export default function AdminUsersActivity() {
 
   return (
     <PageLayout title='Sales Reps Activity'>
+      <div className='animate-slide-up'>
+        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'>
+          {salesReps.map(rep => (
+            <Button
+              key={rep.id}
+              type='button'
+              variant='outline'
+              className='h-48 flex-col gap-2'
+              onClick={() => setSelectedUser(rep)}
+            >
+              <User className='h-6 w-6' />
+              <span className='truncate text-sm'>{rep.name}</span>
+            </Button>
+          ))}
+        </div>
+        <div className='mt-6'>
+          <div className='mb-2 text-xl font-medium text-center'>General activity</div>
+          {activities.length === 0 ? (
+            <div className='text-sm text-slate-500 text-center'>No activity yet</div>
+          ) : (
+            <>
+              <DataTablePagination
+                currentPage={genCurrentPage}
+                totalPages={genTotalPages}
+                pageSize={genPageSize}
+                totalRows={groupedGeneralActivities.length}
+                onPageChange={setGenPage}
+                onPageSizeChange={size => {
+                  setGenPageSize(size)
+                  setGenPage(1)
+                }}
+              />
+              <DataTable
+                key={`${genCurrentPage}-${genPageSize}-${genSort.key}-${genSort.order}`}
+                columns={generalActivityColumns}
+                data={generalTableRows}
+                getRowId={row => row.groupKey}
+              />
+              <DataTablePagination
+                currentPage={genCurrentPage}
+                totalPages={genTotalPages}
+                pageSize={genPageSize}
+                totalRows={groupedGeneralActivities.length}
+                onPageChange={setGenPage}
+                onPageSizeChange={size => {
+                  setGenPageSize(size)
+                  setGenPage(1)
+                }}
+              />
+            </>
+          )}
+        </div>
+        <Dialog
+          open={selectedUser !== null}
+          onOpenChange={open => {
+            if (!open) setSelectedUser(null)
+          }}
+        >
+          <DialogContent className='sm:max-w-[860px] max-h-[90vh] overflow-hidden'>
+            <DialogHeader>
+              <DialogTitle>
+                {selectedUser ? `${selectedUser.name} activity` : 'User activity'}
+              </DialogTitle>
+            </DialogHeader>
+            <DateRangePicker
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onRangeChange={range => {
+                if (!range?.from) {
+                  setDateFrom(undefined)
+                  setDateTo(undefined)
+                  return
+                }
+                setDateFrom(startOfDay(range.from))
+                setDateTo(endOfDay(range.to || range.from))
+              }}
+              onPreset={handlePreset}
+            />
+            {selectedUserActivities.length === 0 && callFetcher.state !== 'loading' ? (
+              <div className='text-sm text-slate-500'>No activity yet</div>
+            ) : (
+              <div className='h-[80vh] overflow-y-auto'>
+                {callFetcher.state === 'loading' && (
+                  <div className='mb-2 text-xs text-slate-400'>
+                    Loading call history...
+                  </div>
+                )}
+                <ActivitySummaryRow items={selectedUserActivities} />
+                <DataTable
+                  key={`${selectedUser?.id || 'none'}-${dateFrom?.toISOString() || 'all'}-${dateTo?.toISOString() || 'all'}`}
+                  columns={userActivityColumns}
+                  data={groupedSelectedUserActivities}
+                  getRowId={row => row.groupKey}
+                />
+                <ActivityTimeline items={groupedSelectedUserActivities} />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    </PageLayout>
+  )
+}
+
+export function HydrateFallback() {
+  return (
+    <PageLayout title='Sales Reps Activity'>
       <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'>
-        {salesReps.map(rep => (
-          <Button
-            key={rep.id}
-            type='button'
-            variant='outline'
-            className='h-48 flex-col gap-2'
-            onClick={() => setSelectedUser(rep)}
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className='h-48 w-full rounded-md border border-slate-200 flex flex-col items-center justify-center gap-2 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 bg-[length:200%_100%] animate-shimmer'
           >
-            <User className='h-6 w-6' />
-            <span className='truncate text-sm'>{rep.name}</span>
-          </Button>
+            <div className='h-6 w-6 rounded-full bg-slate-200' />
+            <div className='h-4 w-20 rounded bg-slate-200' />
+          </div>
         ))}
       </div>
       <div className='mt-6'>
         <div className='mb-2 text-xl font-medium text-center'>General activity</div>
-        {activities.length === 0 ? (
-          <div className='text-sm text-slate-500 text-center'>No activity yet</div>
-        ) : (
-          <>
-            <DataTablePagination
-              currentPage={genCurrentPage}
-              totalPages={genTotalPages}
-              pageSize={genPageSize}
-              totalRows={groupedGeneralActivities.length}
-              onPageChange={setGenPage}
-              onPageSizeChange={size => {
-                setGenPageSize(size)
-                setGenPage(1)
-              }}
-            />
-            <DataTable
-              key={`${genCurrentPage}-${genPageSize}-${genSort.key}-${genSort.order}`}
-              columns={generalActivityColumns}
-              data={generalTableRows}
-              getRowId={row => row.groupKey}
-            />
-            <DataTablePagination
-              currentPage={genCurrentPage}
-              totalPages={genTotalPages}
-              pageSize={genPageSize}
-              totalRows={groupedGeneralActivities.length}
-              onPageChange={setGenPage}
-              onPageSizeChange={size => {
-                setGenPageSize(size)
-                setGenPage(1)
-              }}
-            />
-          </>
-        )}
-      </div>
-      <Dialog
-        open={selectedUser !== null}
-        onOpenChange={open => {
-          if (!open) setSelectedUser(null)
-        }}
-      >
-        <DialogContent className='sm:max-w-[860px] max-h-[90vh] overflow-hidden'>
-          <DialogHeader>
-            <DialogTitle>
-              {selectedUser ? `${selectedUser.name} activity` : 'User activity'}
-            </DialogTitle>
-          </DialogHeader>
-          <DateRangePicker
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onRangeChange={range => {
-              if (!range?.from) {
-                setDateFrom(undefined)
-                setDateTo(undefined)
-                return
-              }
-              setDateFrom(startOfDay(range.from))
-              setDateTo(endOfDay(range.to || range.from))
-            }}
-            onPreset={handlePreset}
-          />
-          {selectedUserActivities.length === 0 ? (
-            <div className='text-sm text-slate-500'>No activity yet</div>
-          ) : (
-            <div className='h-[80vh] overflow-y-auto'>
-              <ActivitySummaryRow items={selectedUserActivities} />
-              <DataTable
-                key={`${selectedUser?.id || 'none'}-${dateFrom?.toISOString() || 'all'}-${dateTo?.toISOString() || 'all'}`}
-                columns={userActivityColumns}
-                data={groupedSelectedUserActivities}
-                getRowId={row => row.groupKey}
-              />
-              <ActivityTimeline items={groupedSelectedUserActivities} />
+        <div className='flex justify-between items-center mb-3'>
+          <Skeleton className='h-8 w-32' />
+          <Skeleton className='h-8 w-48' />
+        </div>
+        <div className='space-y-2'>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className='flex items-center gap-3 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 bg-[length:200%_100%] animate-shimmer rounded'
+            >
+              <div className='h-4 w-32 rounded bg-slate-200' />
+              <div className='h-4 w-40 rounded bg-slate-200' />
+              <div className='h-4 w-48 rounded bg-slate-200' />
+              <div className='h-4 w-24 rounded bg-slate-200' />
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          ))}
+        </div>
+        <div className='flex justify-end mt-3'>
+          <Skeleton className='h-8 w-48' />
+        </div>
+      </div>
     </PageLayout>
   )
 }

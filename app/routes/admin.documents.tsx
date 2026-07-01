@@ -7,6 +7,7 @@ import {
   type MetaFunction,
   Outlet,
   redirect,
+  type ShouldRevalidateFunctionArgs,
   useLoaderData,
   useLocation,
   useNavigation,
@@ -28,6 +29,18 @@ interface Document {
 
 export const meta: MetaFunction = () => {
   return [{ title: 'Admin – Documents' }]
+}
+
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (!formMethod && currentUrl.search === nextUrl.search) {
+    return false
+  }
+  return defaultShouldRevalidate
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -95,11 +108,10 @@ export default function Documents() {
           Add Document
         </LoadingButton>
       </Link>
-      {isListLoading ? (
-        <DataTableSkeleton columnCount={2} rowCount={8} />
-      ) : (
+      {isListLoading && <DataTableSkeleton columnCount={2} rowCount={8} />}
+      <div className={isListLoading ? 'hidden' : 'animate-slide-up'}>
         <DataTable columns={documentColumns} data={documents} />
-      )}
+      </div>
       <Outlet />
     </div>
   )
